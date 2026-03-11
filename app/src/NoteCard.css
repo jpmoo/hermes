@@ -1,0 +1,62 @@
+.note-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-dim);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.note-card:hover {
+  background: var(--bg-card-hover);
+}
+
+.note-card--depth-1 { border-left-color: #5a4a2a; }
+.note-card--depth-2 { border-left-color: #4a3a1a; }
+.note-card--depth-3 { border-left-color: #3a2a12; }
+
+.note-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.note-card-content {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.note-card-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.note-card-star {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.note-card-star:hover {
+  opacity: 1;
+}
+
+.note-card-star--on {
+  color: var(--star);
+  opacity: 1;
+}

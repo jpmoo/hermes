@@ -1,0 +1,78 @@
+.stream-view {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+
+.stream-view-back {
+  margin-bottom: 1rem;
+  padding: 0.4rem 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.stream-view-back:hover {
+  color: var(--accent);
+}
+
+.stream-view-compose {
+  margin-bottom: 1.5rem;
+}
+
+.stream-view-compose textarea {
+  width: 100%;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.stream-view-compose textarea:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+}
+
+.stream-view-compose button {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.stream-view-compose button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stream-view-loading,
+.stream-view-empty {
+  color: var(--text-muted);
+  padding: 2rem 0;
+}
+
+.stream-view-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stream-view-replies {
+  list-style: none;
+  margin: 0.25rem 0 0.25rem 1rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--border);
+}
+
+.stream-view-list > li,
+.stream-view-replies > li {
+  margin-bottom: 0.5rem;
+}

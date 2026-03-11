@@ -1,0 +1,80 @@
+.outline-view {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+
+.outline-view-back {
+  margin-bottom: 1rem;
+  padding: 0.4rem 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.outline-view-back:hover {
+  color: var(--accent);
+}
+
+.outline-view-loading,
+.outline-view-empty {
+  color: var(--text-muted);
+  padding: 2rem 0;
+}
+
+.outline-tree {
+  font-size: 0.95rem;
+}
+
+.outline-node {
+  margin: 0;
+}
+
+.outline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.outline-row:hover {
+  background: var(--bg-card);
+}
+
+.outline-toggle {
+  width: 1.25rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+
+.outline-spacer {
+  width: 1.25rem;
+  flex-shrink: 0;
+}
+
+.outline-content {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outline-content--starred {
+  color: var(--star);
+}
+
+.outline-star {
+  color: var(--star);
+  font-size: 0.85rem;
+}
+
+.outline-children {
+  margin: 0;
+}

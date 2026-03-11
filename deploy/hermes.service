@@ -1,0 +1,17 @@
+[Unit]
+Description=Hermes Personal Knowledge Messenger
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/opt/hermes/server
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/hermes/server/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

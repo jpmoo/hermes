@@ -1,0 +1,25 @@
+{
+  "name": "hermes-client",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:dir": "electron-builder --dir"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.hermes.app",
+    "productName": "Hermes",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js"],
+    "mac": { "category": "public.app-category.productivity" },
+    "linux": { "target": ["dir", "AppImage"] }
+  }
+}

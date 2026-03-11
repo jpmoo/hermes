@@ -1,0 +1,97 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.layout-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.layout-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.layout-logo {
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.layout-logo:hover {
+  text-decoration: none;
+  filter: brightness(1.1);
+}
+
+.layout-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.layout-nav-link {
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.layout-nav-link:hover {
+  color: var(--text);
+}
+
+.layout-nav-link--active {
+  color: var(--accent);
+  background: rgba(201, 162, 39, 0.12);
+}
+
+.layout-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.layout-toggle {
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.layout-toggle:hover {
+  color: var(--text);
+}
+
+.layout-toggle--on {
+  color: var(--star);
+  border-color: var(--accent-dim);
+}
+
+.layout-logout {
+  padding: 0.4rem 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.layout-logout:hover {
+  color: var(--text);
+}
+
+.layout-main {
+  flex: 1;
+}
