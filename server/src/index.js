@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js';
 import notesRoutes from './routes/notes.js';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import { existsSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -34,10 +35,18 @@ app.get('/health', (_, res) => res.json({ status: 'ok' }));
 // Serve built web app (from ../app/dist when deployed)
 const webDist = path.join(__dirname, '..', '..', 'app', 'dist');
 const indexPath = path.join(webDist, 'index.html');
+const indexExists = existsSync(indexPath);
+console.log('Hermes web root:', webDist, indexExists ? '(index.html found)' : '(index.html MISSING – run npm run build in app/)');
 app.use(express.static(webDist));
 // Caddy strip_prefix /hermes can send path as "" for exact /hermes; ensure we serve the app
-app.get(['/', ''], (_, res) => res.sendFile(indexPath));
-app.get('*', (_, res) => res.sendFile(indexPath));
+app.get(['/', ''], (_, res, next) => {
+  if (!indexExists) return res.status(503).send('App not built. Run: npm run build');
+  res.sendFile(indexPath, (err) => err && next(err));
+});
+app.get('*', (_, res, next) => {
+  if (!indexExists) return res.status(503).send('App not built. Run: npm run build');
+  res.sendFile(indexPath, (err) => err && next(err));
+});
 
 const server = createServer(app);
 
