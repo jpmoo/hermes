@@ -17,9 +17,10 @@ A note-taking system built around conversation and tree structure. Specification
 
    ```bash
    createdb hermes
-   psql hermes -f server/src/db/schema.sql
-   # or from repo root:
-   cd server && cp .env.example .env && edit .env  # set DATABASE_URL, JWT_SECRET
+   psql hermes -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+   # From repo root: create .env in server/ then migrate (migrate runs npm install in server)
+   cp server/.env.example server/.env
+   # Edit server/.env: set DATABASE_URL and JWT_SECRET
    npm run db:migrate
    ```
 

@@ -12,7 +12,7 @@
     "dev:server": "cd server && npm run dev",
     "dev:app": "cd app && npm run dev",
     "dev:client": "cd client && npm run dev",
-    "db:migrate": "cd server && npm run db:migrate"
+    "db:migrate": "cd server && npm install && npm run db:migrate"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

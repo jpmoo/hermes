@@ -6,9 +6,9 @@ After=network.target postgresql.service
 Type=simple
 User=hermes
 Group=hermes
-WorkingDirectory=/opt/hermes/server
+WorkingDirectory=/hermes/server
 Environment=NODE_ENV=production
-EnvironmentFile=/opt/hermes/server/.env
+EnvironmentFile=/hermes/server/.env
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
 RestartSec=5
