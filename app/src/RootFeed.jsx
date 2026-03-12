@@ -75,6 +75,8 @@ export default function RootFeed() {
                   depth={0}
                   onOpenThread={() => navigate(`/thread/${n.id}`)}
                   onStarredChange={load}
+                  onNoteUpdate={load}
+                  onNoteDelete={load}
                 />
               </li>
             ))}

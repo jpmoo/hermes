@@ -33,7 +33,21 @@ router.get('/roots', async (req, res) => {
         ORDER BY last_activity_at DESC
       `;
     const r = await pool.query(q, [userId]);
-    res.json(r.rows);
+    const notes = r.rows;
+    if (notes.length > 0) {
+      const ids = notes.map((n) => n.id);
+      const tagRows = await pool.query(
+        `SELECT nt.note_id, t.id AS tag_id, t.name FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = ANY($1) AND nt.status = 'approved' ORDER BY t.name`,
+        [ids]
+      );
+      const byNote = {};
+      tagRows.rows.forEach((row) => {
+        if (!byNote[row.note_id]) byNote[row.note_id] = [];
+        byNote[row.note_id].push({ id: row.tag_id, name: row.name });
+      });
+      notes.forEach((n) => { n.tags = byNote[n.id] || []; });
+    }
+    res.json(notes);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch root feed' });
@@ -61,14 +75,92 @@ router.get('/thread/:id', async (req, res) => {
       [id, userId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Thread not found' });
-    res.json(r.rows);
+    const notes = r.rows;
+    const ids = notes.map((n) => n.id);
+    const tagRows = await pool.query(
+      `SELECT nt.note_id, t.id AS tag_id, t.name FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = ANY($1) AND nt.status = 'approved' ORDER BY t.name`,
+      [ids]
+    );
+    const byNote = {};
+    tagRows.rows.forEach((row) => {
+      if (!byNote[row.note_id]) byNote[row.note_id] = [];
+      byNote[row.note_id].push({ id: row.tag_id, name: row.name });
+    });
+    notes.forEach((n) => { n.tags = byNote[n.id] || []; });
+    res.json(notes);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch thread' });
   }
 });
 
-// Get single note
+// Get tags for a note (approved only)
+router.get('/:id/tags', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT t.id, t.name FROM tags t
+       JOIN note_tags nt ON nt.tag_id = t.id AND nt.note_id = $1 AND nt.status = 'approved'
+       JOIN notes n ON n.id = nt.note_id AND n.user_id = $2
+       ORDER BY t.name`,
+      [req.params.id, req.userId]
+    );
+    res.json(r.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch note tags' });
+  }
+});
+
+// Add tag to note (create tag if name given, then link with status approved for user-applied)
+router.post('/:id/tags', async (req, res) => {
+  try {
+    const noteId = req.params.id;
+    const userId = req.userId;
+    const { tag_id: tagId, name } = req.body;
+    let tid = tagId;
+    if (!tid && name) {
+      const n = (name.trim().toLowerCase().replace(/\s+/g, '-'));
+      const ins = await pool.query('INSERT INTO tags (name) VALUES ($1) ON CONFLICT (name) DO NOTHING RETURNING id', [n]);
+      if (ins.rows.length > 0) tid = ins.rows[0].id;
+      else {
+        const ex = await pool.query('SELECT id FROM tags WHERE name = $1', [n]);
+        if (ex.rows.length) tid = ex.rows[0].id;
+      }
+    }
+    if (!tid) return res.status(400).json({ error: 'tag_id or name required' });
+    const noteCheck = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+    if (noteCheck.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    await pool.query(
+      `INSERT INTO note_tags (note_id, tag_id, source, status) VALUES ($1, $2, 'user', 'approved')
+       ON CONFLICT (note_id, tag_id) DO UPDATE SET source = 'user', status = 'approved'`,
+      [noteId, tid]
+    );
+    const t = await pool.query('SELECT id, name FROM tags WHERE id = $1', [tid]);
+    res.status(201).json(t.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to add tag to note' });
+  }
+});
+
+// Remove tag from note
+router.delete('/:id/tags/:tagId', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `DELETE FROM note_tags nt USING notes n
+       WHERE nt.note_id = n.id AND n.user_id = $1 AND nt.note_id = $2 AND nt.tag_id = $3
+       RETURNING nt.id`,
+      [req.userId, req.params.id, req.params.tagId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Note or tag link not found' });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to remove tag from note' });
+  }
+});
+
+// Get single note (with tags)
 router.get('/:id', async (req, res) => {
   try {
     const r = await pool.query(
@@ -76,7 +168,13 @@ router.get('/:id', async (req, res) => {
       [req.params.id, req.userId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
-    res.json(r.rows[0]);
+    const note = r.rows[0];
+    const tags = await pool.query(
+      `SELECT t.id, t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id AND nt.note_id = $1 AND nt.status = 'approved' ORDER BY t.name`,
+      [req.params.id]
+    );
+    note.tags = tags.rows;
+    res.json(note);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch note' });

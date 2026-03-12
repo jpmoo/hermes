@@ -92,4 +92,26 @@ export async function unstarNote(id) {
   return r.json();
 }
 
+export async function getTags() {
+  const r = await fetch(`${API}/tags`, { headers: headers() });
+  if (!r.ok) throw new Error('Failed to load tags');
+  return r.json();
+}
+
+export async function addNoteTag(noteId, { tag_id, name }) {
+  const r = await fetch(`${API}/notes/${noteId}/tags`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(tag_id != null ? { tag_id } : { name }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to add tag');
+  return data;
+}
+
+export async function removeNoteTag(noteId, tagId) {
+  const r = await fetch(`${API}/notes/${noteId}/tags/${tagId}`, { method: 'DELETE', headers: headers() });
+  if (!r.ok) throw new Error('Failed to remove tag');
+}
+
 export { getToken };

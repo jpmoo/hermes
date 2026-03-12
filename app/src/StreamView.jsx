@@ -22,7 +22,7 @@ function buildTree(flat) {
   return roots;
 }
 
-function StreamList({ nodes, depth, onOpenThread, onStarredChange }) {
+function StreamList({ nodes, depth, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete }) {
   return (
     <>
       {nodes.map((n) => (
@@ -32,6 +32,8 @@ function StreamList({ nodes, depth, onOpenThread, onStarredChange }) {
             depth={depth}
             onOpenThread={() => onOpenThread(n.id)}
             onStarredChange={onStarredChange}
+            onNoteUpdate={onNoteUpdate}
+            onNoteDelete={onNoteDelete}
           />
           {n.children?.length > 0 && (
             <ul className="stream-view-replies">
@@ -40,6 +42,8 @@ function StreamList({ nodes, depth, onOpenThread, onStarredChange }) {
                 depth={depth + 1}
                 onOpenThread={onOpenThread}
                 onStarredChange={onStarredChange}
+                onNoteUpdate={onNoteUpdate}
+                onNoteDelete={onNoteDelete}
               />
             </ul>
           )}
@@ -66,8 +70,12 @@ export default function StreamView() {
       .then((rows) => {
         setThread(rows);
         if (rows.length) setRootNote(rows[0]);
+        if (rows.length === 0 && rootId) navigate('/');
       })
-      .catch(() => setThread([]))
+      .catch(() => {
+        setThread([]);
+        navigate('/');
+      })
       .finally(() => setLoading(false));
 
   useEffect(() => {
@@ -134,6 +142,8 @@ export default function StreamView() {
                 depth={0}
                 onOpenThread={(id) => (id === rootId ? null : setReplyTo(id))}
                 onStarredChange={load}
+                onNoteUpdate={load}
+                onNoteDelete={load}
               />
             </ul>
           </>
