@@ -33,10 +33,11 @@ app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
 // Serve built web app (from ../app/dist when deployed)
 const webDist = path.join(__dirname, '..', '..', 'app', 'dist');
+const indexPath = path.join(webDist, 'index.html');
 app.use(express.static(webDist));
-app.get('*', (_, res) => {
-  res.sendFile(path.join(webDist, 'index.html'));
-});
+// Caddy strip_prefix /hermes can send path as "" for exact /hermes; ensure we serve the app
+app.get(['/', ''], (_, res) => res.sendFile(indexPath));
+app.get('*', (_, res) => res.sendFile(indexPath));
 
 const server = createServer(app);
 
