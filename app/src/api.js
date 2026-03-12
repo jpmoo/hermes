@@ -1,4 +1,5 @@
-const API = '/api';
+const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '';
+const API = `${BASE.replace(/\/$/, '')}/api`;
 
 function getToken() {
   return localStorage.getItem('hermes_token');
