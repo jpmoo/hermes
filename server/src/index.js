@@ -15,6 +15,15 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+// Allow Vite/React app to load (inline styles and scripts); override strict CSP from proxies
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:;"
+  );
+  next();
+});
+
 // API
 app.use('/api/auth', authRoutes);
 app.use('/api/notes', notesRoutes);
