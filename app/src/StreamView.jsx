@@ -111,6 +111,7 @@ export default function StreamView() {
         { to: '/', label: 'Feed' },
         { to: `/thread/${rootId}`, label: 'Stream' },
         { to: `/outline/${rootId}`, label: 'Outline' },
+        { to: '/queue', label: 'Queue' },
       ]}
     >
       <div className="stream-view">

@@ -154,60 +154,6 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
                     <button type="button" className="note-card-tag-remove" onClick={(e) => handleRemoveTag(e, t.id)} aria-label={`Remove ${t.name}`}>×</button>
                   </span>
                 ))}
-                <div className="note-card-tag-add">
-                  {addingTag ? (
-                    <ul className="note-card-tag-dropdown">
-                      {tagOptions.filter((t) => !tags.some((x) => x.id === t.id)).map((t) => (
-                        <li key={t.id}>
-                          <button type="button" onClick={(e) => handleAddTag(e, t)}>{t.name}</button>
-                        </li>
-                      ))}
-                      <li className="note-card-tag-create">
-                        <form onSubmit={handleCreateAndAddTag}>
-                          <input
-                            type="text"
-                            placeholder="New tag..."
-                            value={newTagName}
-                            onChange={(e) => setNewTagName(e.target.value)}
-                          />
-                          <button type="submit">Add</button>
-                        </form>
-                      </li>
-                      <li><button type="button" onClick={() => setAddingTag(false)}>Close</button></li>
-                    </ul>
-                  ) : (
-                    <button type="button" className="note-card-tag-add-btn" onClick={openTagDropdown}>+ Tag</button>
-                  )}
-                </div>
-              </div>
-            )}
-            {tags.length === 0 && (
-              <div className="note-card-tags" onClick={(e) => e.stopPropagation()}>
-                <div className="note-card-tag-add">
-                  {addingTag ? (
-                    <ul className="note-card-tag-dropdown">
-                      {tagOptions.filter((t) => !tags.some((x) => x.id === t.id)).map((t) => (
-                        <li key={t.id}>
-                          <button type="button" onClick={(e) => handleAddTag(e, t)}>{t.name}</button>
-                        </li>
-                      ))}
-                      <li className="note-card-tag-create">
-                        <form onSubmit={handleCreateAndAddTag}>
-                          <input
-                            type="text"
-                            placeholder="New tag..."
-                            value={newTagName}
-                            onChange={(e) => setNewTagName(e.target.value)}
-                          />
-                          <button type="submit">Add</button>
-                        </form>
-                      </li>
-                      <li><button type="button" onClick={() => setAddingTag(false)}>Close</button></li>
-                    </ul>
-                  ) : (
-                    <button type="button" className="note-card-tag-add-btn" onClick={openTagDropdown}>+ Tag</button>
-                  )}
-                </div>
               </div>
             )}
           </>
@@ -228,6 +174,31 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
                 <button type="button" className="note-card-btn note-card-btn-delete" onClick={handleDelete}>
                   Delete
                 </button>
+                <div className="note-card-tag-add">
+                  {addingTag ? (
+                    <ul className="note-card-tag-dropdown">
+                      {tagOptions.filter((t) => !tags.some((x) => x.id === t.id)).map((t) => (
+                        <li key={t.id}>
+                          <button type="button" onClick={(e) => handleAddTag(e, t)}>{t.name}</button>
+                        </li>
+                      ))}
+                      <li className="note-card-tag-create">
+                        <form onSubmit={handleCreateAndAddTag}>
+                          <input
+                            type="text"
+                            placeholder="New tag..."
+                            value={newTagName}
+                            onChange={(e) => setNewTagName(e.target.value)}
+                          />
+                          <button type="submit">Add</button>
+                        </form>
+                      </li>
+                      <li><button type="button" onClick={() => setAddingTag(false)}>Close</button></li>
+                    </ul>
+                  ) : (
+                    <button type="button" className="note-card-tag-add-btn" onClick={openTagDropdown}>+ Tag</button>
+                  )}
+                </div>
               </>
             )}
             <button

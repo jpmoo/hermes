@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
+import { embedNote } from '../services/embedding.js';
+import { proposeTagsForNote } from '../services/aiTags.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -91,6 +93,106 @@ router.get('/thread/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch thread' });
+  }
+});
+
+// Flat / Tag view: notes matching tag(s), mode = and | or
+router.get('/search-by-tags', async (req, res) => {
+  try {
+    const tagIds = req.query.tagIds ? req.query.tagIds.split(',').filter(Boolean) : [];
+    const mode = (req.query.mode || 'and').toLowerCase() === 'or' ? 'or' : 'and';
+    const starredOnly = req.query.starred === 'true';
+    const userId = req.userId;
+    if (tagIds.length === 0) {
+      return res.json([]);
+    }
+    const placeholders = tagIds.map((_, i) => `$${i + 2}`).join(', ');
+    const havingClause = mode === 'and' ? `HAVING COUNT(DISTINCT nt.tag_id) = ${tagIds.length}` : '';
+    const q = `
+      WITH RECURSIVE roots AS (
+        SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $1
+        UNION ALL
+        SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
+      )
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, r.root_id
+      FROM notes n
+      JOIN note_tags nt ON nt.note_id = n.id AND nt.tag_id IN (${placeholders}) AND nt.status = 'approved'
+      JOIN roots r ON r.id = n.id
+      WHERE n.user_id = $1
+      ${starredOnly ? 'AND n.starred = true' : ''}
+      GROUP BY n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, r.root_id
+      ${havingClause}
+      ORDER BY n.last_activity_at DESC
+    `;
+    const r = await pool.query(q, [userId, ...tagIds]);
+    const notes = r.rows;
+    if (notes.length > 0) {
+      const ids = notes.map((n) => n.id);
+      const tagRows = await pool.query(
+        `SELECT nt.note_id, t.id AS tag_id, t.name FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = ANY($1) AND nt.status = 'approved' ORDER BY t.name`,
+        [ids]
+      );
+      const byNote = {};
+      tagRows.rows.forEach((row) => {
+        if (!byNote[row.note_id]) byNote[row.note_id] = [];
+        byNote[row.note_id].push({ id: row.tag_id, name: row.name });
+      });
+      notes.forEach((n) => { n.tags = byNote[n.id] || []; });
+    }
+    res.json(notes);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to search by tags' });
+  }
+});
+
+// Semantic search: embed query, similarity search
+router.get('/search-semantic', async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+    const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
+    const userId = req.userId;
+    if (!q) return res.json([]);
+    const { embed } = await import('../services/ollama.js');
+    const vec = await embed(q);
+    if (!vec) return res.json([]);
+    const vecStr = `[${vec.join(',')}]`;
+    const r = await pool.query(
+      `WITH roots AS (
+        SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $2
+        UNION ALL
+        SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
+      )
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+             1 - (n.embedding <=> $1::vector) AS similarity, r.root_id
+      FROM notes n
+      JOIN roots r ON r.id = n.id
+      WHERE n.user_id = $2 AND n.embedding IS NOT NULL
+      ORDER BY n.embedding <=> $1::vector
+      LIMIT $3`,
+      [vecStr, userId, limit]
+    );
+    const notes = r.rows.map((row) => {
+      const { similarity, root_id, ...note } = row;
+      return { ...note, similarity, root_id };
+    });
+    if (notes.length > 0) {
+      const ids = notes.map((n) => n.id);
+      const tagRows = await pool.query(
+        `SELECT nt.note_id, t.id AS tag_id, t.name FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = ANY($1) AND nt.status = 'approved' ORDER BY t.name`,
+        [ids]
+      );
+      const byNote = {};
+      tagRows.rows.forEach((row) => {
+        if (!byNote[row.note_id]) byNote[row.note_id] = [];
+        byNote[row.note_id].push({ id: row.tag_id, name: row.name });
+      });
+      notes.forEach((n) => { n.tags = byNote[n.id] || []; });
+    }
+    res.json(notes);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to search' });
   }
 });
 
@@ -194,7 +296,10 @@ router.post('/', async (req, res) => {
        RETURNING id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor`,
       [parentId || null, content.trim(), externalAnchor || null, userId]
     );
-    res.status(201).json(r.rows[0]);
+    const note = r.rows[0];
+    embedNote(note.id, note.content).catch(() => {});
+    proposeTagsForNote(note.id, note.content, userId).catch(() => {});
+    res.status(201).json(note);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create note' });
@@ -220,7 +325,12 @@ router.patch('/:id', async (req, res) => {
       values
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
-    res.json(r.rows[0]);
+    const note = r.rows[0];
+    if (content !== undefined) {
+      embedNote(note.id, note.content).catch(() => {});
+      proposeTagsForNote(note.id, note.content, req.userId).catch(() => {});
+    }
+    res.json(note);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update note' });

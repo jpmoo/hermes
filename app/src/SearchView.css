@@ -1,0 +1,64 @@
+.search-view {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+
+.search-view-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.search-view-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.search-view-form button {
+  padding: 0.75rem 1rem;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.search-view-form button:disabled {
+  opacity: 0.6;
+}
+
+.search-view-loading,
+.search-view-empty {
+  color: var(--text-muted);
+  padding: 1rem 0;
+}
+
+.search-view-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-view-list > li {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.search-view-sim {
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.search-view-list .note-card {
+  padding-left: 3rem;
+}

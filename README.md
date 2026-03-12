@@ -4,10 +4,33 @@ A note-taking system built around conversation and tree structure. Specification
 
 ## Structure
 
-- **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth. Serves the built web app and REST + WebSocket.
-- **`app/`** — React (Vite) web app: Stream view, Outline view, Root feed, All/Starred toggle.
+- **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth, embedding + AI tag pipeline, queue, semantic search. Serves the built web app and REST + WebSocket.
+- **`app/`** — React (Vite) web app: Stream, Outline, Root feed, **Tag/Flat view**, **Approval queue**, All/Starred toggle, edit/delete notes, tags on notes.
 - **`client/`** — Electron desktop app that loads the web app from the server (or dev Vite server).
+- **`mcp/`** — MCP server for Claude: `hermes_create_note`, `hermes_get_thread`, `hermes_search_semantic`, `hermes_search_tags`, `hermes_get_queue`, `hermes_approve_tag`, `hermes_star_note`, `hermes_get_starred`, `hermes_get_root_feed`.
+- **`telegram/`** — Telegram bot (capture messages as notes; `/thread`, `/reply`, `/star`, `/tags`).
 - **`deploy/`** — systemd unit and deployment notes for headless Ubuntu.
+
+## Spec implementation (from hermes_spec.pdf)
+
+| Feature | Status |
+|--------|--------|
+| Notes CRUD, threading, root feed | Done |
+| Starred notes, All/Starred toggle | Done |
+| Embedding pipeline (Ollama → pgvector) | Done |
+| AI tag proposals on save (Ollama) | Done |
+| Approval queue (API + UI: slider, approve/reject, context) | Done |
+| Tag inheritance on approve + complement-triggered | Done |
+| Tag relationships (exclusion, complement) API | Done |
+| Flat / Tag view (filter by tags, AND/OR) | Done |
+| Semantic search API | Done |
+| Edit / delete notes (delete with confirm, cascade) | Done |
+| MCP server for Claude | Done |
+| Telegram bot (basic capture + commands) | Stub |
+| Regions view (spatial clusters by embedding) | Not yet |
+| Tag Canvas (graph of tags + edges) | Not yet |
+| Attachments + external_anchor in UI | Not yet |
+| Suggested threading / duplicate / orphan rescue | Not yet |
 
 ## Quick start (local)
 
@@ -100,6 +123,17 @@ A note-taking system built around conversation and tree structure. Specification
 - `POST /api/notes` — create note `{ content, parent_id?, external_anchor? }`
 - `PATCH /api/notes/:id` — update `{ content?, starred?, external_anchor? }`
 - `POST /api/notes/:id/star`, `DELETE /api/notes/:id/star`
+- `GET /api/tags`, `POST /api/tags`, `GET /api/tags/relationships`, `POST /api/tags/relationships`
+- `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...`
+- `GET /api/queue?minConfidence=`, `GET /api/queue/count`, `POST /api/queue/:id/approve`, `POST /api/queue/:id/reject`
+
+## MCP (Claude)
+
+Set `HERMES_API_URL` and `HERMES_MCP_TOKEN` (JWT from login). Run: `cd mcp && npm install && node server.js` (stdio). Add to Claude Desktop config as an MCP server.
+
+## Telegram bot
+
+`cd telegram && npm install`. Set `TELEGRAM_BOT_TOKEN` and `HERMES_API_URL`, `HERMES_MCP_TOKEN` (or token from login). Run `node bot.js`. Send a message to create a root note; `/thread Title` to start a thread; `/tags` to see pending queue.
 
 ## License
 

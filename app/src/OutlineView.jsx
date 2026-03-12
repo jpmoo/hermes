@@ -88,6 +88,9 @@ export default function OutlineView() {
       viewLinks={[
         { to: '/', label: 'Feed' },
         { to: '/outline', label: 'Outline' },
+        { to: '/queue', label: 'Queue' },
+        { to: '/tags', label: 'Tags' },
+        { to: '/search', label: 'Search' },
       ]}
     >
       <div className="outline-view">

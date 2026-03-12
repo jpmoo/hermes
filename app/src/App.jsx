@@ -5,6 +5,9 @@ import Login from './Login';
 import RootFeed from './RootFeed';
 import StreamView from './StreamView';
 import OutlineView from './OutlineView';
+import QueueView from './QueueView';
+import TagView from './TagView';
+import SearchView from './SearchView';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -38,6 +41,30 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <OutlineView />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/queue"
+        element={
+          <PrivateRoute>
+            <QueueView />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/tags"
+        element={
+          <PrivateRoute>
+            <TagView />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/search"
+        element={
+          <PrivateRoute>
+            <SearchView />
           </PrivateRoute>
         }
       />

@@ -98,6 +98,19 @@ export async function getTags() {
   return r.json();
 }
 
+export async function searchByTags(tagIds, mode = 'and', starredOnly = false) {
+  const params = new URLSearchParams({ tagIds: tagIds.join(','), mode, starred: starredOnly });
+  const r = await fetch(`${API}/notes/search-by-tags?${params}`, { headers: headers() });
+  if (!r.ok) throw new Error('Failed to search');
+  return r.json();
+}
+
+export async function searchSemantic(q, limit = 20) {
+  const r = await fetch(`${API}/notes/search-semantic?q=${encodeURIComponent(q)}&limit=${limit}`, { headers: headers() });
+  if (!r.ok) throw new Error('Failed to search');
+  return r.json();
+}
+
 export async function addNoteTag(noteId, { tag_id, name }) {
   const r = await fetch(`${API}/notes/${noteId}/tags`, {
     method: 'POST',
@@ -112,6 +125,30 @@ export async function addNoteTag(noteId, { tag_id, name }) {
 export async function removeNoteTag(noteId, tagId) {
   const r = await fetch(`${API}/notes/${noteId}/tags/${tagId}`, { method: 'DELETE', headers: headers() });
   if (!r.ok) throw new Error('Failed to remove tag');
+}
+
+export async function getQueue(minConfidence = 0) {
+  const r = await fetch(`${API}/queue?minConfidence=${minConfidence}`, { headers: headers() });
+  if (!r.ok) throw new Error('Failed to load queue');
+  return r.json();
+}
+
+export async function getQueueCount(minConfidence = 0) {
+  const r = await fetch(`${API}/queue/count?minConfidence=${minConfidence}`, { headers: headers() });
+  if (!r.ok) throw new Error('Failed to load count');
+  return r.json();
+}
+
+export async function approveProposal(id) {
+  const r = await fetch(`${API}/queue/${id}/approve`, { method: 'POST', headers: headers() });
+  if (!r.ok) throw new Error('Failed to approve');
+  return r.json();
+}
+
+export async function rejectProposal(id) {
+  const r = await fetch(`${API}/queue/${id}/reject`, { method: 'POST', headers: headers() });
+  if (!r.ok) throw new Error('Failed to reject');
+  return r.json();
 }
 
 export { getToken };

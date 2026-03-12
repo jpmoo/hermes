@@ -132,7 +132,7 @@
 .note-card-tag-add-btn {
   padding: 0.2rem 0.4rem;
   background: none;
-  border: 1px dashed var(--border);
+  border: none;
   border-radius: 4px;
   color: var(--text-muted);
   font-size: 0.75rem;
@@ -140,7 +140,6 @@
 
 .note-card-tag-add-btn:hover {
   color: var(--accent);
-  border-color: var(--accent-dim);
 }
 
 .note-card-tag-dropdown {

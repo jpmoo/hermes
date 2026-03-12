@@ -45,6 +45,9 @@ export default function RootFeed() {
       viewLinks={[
         { to: '/', label: 'Feed' },
         { to: '/outline', label: 'Outline' },
+        { to: '/queue', label: 'Queue' },
+        { to: '/tags', label: 'Tags' },
+        { to: '/search', label: 'Search' },
       ]}
     >
       <div className="root-feed">
