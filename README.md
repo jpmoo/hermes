@@ -7,7 +7,7 @@ A note-taking system built around conversation and tree structure. Specification
 - **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth, embedding + AI tag pipeline, queue, semantic search. Serves the built web app and REST + WebSocket.
 - **`app/`** — React (Vite) web app: Stream, Outline, Root feed, **Tag/Flat view**, **Approval queue**, All/Starred toggle, edit/delete notes, tags on notes.
 - **`client/`** — Electron desktop app that loads the web app from the server (or dev Vite server).
-- **`mcp/`** — MCP server for Claude: `hermes_create_note`, `hermes_get_thread`, `hermes_search_semantic`, `hermes_search_tags`, `hermes_get_queue`, `hermes_approve_tag`, `hermes_star_note`, `hermes_get_starred`, `hermes_get_root_feed`.
+- **`mcp/`** — Optional stdio MCP for Claude Desktop. The main server also exposes **Streamable HTTP MCP** at **`/mcp`** (same tools).
 - **`telegram/`** — Telegram bot (capture messages as notes; `/thread`, `/reply`, `/star`, `/tags`).
 - **`deploy/`** — systemd unit and deployment notes for headless Ubuntu.
 
@@ -131,7 +131,13 @@ A note-taking system built around conversation and tree structure. Specification
 
 ## MCP (Claude)
 
-Set `HERMES_API_URL` and `HERMES_MCP_TOKEN` (JWT from login). Run: `cd mcp && npm install && node server.js` (stdio). Add to Claude Desktop config as an MCP server.
+**Why a bare URL failed before:** Only **stdio** lived in `mcp/server.js`. Reverse-proxying to Hermes hit the web app, not MCP. The API server now serves **Streamable HTTP MCP** at **`/mcp`**.
+
+**Remote URL (e.g. Tailscale + Caddy):** Use the public MCP endpoint, e.g.  
+`https://home-server.tailxxxx.ts.net/hermes/mcp`  
+if Caddy strips `/hermes` and proxies to Hermes so the backend path is `/mcp`. Tools call the API with **`Authorization: Bearer <JWT>`** (same JWT as the web app). If the client cannot send headers, set **`HERMES_MCP_TOKEN`** on the server so MCP tool calls use that JWT.
+
+**Claude Desktop (local):** Set `HERMES_API_URL` and `HERMES_MCP_TOKEN`, then `cd mcp && npm install && node server.js` (stdio) and register that command in Claude’s MCP config.
 
 ## Telegram bot
 

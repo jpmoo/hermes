@@ -10,6 +10,7 @@ import queueRoutes from './routes/queue.js';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { existsSync } from 'fs';
+import { mountMcpHttp } from './mcpHttp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -35,6 +36,8 @@ app.use('/api/queue', queueRoutes);
 
 // Health for systemd and load balancers
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+mountMcpHttp(app, { port: PORT });
 
 // Serve built web app (from ../app/dist when deployed)
 const webDist = path.join(__dirname, '..', '..', 'app', 'dist');
