@@ -77,12 +77,19 @@ CREATE INDEX IF NOT EXISTS idx_note_tags_note ON note_tags(note_id);
 CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_note_tags_status ON note_tags(status) WHERE status = 'pending';
 
--- Trigger: keep updated_at and last_activity_at in sync
+-- Trigger: bump updated_at only on real edits (not when ancestors get last_activity_at from replies)
 CREATE OR REPLACE FUNCTION notes_updated()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = now();
-  NEW.last_activity_at = now();
+  IF NEW.content IS DISTINCT FROM OLD.content
+     OR NEW.starred IS DISTINCT FROM OLD.starred
+     OR NEW.external_anchor IS DISTINCT FROM OLD.external_anchor
+     OR NEW.parent_id IS DISTINCT FROM OLD.parent_id THEN
+    NEW.updated_at = now();
+    NEW.last_activity_at = now();
+  ELSE
+    NEW.updated_at = OLD.updated_at;
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

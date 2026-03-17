@@ -23,16 +23,18 @@ router.get('/roots', async (req, res) => {
           SELECT DISTINCT s.root_id FROM subtree s
           JOIN notes n ON n.id = s.note_id AND n.user_id = $1 AND n.starred = true
         )
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
         FROM notes n
         WHERE n.parent_id IS NULL AND n.user_id = $1 AND n.id IN (SELECT root_id FROM starred_roots)
         ORDER BY n.last_activity_at DESC
       `
       : `
-        SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor
-        FROM notes
-        WHERE parent_id IS NULL AND user_id = $1
-        ORDER BY last_activity_at DESC
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+        FROM notes n
+        WHERE n.parent_id IS NULL AND n.user_id = $1
+        ORDER BY n.last_activity_at DESC
       `;
     const r = await pool.query(q, [userId]);
     const notes = r.rows;
@@ -64,10 +66,12 @@ router.get('/thread/:id', async (req, res) => {
     const userId = req.userId;
     const r = await pool.query(
       `WITH RECURSIVE tree AS (
-        SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, 0 AS depth
+        SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, 0 AS depth,
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = notes.id) AS reply_count
         FROM notes WHERE id = $1 AND user_id = $2
         UNION ALL
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, t.depth + 1
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, t.depth + 1,
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id)
         FROM notes n JOIN tree t ON n.parent_id = t.id
         WHERE n.user_id = $2
       )
@@ -114,7 +118,8 @@ router.get('/search-by-tags', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, r.root_id
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, r.root_id,
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
       FROM notes n
       JOIN note_tags nt ON nt.note_id = n.id AND nt.tag_id IN (${placeholders}) AND nt.status = 'approved'
       JOIN roots r ON r.id = n.id
@@ -164,7 +169,8 @@ router.get('/search-semantic', async (req, res) => {
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
       SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
-             1 - (n.embedding <=> $1::vector) AS similarity, r.root_id
+             1 - (n.embedding <=> $1::vector) AS similarity, r.root_id,
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
       FROM notes n
       JOIN roots r ON r.id = n.id
       WHERE n.user_id = $2 AND n.embedding IS NOT NULL

@@ -45,6 +45,8 @@ A note-taking system built around conversation and tree structure. Specification
    cp server/.env.example server/.env
    # Edit server/.env: set DATABASE_URL and JWT_SECRET
    npm run db:migrate
+   # If you already migrated before: fix parent edited-time when replies are added
+   psql "$DATABASE_URL" -f server/src/db/migrations/002_notes_updated_at.sql
    ```
 
 2. **Server**

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { starNote, unstarNote, updateNote, deleteNote, getTags, addNoteTag, removeNoteTag } from './api';
 import './NoteCard.css';
 
-export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete }) {
+export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete, hasReplies }) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [addingTag, setAddingTag] = useState(false);
@@ -118,11 +118,16 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
     }
   };
 
-  const borderWidth = Math.min(depth + 2, 6);
+  const replies = hasReplies ?? ((note.reply_count ?? 0) > 0);
+  const showThreadline = depth > 0 || replies;
+  const borderWidth = showThreadline ? Math.min(depth + 2, 6) : 1;
+  const cardClass = showThreadline
+    ? `note-card note-card--depth-${Math.min(depth, 3)}`
+    : 'note-card note-card--leaf';
 
   return (
     <article
-      className={`note-card note-card--depth-${Math.min(depth, 3)}`}
+      className={cardClass}
       style={{ borderLeftWidth: borderWidth }}
       onClick={onOpenThread}
       role="button"

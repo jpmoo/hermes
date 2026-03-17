@@ -16,6 +16,11 @@
 .note-card--depth-2 { border-left-color: #4a3a1a; }
 .note-card--depth-3 { border-left-color: #3a2a12; }
 
+/* Root notes with no replies: no accent threadline */
+.note-card--leaf {
+  border-left-color: var(--border);
+}
+
 .note-card-body {
   display: flex;
   flex-direction: column;

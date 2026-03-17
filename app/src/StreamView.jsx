@@ -30,6 +30,7 @@ function StreamList({ nodes, depth, onOpenThread, onStarredChange, onNoteUpdate,
           <NoteCard
             note={n}
             depth={depth}
+            hasReplies={(n.children?.length ?? 0) > 0}
             onOpenThread={() => onOpenThread(n.id)}
             onStarredChange={onStarredChange}
             onNoteUpdate={onNoteUpdate}
