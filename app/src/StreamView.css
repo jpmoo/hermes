@@ -17,6 +17,60 @@
   color: var(--accent);
 }
 
+.stream-view-focus-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.stream-view-focus-label {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stream-view-focus-clear {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.stream-view-compose-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.stream-view-file-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.stream-view-file-label input {
+  display: none;
+}
+
+.stream-view-file-hint {
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
 .stream-view-compose {
   margin-bottom: 1.5rem;
 }
@@ -38,8 +92,8 @@
   border-color: var(--accent-dim);
 }
 
-.stream-view-compose button {
-  margin-top: 0.5rem;
+.stream-view-compose-row button[type='submit'] {
+  margin-left: auto;
   padding: 0.5rem 1rem;
   background: var(--accent);
   color: var(--bg);
@@ -48,7 +102,7 @@
   font-weight: 500;
 }
 
-.stream-view-compose button:disabled {
+.stream-view-compose-row button[type='submit']:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

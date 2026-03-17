@@ -2,6 +2,10 @@
  * Streamable HTTP MCP at GET/POST /mcp. One transport per session (required by SDK).
  * Caddy strip_prefix /hermes → backend sees /mcp.
  * Auth: Authorization: Bearer <JWT>; falls back to HERMES_MCP_TOKEN when header omitted.
+ *
+ * SDK requires Accept to include BOTH application/json and text/event-stream; many clients
+ * send Accept: star-slash only → 406 and no tools. We normalize Accept before handling.
+ * enableJsonResponse: remote connectors (e.g. Claude) often expect JSON POST bodies, not SSE.
  */
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -68,6 +72,42 @@ export function mountMcpHttp(app, opts) {
 
   const api = makeApi(internalBase, getToken);
 
+  app.use('/mcp', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id, mcp-session-id');
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Authorization, Content-Type, Accept, Mcp-Session-Id, mcp-session-id, Mcp-Protocol-Version, mcp-protocol-version'
+      );
+      res.setHeader('Access-Control-Max-Age', '86400');
+      return res.status(204).end();
+    }
+    const acc = req.headers.accept || '';
+    const needAccept =
+      !acc.includes('application/json') || !acc.includes('text/event-stream');
+    if (needAccept) {
+      const merged = 'application/json, text/event-stream' + (acc && acc !== '*/*' ? `, ${acc}` : '');
+      req.headers.accept = merged;
+      const raw = req.rawHeaders;
+      if (raw && Array.isArray(raw)) {
+        let found = false;
+        for (let i = 0; i < raw.length; i += 2) {
+          if (String(raw[i]).toLowerCase() === 'accept') {
+            raw[i + 1] = merged;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          raw.push('Accept', merged);
+        }
+      }
+    }
+    next();
+  });
+
   app.all('/mcp', (req, res, next) => {
     const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '')?.trim() || '';
     const sidRaw = req.headers['mcp-session-id'] || req.headers['Mcp-Session-Id'];
@@ -100,6 +140,7 @@ export function mountMcpHttp(app, opts) {
           const sessionId = randomUUID();
           const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => sessionId,
+            enableJsonResponse: true,
             onsessionclosed: () => {
               sessions.delete(sessionId);
             },

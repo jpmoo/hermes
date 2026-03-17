@@ -65,6 +65,7 @@ export default function SearchView() {
                 <NoteCard
                   note={n}
                   depth={0}
+                  hasReplies={(n.reply_count ?? 0) > 0}
                   onOpenThread={() => navigate(`/thread/${n.root_id || n.parent_id || n.id}`)}
                   onNoteUpdate={load}
                   onNoteDelete={load}

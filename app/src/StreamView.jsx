@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getThread, createNote, getNote } from './api';
+import { getThread, createNote, uploadNoteFiles } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import './StreamView.css';
@@ -22,7 +22,17 @@ function buildTree(flat) {
   return roots;
 }
 
-function StreamList({ nodes, depth, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete }) {
+function findNode(nodes, id) {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const ch = n.children || [];
+    const f = findNode(ch, id);
+    if (f) return f;
+  }
+  return null;
+}
+
+function StreamList({ nodes, depth, onFocusNote, onStarredChange, onNoteUpdate, onNoteDelete }) {
   return (
     <>
       {nodes.map((n) => (
@@ -31,17 +41,18 @@ function StreamList({ nodes, depth, onOpenThread, onStarredChange, onNoteUpdate,
             note={n}
             depth={depth}
             hasReplies={(n.children?.length ?? 0) > 0}
-            onOpenThread={() => onOpenThread(n.id)}
+            onOpenThread={() => onFocusNote(n.id)}
             onStarredChange={onStarredChange}
             onNoteUpdate={onNoteUpdate}
             onNoteDelete={onNoteDelete}
+            allowAttachmentDelete
           />
           {n.children?.length > 0 && (
             <ul className="stream-view-replies">
               <StreamList
                 nodes={n.children}
                 depth={depth + 1}
-                onOpenThread={onOpenThread}
+                onFocusNote={onFocusNote}
                 onStarredChange={onStarredChange}
                 onNoteUpdate={onNoteUpdate}
                 onNoteDelete={onNoteDelete}
@@ -61,8 +72,10 @@ export default function StreamView() {
   const [loading, setLoading] = useState(true);
   const [starredOnly, setStarredOnly] = useState(false);
   const [replyContent, setReplyContent] = useState('');
-  const [replyTo, setReplyTo] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [focusId, setFocusId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -83,15 +96,37 @@ export default function StreamView() {
     load();
   }, [rootId, starredOnly]);
 
-  const handleReply = async (e, parentId) => {
+  useEffect(() => {
+    setFocusId(null);
+  }, [rootId, starredOnly]);
+
+  const tree = buildTree(thread);
+  useEffect(() => {
+    if (!focusId || !thread.length) return;
+    if (!findNode(buildTree(thread), focusId)) setFocusId(null);
+  }, [thread, focusId]);
+
+  const threadRootId = thread[0]?.id;
+  const focusedNode = focusId && threadRootId ? findNode(tree, focusId) : null;
+  const displayTree =
+    focusedNode && focusId !== threadRootId
+      ? [{ ...focusedNode, children: focusedNode.children || [] }]
+      : tree;
+
+  const replyParentId = focusId && focusedNode ? focusId : rootId;
+  const focusSnippet = focusedNode?.content?.slice(0, 50) || '';
+
+  const handleReply = async (e) => {
     e.preventDefault();
-    const content = parentId === rootId ? replyContent : (e.target.querySelector('textarea')?.value ?? '');
-    if (!content?.trim() || submitting) return;
+    const text = replyContent.trim();
+    if ((!text && pendingFiles.length === 0) || submitting) return;
     setSubmitting(true);
     try {
-      await createNote({ content: content.trim(), parent_id: parentId });
+      const note = await createNote({ content: text, parent_id: replyParentId });
+      if (pendingFiles.length > 0) await uploadNoteFiles(note.id, pendingFiles);
       setReplyContent('');
-      setReplyTo(null);
+      setPendingFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       load();
     } catch (err) {
       console.error(err);
@@ -99,8 +134,6 @@ export default function StreamView() {
       setSubmitting(false);
     }
   };
-
-  const tree = buildTree(thread);
 
   return (
     <Layout
@@ -126,23 +159,51 @@ export default function StreamView() {
           <p className="stream-view-empty">Thread not found.</p>
         ) : (
           <>
-            <form className="stream-view-compose" onSubmit={(e) => handleReply(e, rootId)}>
+            {focusId && focusId !== threadRootId && (
+              <div className="stream-view-focus-bar">
+                <span className="stream-view-focus-label">Focused: {focusSnippet}{focusedNode?.content?.length > 50 ? '…' : ''}</span>
+                <button type="button" className="stream-view-focus-clear" onClick={() => setFocusId(null)}>
+                  Show full thread
+                </button>
+              </div>
+            )}
+
+            <form className="stream-view-compose" onSubmit={handleReply}>
               <textarea
-                placeholder="Reply to thread…"
+                placeholder={
+                  replyParentId === rootId
+                    ? 'Reply to thread…'
+                    : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”…`
+                }
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 rows={2}
               />
-              <button type="submit" disabled={!replyContent.trim() || submitting}>
-                Reply
-              </button>
+              <div className="stream-view-compose-row">
+                <label className="stream-view-file-label">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
+                    onChange={(e) => setPendingFiles(Array.from(e.target.files || []))}
+                  />
+                  Attach files
+                </label>
+                {pendingFiles.length > 0 && (
+                  <span className="stream-view-file-hint">{pendingFiles.length} file(s) selected</span>
+                )}
+                <button type="submit" disabled={(!replyContent.trim() && pendingFiles.length === 0) || submitting}>
+                  Send
+                </button>
+              </div>
             </form>
 
             <ul className="stream-view-list">
               <StreamList
-                nodes={tree}
+                nodes={displayTree}
                 depth={0}
-                onOpenThread={(id) => (id === rootId ? null : setReplyTo(id))}
+                onFocusNote={setFocusId}
                 onStarredChange={load}
                 onNoteUpdate={load}
                 onNoteDelete={load}

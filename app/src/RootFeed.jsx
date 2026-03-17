@@ -76,6 +76,7 @@ export default function RootFeed() {
                 <NoteCard
                   note={n}
                   depth={0}
+                  hasReplies={(n.reply_count ?? 0) > 0}
                   onOpenThread={() => navigate(`/thread/${n.id}`)}
                   onStarredChange={load}
                   onNoteUpdate={load}

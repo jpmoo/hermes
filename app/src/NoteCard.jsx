@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { starNote, unstarNote, updateNote, deleteNote, getTags, addNoteTag, removeNoteTag } from './api';
+import { starNote, unstarNote, updateNote, deleteNote, getTags, addNoteTag, removeNoteTag, deleteNoteFile } from './api';
+import LinkifiedText from './LinkifiedText';
+import NoteAttachments from './NoteAttachments';
 import './NoteCard.css';
 
-export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete, hasReplies }) {
+export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete, hasReplies, allowAttachmentDelete }) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [addingTag, setAddingTag] = useState(false);
@@ -119,20 +121,29 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
   };
 
   const replies = hasReplies ?? ((note.reply_count ?? 0) > 0);
-  const showThreadline = depth > 0 || replies;
+  const showThreadline = replies;
   const borderWidth = showThreadline ? Math.min(depth + 2, 6) : 1;
   const cardClass = showThreadline
     ? `note-card note-card--depth-${Math.min(depth, 3)}`
     : 'note-card note-card--leaf';
 
+  const handleDeleteAttachment = async (fileId) => {
+    try {
+      await deleteNoteFile(fileId);
+      onNoteUpdate?.();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <article
       className={cardClass}
       style={{ borderLeftWidth: borderWidth }}
-      onClick={onOpenThread}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onOpenThread?.()}
+      onClick={editing ? undefined : () => onOpenThread?.()}
+      role={editing ? undefined : 'button'}
+      tabIndex={editing ? undefined : 0}
+      onKeyDown={editing ? undefined : (e) => e.key === 'Enter' && onOpenThread?.()}
     >
       <div className="note-card-body">
         {editing ? (
@@ -150,7 +161,13 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
           </form>
         ) : (
           <>
-            <p className="note-card-content">{note.content || '—'}</p>
+            <p className="note-card-content">
+              {note.content?.trim() ? <LinkifiedText text={note.content} /> : note.attachments?.length ? null : '—'}
+            </p>
+            <NoteAttachments
+              attachments={note.attachments}
+              onDeleted={allowAttachmentDelete ? handleDeleteAttachment : undefined}
+            />
             {tags.length > 0 && (
               <div className="note-card-tags" onClick={(e) => e.stopPropagation()}>
                 {tags.map((t) => (

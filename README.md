@@ -29,7 +29,8 @@ A note-taking system built around conversation and tree structure. Specification
 | Telegram bot (basic capture + commands) | Stub |
 | Regions view (spatial clusters by embedding) | Not yet |
 | Tag Canvas (graph of tags + edges) | Not yet |
-| Attachments + external_anchor in UI | Not yet |
+| Attachments (BYTEA in DB, Stream upload, clickable URLs) | Done |
+| external_anchor in UI | Not yet |
 | Suggested threading / duplicate / orphan rescue | Not yet |
 
 ## Quick start (local)
@@ -47,6 +48,7 @@ A note-taking system built around conversation and tree structure. Specification
    npm run db:migrate
    # If you already migrated before: fix parent edited-time when replies are added
    psql "$DATABASE_URL" -f server/src/db/migrations/002_notes_updated_at.sql
+   psql "$DATABASE_URL" -f server/src/db/migrations/003_note_file_blobs.sql
    ```
 
 2. **Server**
@@ -133,9 +135,24 @@ A note-taking system built around conversation and tree structure. Specification
 
 **Why a bare URL failed before:** Only **stdio** lived in `mcp/server.js`. Reverse-proxying to Hermes hit the web app, not MCP. The API server now serves **Streamable HTTP MCP** at **`/mcp`**.
 
-**Remote URL (e.g. Tailscale + Caddy):** Use the public MCP endpoint, e.g.  
+**Remote URL (e.g. Tailscale + Caddy):** e.g.  
 `https://home-server.tailxxxx.ts.net/hermes/mcp`  
-if Caddy strips `/hermes` and proxies to Hermes so the backend path is `/mcp`. Tools call the API with **`Authorization: Bearer <JWT>`** (same JWT as the web app). If the client cannot send headers, set **`HERMES_MCP_TOKEN`** on the server so MCP tool calls use that JWT.
+(Caddy should strip `/hermes` so the backend path is `/mcp`.)
+
+### Authenticating Hermes MCP (who am I when tools run?)
+
+Tools call your Hermes REST API **as a specific user**. That user is determined by the JWT:
+
+1. **`Authorization: Bearer <jwt>`** on each MCP HTTP request — if Claude’s connector lets you add **custom headers**, set this to the same token the web app uses after login.
+2. **`HERMES_MCP_TOKEN` in `server/.env`** — if no `Authorization` header is sent, the server uses this JWT for all tool API calls. Easiest for connectors that only accept a URL: log in once in the browser, copy the token (see below), put it in `HERMES_MCP_TOKEN`, restart Hermes.
+
+**Get a JWT from the web app:** Log in at Hermes → DevTools → Application → Local Storage → key **`hermes_token`** (or call `POST /api/auth/login` with your username/password and use `token` from the JSON).
+
+**Security:** Anyone who can reach `/mcp` and present a valid token (or who hits your server while `HERMES_MCP_TOKEN` is set) can act as that user. Prefer Tailscale/restricted access; rotate the token by logging in again and updating env.
+
+### If Claude “connects” but shows no Hermes tools
+
+The MCP spec requires clients to send an `Accept` header listing both `application/json` and `text/event-stream`. Many clients send `*/*` only; the server now normalizes `Accept` and uses **JSON responses** for MCP POSTs so remote connectors can list tools reliably. **Redeploy/restart** the Hermes server after updating. Claude’s own `web_fetch` to your MCP URL will still fail — that’s normal; tools use the MCP channel, not a browser GET.
 
 **Claude Desktop (local):** Set `HERMES_API_URL` and `HERMES_MCP_TOKEN`, then `cd mcp && npm install && node server.js` (stdio) and register that command in Claude’s MCP config.
 

@@ -1,11 +1,54 @@
 import { Router } from 'express';
+import multer from 'multer';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { embedNote } from '../services/embedding.js';
 import { proposeTagsForNote } from '../services/aiTags.js';
+import { attachBlobListToNotes, MAX_BYTES } from '../services/noteFileBlobs.js';
 
 const router = Router();
 router.use(requireAuth);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_BYTES, files: 20 },
+});
+
+router.post('/:id/attachments', (req, res, next) => {
+  upload.array('files', 20)(req, res, (err) => {
+    if (err?.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: `File exceeds ${MAX_BYTES} bytes` });
+    }
+    if (err) return next(err);
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const noteId = req.params.id;
+    const userId = req.userId;
+    const files = req.files || [];
+    if (files.length === 0) return res.status(400).json({ error: 'No files (use field name files)' });
+    const noteCheck = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+    if (noteCheck.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    const inserted = [];
+    for (const f of files) {
+      const buf = f.buffer;
+      if (!buf?.length) continue;
+      const ins = await pool.query(
+        `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, filename, mime_type, byte_size`,
+        [noteId, userId, f.originalname?.slice(0, 512) || 'file', f.mimetype || 'application/octet-stream', buf.length, buf]
+      );
+      inserted.push(ins.rows[0]);
+    }
+    if (inserted.length === 0) return res.status(400).json({ error: 'No valid files' });
+    res.status(201).json(inserted);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
 
 // Root feed: root notes, reverse chron by last_activity_at, optional starred filter
 router.get('/roots', async (req, res) => {
@@ -51,6 +94,7 @@ router.get('/roots', async (req, res) => {
       });
       notes.forEach((n) => { n.tags = byNote[n.id] || []; });
     }
+    await attachBlobListToNotes(notes, userId);
     res.json(notes);
   } catch (err) {
     console.error(err);
@@ -93,6 +137,7 @@ router.get('/thread/:id', async (req, res) => {
       byNote[row.note_id].push({ id: row.tag_id, name: row.name });
     });
     notes.forEach((n) => { n.tags = byNote[n.id] || []; });
+    await attachBlobListToNotes(notes, userId);
     res.json(notes);
   } catch (err) {
     console.error(err);
@@ -144,6 +189,7 @@ router.get('/search-by-tags', async (req, res) => {
       });
       notes.forEach((n) => { n.tags = byNote[n.id] || []; });
     }
+    await attachBlobListToNotes(notes, userId);
     res.json(notes);
   } catch (err) {
     console.error(err);
@@ -195,6 +241,7 @@ router.get('/search-semantic', async (req, res) => {
       });
       notes.forEach((n) => { n.tags = byNote[n.id] || []; });
     }
+    await attachBlobListToNotes(notes, userId);
     res.json(notes);
   } catch (err) {
     console.error(err);
@@ -282,6 +329,7 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     note.tags = tags.rows;
+    await attachBlobListToNotes([note], req.userId);
     res.json(note);
   } catch (err) {
     console.error(err);
@@ -294,13 +342,14 @@ router.post('/', async (req, res) => {
   try {
     const { content, parent_id: parentId, external_anchor: externalAnchor } = req.body;
     const userId = req.userId;
-    if (!content || typeof content !== 'string') {
-      return res.status(400).json({ error: 'Content required' });
+    if (typeof content !== 'string') {
+      return res.status(400).json({ error: 'Content must be a string' });
     }
+    const text = content.trim();
     const r = await pool.query(
       `INSERT INTO notes (parent_id, content, external_anchor, user_id) VALUES ($1, $2, $3, $4)
        RETURNING id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor`,
-      [parentId || null, content.trim(), externalAnchor || null, userId]
+      [parentId || null, text, externalAnchor || null, userId]
     );
     const note = r.rows[0];
     embedNote(note.id, note.content).catch(() => {});

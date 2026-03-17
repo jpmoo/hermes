@@ -35,6 +35,15 @@
   word-break: break-word;
 }
 
+.note-card-content a {
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.note-card-content a:hover {
+  text-decoration: underline;
+}
+
 .note-card-meta {
   display: flex;
   align-items: center;

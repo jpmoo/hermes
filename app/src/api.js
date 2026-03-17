@@ -57,7 +57,7 @@ export async function createNote({ content, parent_id, external_anchor }) {
   const r = await fetch(`${API}/notes`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ content, parent_id, external_anchor }),
+    body: JSON.stringify({ content: content ?? '', parent_id, external_anchor }),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Failed to create note');
@@ -149,6 +149,26 @@ export async function rejectProposal(id) {
   const r = await fetch(`${API}/queue/${id}/reject`, { method: 'POST', headers: headers() });
   if (!r.ok) throw new Error('Failed to reject');
   return r.json();
+}
+
+export async function uploadNoteFiles(noteId, files) {
+  if (!files?.length) return [];
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  const t = getToken();
+  const r = await fetch(`${API}/notes/${noteId}/attachments`, {
+    method: 'POST',
+    headers: t ? { Authorization: `Bearer ${t}` } : {},
+    body: fd,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Upload failed');
+  return Array.isArray(data) ? data : [];
+}
+
+export async function deleteNoteFile(attachmentId) {
+  const r = await fetch(`${API}/note-files/${attachmentId}`, { method: 'DELETE', headers: headers() });
+  if (!r.ok) throw new Error('Failed to delete file');
 }
 
 export { getToken };
