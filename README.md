@@ -184,7 +184,18 @@ curl -sS -X POST "${HERMES_URL}/api/notes/${NOTE_ID}/attachments" \
   -F "files=@/path/to/photo.jpg"
 ```
 
-(`HERMES_URL` = e.g. `https://your-host/hermes` or `http://127.0.0.1:3000` if API is at root.)
+**URL format (replace `{note_id}` with the UUID from `hermes_create_note`):**
+
+| How you reach Hermes | Full upload URL |
+|----------------------|-----------------|
+| Web app at `https://HOST/hermes/` (default Vite base) | `https://HOST/hermes/api/notes/{note_id}/attachments` |
+| API only on laptop | `http://127.0.0.1:3000/api/notes/{note_id}/attachments` |
+
+There is **no** separate “upload microservice” path—only this route under `/api/notes/…`.
+
+**Why Claude often can’t “just POST” the file:** Tools that run **inside Claude’s sandbox** (code execution, browser upload, etc.) usually have **no network** to your Tailscale host or `localhost`. Multipart from there will fail. **Workarounds:** run **`curl`** (or the web UI) **on your own machine**, or use **`hermes_attach_files`** for smaller files (MCP → Hermes server decodes base64; that path does not need Claude’s container to reach your API).
+
+Optional: set **`HERMES_PUBLIC_API_URL`** in `server/.env` so MCP tool **`hermes_attachment_upload_help`** prints your exact base URL.
 
 **Small files / automation-only:** **`hermes_attach_files`** / **`hermes_add_attachments`** — **`note_id`** + **`files`**: `[{ "base64": "…", "filename": "x.png", "mime_type": "image/png" }]` (up to 20). The server decodes and POSTs multipart internally; the slow part is still **getting** that base64 through MCP JSON.
 

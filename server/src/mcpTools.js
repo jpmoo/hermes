@@ -135,6 +135,17 @@ export const TOOL_DEFS = [
       required: [],
     },
   },
+  {
+    name: 'hermes_attachment_upload_help',
+    description:
+      'Returns the exact HTTP multipart upload URL pattern for attachments (POST …/api/notes/{note_id}/attachments, field files, Bearer JWT). Use when the user asks how to upload outside MCP. Explains Claude sandbox cannot reach private servers.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note_id: { type: 'string', description: 'Optional; if set, response includes a filled example URL' },
+      },
+    },
+  },
 ];
 
 export async function listTools() {
@@ -311,6 +322,32 @@ export async function callTool(ctx, req) {
         }
         await api(`/note-files/orphans/${encodeURIComponent(String(blobId).trim())}`, { method: 'DELETE' });
         return { content: [{ type: 'text', text: JSON.stringify({ ok: true, deleted: blobId }) }] };
+      }
+      case 'hermes_attachment_upload_help': {
+        const noteId = args?.note_id ? String(args.note_id).trim() : '{note_uuid}';
+        const publicBase = (process.env.HERMES_PUBLIC_API_URL || '').replace(/\/$/, '');
+        const pathSuffix = `/api/notes/${noteId}/attachments`;
+        const payload = {
+          method: 'POST',
+          path_pattern: '/api/notes/{note_id}/attachments',
+          multipart_form_field: 'files',
+          headers: { Authorization: 'Bearer <same JWT as Hermes web app / HERMES_MCP_TOKEN>' },
+          curl_example: `curl -X POST "BASE${pathSuffix}" -H "Authorization: Bearer TOKEN" -F "files=@/path/to/file.jpg"`,
+          url_examples: {
+            web_app_typical:
+              'If the Hermes UI is at https://HOST/hermes/ then the API is usually https://HOST/hermes/api/notes/{note_id}/attachments',
+            api_on_port_3000: `http://127.0.0.1:3000/api/notes/{note_id}/attachments`,
+          },
+          ...(publicBase
+            ? { your_configured_base_example: `${publicBase}${pathSuffix}` }
+            : {
+                configure:
+                  'Set HERMES_PUBLIC_API_URL in server .env (e.g. https://tailnet/hermes) to get an exact URL in this tool response.',
+              }),
+          why_claude_http_upload_fails:
+            'Claude code execution / browser tools often run in a network-isolated container with no route to your home server or Tailscale IP—multipart from inside that sandbox will fail with "network blocked". The user should run curl on their own machine, or attach small files via hermes_attach_files (base64 through MCP, which hits Hermes from the MCP server).',
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
       }
       default:
         return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown tool: ${name}` }) }], isError: true };
