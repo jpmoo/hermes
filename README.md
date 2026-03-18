@@ -29,7 +29,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Telegram bot (basic capture + commands) | Stub |
 | Regions view (spatial clusters by embedding) | Not yet |
 | Tag Canvas (graph of tags + edges) | Not yet |
-| Attachments (BYTEA in DB, Stream upload, clickable URLs) | Done |
+| Attachments (BYTEA in DB, Stream upload, `POST /api/notes/:id/attachments` multipart) | Done |
 | external_anchor (API field; optional link to ticket/URL outside Hermes) | API only; UI field not yet |
 | Suggested threading / duplicate / orphan rescue | Not yet |
 
@@ -135,6 +135,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/notes/roots?starred=true|false` — root feed (requires `Authorization: Bearer <token>`)
 - `GET /api/notes/thread/:id?starred=` — full thread
 - `POST /api/notes` — create note `{ content, parent_id?, external_anchor? }`
+- **`POST /api/notes/:id/attachments`** — **multipart/form-data**, field name **`files`** (one or more parts, up to 20 per request). Same as the web Stream UI. **`Authorization: Bearer <jwt>`** required. Use this for **large images/PDFs**; no base64, streams straight into Postgres. Max size per file: `HERMES_MAX_ATTACHMENT_BYTES` (default 20MB).
 - `PATCH /api/notes/:id` — update `{ content?, starred?, external_anchor? }`
 - `POST /api/notes/:id/star`, `DELETE /api/notes/:id/star`
 - `GET /api/tags`, `POST /api/tags`, `GET /api/tags/relationships`, `POST /api/tags/relationships`
@@ -166,11 +167,28 @@ Tools call your Hermes REST API **as a specific user**. That user is determined 
 
 The MCP spec requires clients to send an `Accept` header listing both `application/json` and `text/event-stream`. Many clients send `*/*` only; the server now normalizes `Accept` and uses **JSON responses** for MCP POSTs so remote connectors can list tools reliably. **Redeploy/restart** the Hermes server after updating. Claude’s own `web_fetch` to your MCP URL will still fail — that’s normal; tools use the MCP channel, not a browser GET.
 
-### Attachments (MCP)
+### Attachments (MCP vs REST)
 
-Claude should use **`hermes_attach_files`** (or alias **`hermes_add_attachments`**): pass **`note_id`** and **`files`**: `[{ "base64": "<standard base64>", "filename": "photo.png", "mime_type": "image/png" }]` (up to 20 files). Works from **Hermes `/mcp`** (Streamable HTTP) and from **`mcp/server.js`** (stdio) — both wire multipart upload to the API.
+**Why big uploads feel slow via MCP:** Tool arguments are **JSON**. Every file must be **base64** in that payload (Claude → MCP → Hermes). A 600KB image becomes ~800KB+ of text, parsed twice, and is the wrong shape for bulk binary. **Hermes already exposes the right path: direct HTTP multipart.**
 
-**One-step alternative:** **`hermes_create_note`** with optional **`attachments`** or **`files`** (same shape) uploads in the same call after the note is created.
+**Recommended for images or files ≳100KB**
+
+1. Create the note with MCP (**`hermes_create_note`**) text-only; copy the returned **`id`**.
+2. Upload with **multipart** (not MCP), same JWT as the app:
+
+```bash
+export TOKEN="…"   # same JWT as hermes_token / HERMES_MCP_TOKEN
+export NOTE_ID="uuid-from-step-1"
+curl -sS -X POST "${HERMES_URL}/api/notes/${NOTE_ID}/attachments" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -F "files=@/path/to/photo.jpg"
+```
+
+(`HERMES_URL` = e.g. `https://your-host/hermes` or `http://127.0.0.1:3000` if API is at root.)
+
+**Small files / automation-only:** **`hermes_attach_files`** / **`hermes_add_attachments`** — **`note_id`** + **`files`**: `[{ "base64": "…", "filename": "x.png", "mime_type": "image/png" }]` (up to 20). The server decodes and POSTs multipart internally; the slow part is still **getting** that base64 through MCP JSON.
+
+**One-step with attachment in MCP:** **`hermes_create_note`** may include **`attachments`** / **`files`** (same base64 shape); fine for tiny assets, not ideal for large photos.
 
 **Reading files:** **`hermes_get_thread`** / feed responses include per-note **`attachments`** (metadata: id, filename, mime_type, byte_size). Download uses the authenticated note-file API in the web app; MCP returns metadata only unless you add a dedicated fetch tool later.
 

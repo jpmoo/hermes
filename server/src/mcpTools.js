@@ -31,7 +31,7 @@ export const TOOL_DEFS = [
   {
     name: 'hermes_create_note',
     description:
-      'Create a root note or a reply (set parent_id). To add files: either include attachments or files array here (same shape as hermes_attach_files), OR create the note then call hermes_attach_files with the returned id.',
+      'Create a root note or a reply (set parent_id). For LARGE images/files: create text-only, then upload via HTTP POST /api/notes/{id}/attachments (multipart field files) with JWT—not base64 in MCP. Optional small attachments: attachments/files array with base64 per item.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -74,7 +74,7 @@ export const TOOL_DEFS = [
   {
     name: 'hermes_attach_files',
     description:
-      'Upload files (images, PDFs, documents) and attach them to an existing Hermes note. Requires note_id plus files array with base64-encoded bytes per file. This is the main MCP tool for attachments. Same behavior as hermes_add_attachments.',
+      'Attach files via base64 in JSON—OK for small files; LARGE uploads are slow (MCP JSON bloat). Prefer: POST /api/notes/{note_id}/attachments with multipart form field files + Authorization Bearer JWT. This tool: note_id + files [{ base64, filename?, mime_type? }]. Alias: hermes_add_attachments.',
     inputSchema: ATTACH_FILES_SCHEMA,
   },
   {
