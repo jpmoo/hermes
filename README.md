@@ -22,7 +22,8 @@ A note-taking system built around conversation and tree structure. Specification
 | Approval queue (API + UI: slider, approve/reject, context) | Done |
 | Inherit parent tags from note UI; complements on approve | Done |
 | Tag relationships (exclusion, complement) API | Done |
-| Flat / Tag view (filter by tags, AND/OR; resubmit tagless for AI queue) | Done |
+| Flat / Tag view (filter by tags, AND/OR) | Done |
+| Queue: resubmit tagless notes for AI suggestions | Done |
 | Semantic search API | Done |
 | Edit / delete notes (delete with confirm, cascade) | Done |
 | MCP server for Claude | Done |

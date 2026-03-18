@@ -40,6 +40,34 @@
   filter: brightness(1.1);
 }
 
+.queue-view-resubmit {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.queue-view-resubmit:hover:not(:disabled) {
+  border-color: var(--accent-dim);
+  background: var(--bg-card-hover);
+}
+
+.queue-view-resubmit:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.queue-view-resubmit-msg {
+  margin: -0.5rem 0 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 .queue-view-loading,
 .queue-view-empty {
   color: var(--text-muted);

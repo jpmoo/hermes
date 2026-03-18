@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getQueue, getQueueCount, approveProposal, rejectProposal } from './api';
+import {
+  getQueue,
+  getQueueCount,
+  approveProposal,
+  rejectProposal,
+  resubmitTaglessNotes,
+} from './api';
 import Layout from './Layout';
 import './QueueView.css';
 
@@ -11,6 +17,8 @@ export default function QueueView() {
   const [minConfidencePercent, setMinConfidencePercent] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState(new Set());
+  const [resubmitBusy, setResubmitBusy] = useState(false);
+  const [resubmitMsg, setResubmitMsg] = useState(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -63,6 +71,29 @@ export default function QueueView() {
     load();
   };
 
+  const handleResubmitTagless = async () => {
+    setResubmitMsg(null);
+    const ok = window.confirm(
+      'Send notes that have no approved tags through AI tag suggestion again? Up to 150 notes per run (most recent first). New proposals will appear here as Ollama finishes (refresh or wait).'
+    );
+    if (!ok) return;
+    setResubmitBusy(true);
+    try {
+      const { queued, totalTagless, hasMore } = await resubmitTaglessNotes(150);
+      if (queued === 0) {
+        setResubmitMsg('No tagless notes with text to process.');
+      } else {
+        setResubmitMsg(
+          `Queued ${queued} note${queued === 1 ? '' : 's'} for suggestions${hasMore ? ` (${totalTagless} tagless total — run again for more)` : ''}. Items will show up below as they are generated.`
+        );
+      }
+    } catch (e) {
+      setResubmitMsg(e.message || 'Request failed');
+    } finally {
+      setResubmitBusy(false);
+    }
+  };
+
   return (
     <Layout
       title="Tag approval queue"
@@ -94,7 +125,16 @@ export default function QueueView() {
               Approve all visible
             </button>
           )}
+          <button
+            type="button"
+            className="queue-view-resubmit"
+            disabled={resubmitBusy}
+            onClick={handleResubmitTagless}
+          >
+            {resubmitBusy ? 'Queueing…' : 'Resubmit tagless notes'}
+          </button>
         </div>
+        {resubmitMsg && <p className="queue-view-resubmit-msg">{resubmitMsg}</p>}
 
         {loading ? (
           <p className="queue-view-loading">Loading…</p>
