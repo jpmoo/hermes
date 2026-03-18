@@ -83,7 +83,7 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
       return;
     }
     try {
-      const list = await getTags();
+      const list = await getTags({ inUseOnly: true });
       setTagOptions(list);
       setAddingTag(true);
     } catch (err) {
@@ -113,7 +113,7 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
       setNewTagName('');
       setAddingTag(false);
       onNoteUpdate?.();
-      const list = await getTags();
+      const list = await getTags({ inUseOnly: true });
       setTagOptions(list);
     } catch (err) {
       console.error(err);

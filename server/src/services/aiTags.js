@@ -3,9 +3,19 @@ import { generate } from './ollama.js';
 
 export async function proposeTagsForNote(noteId, content, userId) {
   if (!content || !content.trim()) return;
-  const tagRows = await pool.query('SELECT id, name FROM tags ORDER BY name');
+  // Only tags already approved on this user's notes — not orphans or queue-only pending
+  const tagRows = await pool.query(
+    `SELECT DISTINCT t.id, t.name
+     FROM tags t
+     INNER JOIN note_tags nt ON nt.tag_id = t.id AND nt.status = 'approved'
+     INNER JOIN notes n ON n.id = nt.note_id AND n.user_id = $1
+     ORDER BY t.name`,
+    [userId]
+  );
   const tagNames = tagRows.rows.map((r) => r.name);
-  const tagList = tagNames.length ? tagNames.join(', ') : '(no existing tags; suggest 1-3 new single-word or hyphenated tags)';
+  const tagList = tagNames.length
+    ? tagNames.join(', ')
+    : '(no tags currently in use on your notes; suggest 1-3 new single-word or hyphenated tags)';
 
   const prompt = `You are a tag suggester for short notes. Given the note text and the existing tag vocabulary, suggest 1-5 tags that best describe the note. Use ONLY tags from the existing list when they fit; otherwise suggest new tags (lowercase, hyphenated). Reply with a JSON array of objects: [{"tag":"tag-name","confidence":0.0-1.0}, ...]. No other text.
 
