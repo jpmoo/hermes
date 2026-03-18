@@ -65,7 +65,9 @@
 
 .stream-page-float .note-card {
   pointer-events: none;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    4px 4px 0 rgba(28, 27, 24, 0.1),
+    0 12px 40px rgba(0, 0, 0, 0.18);
 }
 
 .stream-page-float--move {
@@ -305,4 +307,9 @@
 
 .stream-page-root-item {
   scroll-margin-top: 0.5rem;
+}
+
+/* Offset drop shadow: ~4px right + down on every root bubble and reply */
+.stream-page-scroll article.note-card {
+  box-shadow: 4px 4px 0 rgba(28, 27, 24, 0.1);
 }

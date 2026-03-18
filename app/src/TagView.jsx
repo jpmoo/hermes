@@ -10,7 +10,6 @@ export default function TagView() {
   const [allTags, setAllTags] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [mode, setMode] = useState('and');
-  const [starredOnly, setStarredOnly] = useState(false);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(false);
   const { logout } = useAuth();
@@ -26,8 +25,8 @@ export default function TagView() {
       return;
     }
     setLoading(true);
-    searchByTags(selectedIds, mode, starredOnly).then(setNotes).catch(() => setNotes([])).finally(() => setLoading(false));
-  }, [selectedIds.join(','), mode, starredOnly]);
+    searchByTags(selectedIds, mode, false).then(setNotes).catch(() => setNotes([])).finally(() => setLoading(false));
+  }, [selectedIds.join(','), mode]);
 
   const toggleTag = (tag) => {
     setSelectedIds((prev) =>
@@ -46,7 +45,7 @@ export default function TagView() {
           return;
         }
         setLoading(true);
-        return searchByTags(valid, mode, starredOnly)
+        return searchByTags(valid, mode, false)
           .then(setNotes)
           .catch(() => setNotes([]))
           .finally(() => setLoading(false));
@@ -57,8 +56,6 @@ export default function TagView() {
   return (
     <Layout
       title="Tags"
-      starredOnly={starredOnly}
-      onStarredOnlyChange={setStarredOnly}
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },

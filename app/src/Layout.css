@@ -147,6 +147,16 @@
   background: rgba(201, 162, 39, 0.1);
 }
 
+.layout-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.layout-toggle:disabled:hover {
+  color: var(--text-muted);
+  background: none;
+}
+
 .layout-logout {
   display: inline-flex;
   align-items: center;

@@ -10,7 +10,15 @@ import {
 
 const LAYOUT_THEME_COLOR = '#f4f3f0';
 
-export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogout, viewLinks, children }) {
+export default function Layout({
+  title,
+  starredOnly = false,
+  onStarredOnlyChange,
+  starFilterEnabled = false,
+  onLogout,
+  viewLinks,
+  children,
+}) {
   const location = useLocation();
 
   useEffect(() => {
@@ -48,13 +56,22 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
           <div className="layout-actions">
             <button
               type="button"
-              className={`layout-toggle ${starredOnly ? 'layout-toggle--on' : ''}`}
-              onClick={() => onStarredOnlyChange?.(!starredOnly)}
-              aria-label={starredOnly ? 'Show all notes' : 'Show starred only'}
+              className={`layout-toggle ${starFilterEnabled && starredOnly ? 'layout-toggle--on' : ''}`}
+              disabled={!starFilterEnabled}
+              onClick={() => starFilterEnabled && onStarredOnlyChange?.(!starredOnly)}
+              aria-label={
+                !starFilterEnabled
+                  ? 'Starred filter (available on Stream)'
+                  : starredOnly
+                    ? 'Show all notes'
+                    : 'Show starred only'
+              }
               title={
-                starredOnly
-                  ? 'Starred only — click to show all notes'
-                  : 'All notes — click to show starred only'
+                !starFilterEnabled
+                  ? 'Starred filter is available on Stream'
+                  : starredOnly
+                    ? 'Starred only — click to show all notes'
+                    : 'All notes — click to show starred only'
               }
             >
               <NavIconStar className="layout-action-icon" />

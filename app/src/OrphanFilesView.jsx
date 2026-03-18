@@ -63,8 +63,6 @@ export default function OrphanFilesView() {
   return (
     <Layout
       title="Orphans"
-      starredOnly={false}
-      onStarredOnlyChange={() => {}}
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },

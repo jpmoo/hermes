@@ -123,7 +123,6 @@ export default function OutlineView() {
   const [thread, setThread] = useState([]);
   const [rootThreads, setRootThreads] = useState({});
   const [loading, setLoading] = useState(true);
-  const [starredOnly, setStarredOnly] = useState(false);
   const [expandAllTick, setExpandAllTick] = useState(0);
   const [collapseAllTick, setCollapseAllTick] = useState(0);
   const loadRootInflight = useRef(new Map());
@@ -140,11 +139,11 @@ export default function OutlineView() {
     setRootThreads({});
     loadRootInflight.current = new Map();
     if (rootId) {
-      getThread(rootId, starredOnly).then(setThread).finally(() => setLoading(false));
+      getThread(rootId, false).then(setThread).finally(() => setLoading(false));
     } else {
-      getRoots(starredOnly).then(setRoots).finally(() => setLoading(false));
+      getRoots(false).then(setRoots).finally(() => setLoading(false));
     }
-  }, [rootId, starredOnly]);
+  }, [rootId]);
 
   const loadThreadForRoot = useCallback(async (id) => {
     if (rootThreadsRef.current[id]) return;
@@ -152,7 +151,7 @@ export default function OutlineView() {
       await loadRootInflight.current.get(id);
       return;
     }
-    const p = getThread(id, starredOnly)
+    const p = getThread(id, false)
       .then((flat) => {
         const built = buildTree(flat)[0];
         if (built) {
@@ -164,7 +163,7 @@ export default function OutlineView() {
       });
     loadRootInflight.current.set(id, p);
     await p;
-  }, [starredOnly]);
+  }, []);
 
   const isThread = Boolean(rootId);
   const tree = isThread
@@ -202,8 +201,6 @@ export default function OutlineView() {
   return (
     <Layout
       title={isThread ? 'Outline' : 'All notes (outline)'}
-      starredOnly={starredOnly}
-      onStarredOnlyChange={setStarredOnly}
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },

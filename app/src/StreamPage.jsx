@@ -718,6 +718,7 @@ export default function StreamPage() {
   return (
     <Layout
       title={layoutTitle}
+      starFilterEnabled
       starredOnly={starredOnly}
       onStarredOnlyChange={setStarredOnly}
       onLogout={logout}
