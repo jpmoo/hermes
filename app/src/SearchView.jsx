@@ -134,6 +134,7 @@ export default function SearchView() {
                   onOpenThread={() =>
                     navigate(`/thread/${n.root_id || n.parent_id || n.id}`)
                   }
+                  onStarredChange={reloadResults}
                   onNoteUpdate={reloadResults}
                   onNoteDelete={reloadResults}
                 />

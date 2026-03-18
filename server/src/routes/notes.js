@@ -282,7 +282,7 @@ router.get('/search-semantic', async (req, res) => {
       const vecStr = `[${vec.join(',')}]`;
       try {
         const semR = await pool.query(
-          `WITH roots AS (
+          `WITH RECURSIVE roots AS (
         SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $2
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
