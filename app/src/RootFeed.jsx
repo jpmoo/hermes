@@ -69,6 +69,7 @@ export default function RootFeed() {
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
+        { to: '/orphans', label: 'Orphan files' },
       ]}
     >
       <div className="root-feed">

@@ -13,7 +13,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { listTools, callTool } from './mcpTools.js';
-import { hermesApiFetcher } from './mcpApiClient.js';
+import { hermesApiFetcher, uploadNoteAttachmentsMultipart } from './mcpApiClient.js';
 
 const mcpRequestStore = new AsyncLocalStorage();
 
@@ -41,10 +41,12 @@ function isInitializeBody(body) {
   return typeof body === 'object' && body.method === 'initialize';
 }
 
-function createMcpServer(api) {
+function createMcpServer(api, internalBase, getTokenFn) {
+  const uploadAttachments = (noteId, files) =>
+    uploadNoteAttachmentsMultipart(internalBase, getTokenFn, noteId, files);
   const mcpServer = new Server({ name: 'hermes-mcp', version: '0.1.0' }, { capabilities: { tools: {} } });
   mcpServer.setRequestHandler(ListToolsRequestSchema, listTools);
-  mcpServer.setRequestHandler(CallToolRequestSchema, (req) => callTool(api, req));
+  mcpServer.setRequestHandler(CallToolRequestSchema, (req) => callTool({ api, uploadAttachments }, req));
   return mcpServer;
 }
 
@@ -137,7 +139,7 @@ export function mountMcpHttp(app, opts) {
               sessions.delete(sessionId);
             },
           });
-          const mcpServer = createMcpServer(api);
+          const mcpServer = createMcpServer(api, internalBase, getToken);
           await mcpServer.connect(transport);
           sessions.set(sessionId, { transport, lastTouch: Date.now() });
           await transport.handleRequest(req, res, body);

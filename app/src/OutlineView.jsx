@@ -91,6 +91,7 @@ export default function OutlineView() {
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
+        { to: '/orphans', label: 'Orphan files' },
       ]}
     >
       <div className="outline-view">

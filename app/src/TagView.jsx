@@ -52,6 +52,7 @@ export default function TagView() {
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
+        { to: '/orphans', label: 'Orphan files' },
       ]}
     >
       <div className="tag-view">

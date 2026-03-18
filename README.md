@@ -130,6 +130,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/tags`, `POST /api/tags`, `GET /api/tags/relationships`, `POST /api/tags/relationships`
 - `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...`
 - `GET /api/queue?minConfidence=`, `GET /api/queue/count`, `POST /api/queue/:id/approve`, `POST /api/queue/:id/reject`
+- `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphan files**)
 
 ## MCP (Claude)
 
@@ -153,6 +154,8 @@ Tools call your Hermes REST API **as a specific user**. That user is determined 
 ### If Claude “connects” but shows no Hermes tools
 
 The MCP spec requires clients to send an `Accept` header listing both `application/json` and `text/event-stream`. Many clients send `*/*` only; the server now normalizes `Accept` and uses **JSON responses** for MCP POSTs so remote connectors can list tools reliably. **Redeploy/restart** the Hermes server after updating. Claude’s own `web_fetch` to your MCP URL will still fail — that’s normal; tools use the MCP channel, not a browser GET.
+
+**Tools:** include **`hermes_add_attachments`** (`note_id` + `files: [{ base64, filename?, mime_type? }]`) to upload files to an existing note (same as web attachments).
 
 **Tool for “what are my top-level notes?”** → **`hermes_get_root_feed`** (lists root threads like the Feed view). If Claude says “authorization error” on any Hermes tool, the JWT is missing or expired — set **`HERMES_MCP_TOKEN`** and restart (see above).
 

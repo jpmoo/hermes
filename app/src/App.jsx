@@ -8,6 +8,7 @@ import OutlineView from './OutlineView';
 import QueueView from './QueueView';
 import TagView from './TagView';
 import SearchView from './SearchView';
+import OrphanFilesView from './OrphanFilesView';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -65,6 +66,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <SearchView />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/orphans"
+        element={
+          <PrivateRoute>
+            <OrphanFilesView />
           </PrivateRoute>
         }
       />

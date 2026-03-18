@@ -23,6 +23,31 @@ export const TOOL_DEFS = [
     description:
       'List all top-level notes (root threads / main feed), newest first. Use for: what notes do I have, show my threads, root-level list.',
   },
+  {
+    name: 'hermes_add_attachments',
+    description:
+      'Attach one or more files to an existing note. Each file must be base64-encoded (standard encoding). Max 20 files per call; same size limits as the web app.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note_id: { type: 'string', description: 'UUID of the note to attach files to' },
+        files: {
+          type: 'array',
+          description: 'Each entry: base64 (or data) required; filename and mime_type optional',
+          items: {
+            type: 'object',
+            properties: {
+              filename: { type: 'string' },
+              mime_type: { type: 'string' },
+              base64: { type: 'string', description: 'File bytes as base64' },
+              data: { type: 'string', description: 'Alias for base64' },
+            },
+          },
+        },
+      },
+      required: ['note_id', 'files'],
+    },
+  },
 ];
 
 export async function listTools() {
@@ -35,8 +60,11 @@ export async function listTools() {
   };
 }
 
-/** @param {(path: string, options?: RequestInit) => Promise<unknown>} api */
-export async function callTool(api, req) {
+/**
+ * @param {{ api: (path: string, options?: RequestInit) => Promise<unknown>, uploadAttachments?: (noteId: string, files: unknown[]) => Promise<unknown> }} ctx
+ */
+export async function callTool(ctx, req) {
+  const { api, uploadAttachments } = ctx;
   const { name, arguments: args } = req.params;
   try {
     switch (name) {
@@ -84,6 +112,18 @@ export async function callTool(api, req) {
       }
       case 'hermes_get_root_feed': {
         const body = await api('/notes/roots');
+        return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
+      }
+      case 'hermes_add_attachments': {
+        if (!uploadAttachments) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'Attachments upload not available' }) }],
+            isError: true,
+          };
+        }
+        const { note_id, files } = args || {};
+        const list = Array.isArray(files) ? files : [];
+        const body = await uploadAttachments(note_id, list);
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       }
       default:

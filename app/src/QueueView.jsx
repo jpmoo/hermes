@@ -70,6 +70,7 @@ export default function QueueView() {
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
+        { to: '/orphans', label: 'Orphan files' },
       ]}
     >
       <div className="queue-view">

@@ -171,4 +171,16 @@ export async function deleteNoteFile(attachmentId) {
   if (!r.ok) throw new Error('Failed to delete file');
 }
 
+export async function getOrphanAttachments() {
+  const r = await fetch(`${API}/note-files/orphans`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load orphan files');
+  return Array.isArray(data) ? data : [];
+}
+
+export async function deleteOrphanAttachment(id) {
+  const r = await fetch(`${API}/note-files/orphans/${id}`, { method: 'DELETE', headers: headers() });
+  if (!r.ok) throw new Error('Failed to delete');
+}
+
 export { getToken };

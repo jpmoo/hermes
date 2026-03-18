@@ -8,15 +8,17 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { listTools, callTool } from '../server/src/mcpTools.js';
-import { hermesApiFetcher } from '../server/src/mcpApiClient.js';
+import { hermesApiFetcher, uploadNoteAttachmentsMultipart } from '../server/src/mcpApiClient.js';
 
 const API_URL = (process.env.HERMES_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const TOKEN = process.env.HERMES_MCP_TOKEN || '';
 const api = hermesApiFetcher(API_URL, () => TOKEN);
+const uploadAttachments = (noteId, files) =>
+  uploadNoteAttachmentsMultipart(API_URL, () => TOKEN, noteId, files);
 
 const server = new Server({ name: 'hermes-mcp', version: '0.1.0' }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, listTools);
-server.setRequestHandler(CallToolRequestSchema, (req) => callTool(api, req));
+server.setRequestHandler(CallToolRequestSchema, (req) => callTool({ api, uploadAttachments }, req));
 
 async function main() {
   const transport = new StdioServerTransport();
