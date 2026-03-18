@@ -93,6 +93,19 @@
   visibility: hidden;
 }
 
+.stream-page-drill-fade {
+  opacity: 0.12;
+  filter: blur(3px);
+  pointer-events: none;
+  transition:
+    opacity 0.35s ease,
+    filter 0.35s ease;
+}
+
+.stream-page-drill-picked {
+  visibility: hidden;
+}
+
 @keyframes streamReplyFall {
   from {
     opacity: 0;
@@ -110,6 +123,36 @@
 
 .stream-page-thread-enter {
   animation: streamPageThreadIn 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stream-page-thread-enter--level-drop {
+  animation: none;
+}
+
+.stream-page-branch-head-exit > article {
+  animation: streamBranchHeadExit 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes streamBranchHeadExit {
+  to {
+    opacity: 0;
+    transform: translateY(-44px) scale(0.95);
+  }
+}
+
+.stream-page-level-drop > article {
+  animation: streamLevelDropIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes streamLevelDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .stream-page-thread-enter--exit {

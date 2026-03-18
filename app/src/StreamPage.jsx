@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api';
@@ -31,6 +31,108 @@ function findNode(nodes, id) {
   return null;
 }
 
+/** IDs from tree root down to target (inclusive). */
+function pathFromRootToId(nodes, targetId, acc = []) {
+  for (const n of nodes) {
+    if (n.id === targetId) return [...acc, n.id];
+    const sub = pathFromRootToId(n.children || [], targetId, [...acc, n.id]);
+    if (sub) return sub;
+  }
+  return null;
+}
+
+function clearDrillDimming(container) {
+  if (!container) return;
+  container.querySelectorAll('.stream-page-drill-fade, .stream-page-drill-picked').forEach((el) => {
+    el.classList.remove('stream-page-drill-fade', 'stream-page-drill-picked');
+  });
+}
+
+/** Dim nodes not on path from displayed root to target; mark target li picked. Returns target li or null. */
+function applyDrillDimming(threadListEl, pathFromDisplayRoot) {
+  clearDrillDimming(threadListEl);
+  if (!pathFromDisplayRoot || pathFromDisplayRoot.length < 2) return null;
+  const rootLi = threadListEl.querySelector(':scope > li[data-stream-note]');
+  if (!rootLi || rootLi.dataset.streamNote !== pathFromDisplayRoot[0]) return null;
+
+  const rootArticle = rootLi.querySelector(':scope > article');
+  if (pathFromDisplayRoot.length > 1 && rootArticle) {
+    rootArticle.classList.add('stream-page-drill-fade');
+  }
+
+  let ul = rootLi.querySelector(':scope > ul.stream-page-replies');
+  for (let depth = 1; depth < pathFromDisplayRoot.length; depth++) {
+    const targetId = pathFromDisplayRoot[depth];
+    const isLast = depth === pathFromDisplayRoot.length - 1;
+    if (!ul) return null;
+    const lis = [...ul.querySelectorAll(':scope > li[data-stream-note]')];
+    let found = false;
+    for (const li of lis) {
+      if (li.dataset.streamNote !== targetId) {
+        li.classList.add('stream-page-drill-fade');
+        continue;
+      }
+      found = true;
+      if (isLast) {
+        li.classList.add('stream-page-drill-picked');
+      } else {
+        li.querySelector(':scope > article')?.classList.add('stream-page-drill-fade');
+        ul = li.querySelector(':scope > ul.stream-page-replies');
+      }
+      break;
+    }
+    if (!found) return null;
+  }
+  return threadListEl.querySelector('li.stream-page-drill-picked');
+}
+
+function countSubtreeNotes(n) {
+  return 1 + (n.children || []).reduce((s, c) => s + countSubtreeNotes(c), 0);
+}
+
+function assignLevelDropTree(n, start, m) {
+  m.set(n.id, start);
+  let u = start + 36;
+  for (const ch of n.children || []) {
+    assignLevelDropTree(ch, u, m);
+    u += 32;
+  }
+}
+
+/** P becomes root; former head flipNoteId FLIPs; siblings drop first, flip node's subtree after */
+function buildParentBranchLevelDrops(P, flipNoteId) {
+  const m = new Map();
+  m.set(P.id, 0);
+  const children = P.children || [];
+  let d = 48;
+  for (const c of children) {
+    if (c.id === flipNoteId) continue;
+    assignLevelDropTree(c, d, m);
+    d += 40 + countSubtreeNotes(c) * 28;
+  }
+  const flipChild = children.find((c) => c.id === flipNoteId);
+  let bd = 460;
+  for (const ch of flipChild?.children || []) {
+    assignLevelDropTree(ch, bd, m);
+    bd += 36;
+  }
+  return m;
+}
+
+function buildFullThreadLevelDrops(treeRoots) {
+  const m = new Map();
+  let d = 0;
+  function walk(nodes) {
+    for (const n of nodes) {
+      m.set(n.id, d);
+      d += 30;
+      walk(n.children || []);
+    }
+  }
+  walk(treeRoots);
+  return m;
+}
+
 function StreamList({
   nodes,
   depth,
@@ -39,22 +141,30 @@ function StreamList({
   onNoteUpdate,
   onNoteDelete,
   staggerDelays,
+  levelDropDelays,
+  branchHeadExiting,
+  indexInParent = 0,
 }) {
   return (
     <>
-      {nodes.map((n) => {
-        const delayMs = depth > 0 && staggerDelays?.get(n.id);
+      {nodes.map((n, i) => {
+        const levelDropMs = levelDropDelays?.get(n.id);
+        const replyMs = !levelDropMs && depth > 0 && staggerDelays?.get(n.id);
+        const delayMs = levelDropMs ?? replyMs;
+        const animClass = levelDropMs != null ? 'stream-page-level-drop' : replyMs != null ? 'stream-page-reply-stagger' : undefined;
+        const headExit = Boolean(branchHeadExiting && depth === 0 && (indexInParent + i) === 0);
         return (
           <li
             key={n.id}
-            className={delayMs != null ? 'stream-page-reply-stagger' : undefined}
+            data-stream-note={n.id}
+            className={[animClass, headExit ? 'stream-page-branch-head-exit' : ''].filter(Boolean).join(' ') || undefined}
             style={delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined}
           >
             <NoteCard
               note={n}
               depth={depth}
               hasReplies={(n.children?.length ?? 0) > 0}
-              onOpenThread={() => onFocusNote(n.id)}
+              onOpenThread={(ev) => onFocusNote(n.id, ev)}
               onStarredChange={onStarredChange}
               onNoteUpdate={onNoteUpdate}
               onNoteDelete={onNoteDelete}
@@ -69,6 +179,9 @@ function StreamList({
                   onNoteUpdate={onNoteUpdate}
                   onNoteDelete={onNoteDelete}
                   staggerDelays={staggerDelays}
+                  levelDropDelays={levelDropDelays}
+                  branchHeadExiting={branchHeadExiting}
+                  indexInParent={0}
                 />
               </ul>
             )}
@@ -101,6 +214,7 @@ export default function StreamPage() {
   const rootFileRef = useRef(null);
   const replyFileRef = useRef(null);
   const threadAnchorRef = useRef(null);
+  const threadListRef = useRef(null);
   const focusFromUrlApplied = useRef('');
   const floatTimerRef = useRef(null);
   const { logout } = useAuth();
@@ -108,6 +222,11 @@ export default function StreamPage() {
   const [floatOpen, setFloatOpen] = useState(null);
   const [replyStagger, setReplyStagger] = useState(false);
   const [threadExiting, setThreadExiting] = useState(false);
+  const [branchHeadExiting, setBranchHeadExiting] = useState(false);
+  const [levelDropDelays, setLevelDropDelays] = useState(null);
+  const [flipTick, setFlipTick] = useState(0);
+  const flipPayloadRef = useRef(null);
+  const levelNavBusyRef = useRef(false);
 
   const loadRoots = useCallback(() => {
     setLoadError(null);
@@ -257,14 +376,120 @@ export default function StreamPage() {
     }, 220);
   }, [setSearchParams, loadRoots]);
 
-  const upOneLevel = useCallback(() => {
-    focusFromUrlApplied.current = '';
-    setFocusId(null);
-    if (threadRootId) setSearchParams({ thread: threadRootId });
-  }, [threadRootId, setSearchParams]);
-
   const tree = buildTree(thread);
   const actualRootId = thread[0]?.id;
+
+  const clearLevelDropSoon = useCallback(() => {
+    window.setTimeout(() => setLevelDropDelays(null), 1550);
+  }, []);
+
+  const animateToFullThread = useCallback(() => {
+    if (!threadRootId || levelNavBusyRef.current || floatTimerRef.current) return;
+    if (!focusId || focusId === actualRootId) return;
+    levelNavBusyRef.current = true;
+    focusFromUrlApplied.current = '';
+    setBranchHeadExiting(true);
+    window.setTimeout(() => {
+      setBranchHeadExiting(false);
+      setFocusId(null);
+      setSearchParams({ thread: threadRootId });
+      setLevelDropDelays(buildFullThreadLevelDrops(buildTree(thread)));
+      clearLevelDropSoon();
+      levelNavBusyRef.current = false;
+    }, 400);
+  }, [threadRootId, focusId, actualRootId, thread, setSearchParams, clearLevelDropSoon]);
+
+  const upOneLevel = useCallback(() => {
+    if (!threadRootId || !focusId || focusId === actualRootId) return;
+    if (levelNavBusyRef.current || floatTimerRef.current) return;
+    const row = thread.find((n) => n.id === focusId);
+    const parentId = row?.parent_id;
+    if (!parentId || parentId === actualRootId) {
+      animateToFullThread();
+      return;
+    }
+    levelNavBusyRef.current = true;
+    focusFromUrlApplied.current = '';
+    const leavingHeadId = focusId;
+    const listEl = threadListRef.current;
+    const art = listEl?.querySelector(':scope > li[data-stream-note] > article');
+    const fr = art?.getBoundingClientRect();
+    const fromRect = fr
+      ? { left: fr.left, top: fr.top, width: fr.width, height: fr.height, noteId: leavingHeadId }
+      : null;
+
+    const t = buildTree(thread);
+    const parentNode = findNode(t, parentId);
+    const delays = parentNode ? buildParentBranchLevelDrops(parentNode, leavingHeadId) : new Map();
+
+    setFocusId(parentId);
+    setSearchParams({ thread: threadRootId, focus: parentId });
+    setLevelDropDelays(delays);
+    if (fromRect) {
+      flipPayloadRef.current = fromRect;
+      setFlipTick((x) => x + 1);
+    } else {
+      const d = new Map(delays);
+      d.set(leavingHeadId, 440);
+      setLevelDropDelays(d);
+    }
+    clearLevelDropSoon();
+    window.setTimeout(() => {
+      levelNavBusyRef.current = false;
+    }, 650);
+  }, [
+    threadRootId,
+    focusId,
+    actualRootId,
+    thread,
+    setSearchParams,
+    animateToFullThread,
+    clearLevelDropSoon,
+  ]);
+
+  useLayoutEffect(() => {
+    const payload = flipPayloadRef.current;
+    if (!payload || !threadListRef.current) return;
+    const { noteId, left, top, width, height } = payload;
+    flipPayloadRef.current = null;
+    const toArt = threadListRef.current.querySelector(`li[data-stream-note="${noteId}"] > article`);
+    if (!toArt) return;
+    const tr = toArt.getBoundingClientRect();
+    const dx = left - tr.left;
+    const dy = top - tr.top;
+    const sx = width / Math.max(tr.width, 1);
+    const sy = height / Math.max(tr.height, 1);
+    toArt.style.transformOrigin = 'top left';
+    toArt.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    toArt.style.transition = 'none';
+    const bLi = toArt.closest('li');
+    const bUl = bLi?.querySelector(':scope > ul.stream-page-replies');
+    if (bUl) {
+      bUl.style.opacity = '0';
+      bUl.style.transition = 'none';
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        toArt.style.transition =
+          'transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease';
+        toArt.style.transform = '';
+        window.setTimeout(() => {
+          toArt.style.transition = '';
+          toArt.style.transformOrigin = '';
+        }, 550);
+        if (bUl) {
+          window.setTimeout(() => {
+            bUl.style.transition = 'opacity 0.38s ease';
+            bUl.style.opacity = '1';
+            window.setTimeout(() => {
+              bUl.style.transition = '';
+              bUl.style.opacity = '';
+            }, 400);
+          }, 380);
+        }
+      });
+    });
+  }, [flipTick]);
   const focusedNode = focusId && actualRootId ? findNode(tree, focusId) : null;
   const displayTree =
     focusedNode && focusId !== actualRootId
@@ -296,7 +521,7 @@ export default function StreamPage() {
     return () => clearTimeout(t);
   }, [replyStagger, threadReady, threadRootId]);
 
-  const onFocusNote = useCallback(
+  const applyFocusImmediate = useCallback(
     (id) => {
       setFocusId(id);
       if (!threadRootId) return;
@@ -308,6 +533,119 @@ export default function StreamPage() {
       }
     },
     [threadRootId, thread, setSearchParams]
+  );
+
+  const beginDrillFocus = useCallback(
+    (id, e) => {
+      const listEl = threadListRef.current;
+      if (!listEl || loadingThread || !thread.length || !actualRootId) {
+        applyFocusImmediate(id);
+        return;
+      }
+      const t = buildTree(thread);
+      const fullPath = pathFromRootToId(t, id);
+      if (!fullPath) {
+        applyFocusImmediate(id);
+        return;
+      }
+      const displayRoot = focusId && focusId !== actualRootId ? focusId : actualRootId;
+      const idx = fullPath.indexOf(displayRoot);
+      const drillPath = idx >= 0 ? fullPath.slice(idx) : fullPath;
+      if (drillPath.length < 2) {
+        applyFocusImmediate(id);
+        return;
+      }
+      const li = e?.currentTarget?.closest?.('li[data-stream-note]');
+      if (!li || li.dataset.streamNote !== id) {
+        applyFocusImmediate(id);
+        return;
+      }
+      if (floatTimerRef.current) {
+        clearTimeout(floatTimerRef.current);
+        floatTimerRef.current = null;
+        clearDrillDimming(listEl);
+        setFloatOpen(null);
+      }
+      const targetLi = applyDrillDimming(listEl, drillPath);
+      if (!targetLi) {
+        applyFocusImmediate(id);
+        return;
+      }
+      const article = targetLi.querySelector('article');
+      const r = (article || targetLi).getBoundingClientRect();
+      const row = thread.find((n) => n.id === id);
+      if (!row) {
+        clearDrillDimming(listEl);
+        applyFocusImmediate(id);
+        return;
+      }
+      const node = findNode(t, id);
+      const note = {
+        ...row,
+        reply_count: node?.children?.length ?? row.reply_count ?? 0,
+      };
+      setFloatOpen({
+        note,
+        top: r.top,
+        left: r.left,
+        width: r.width,
+        phase: 'idle',
+      });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setFloatOpen((prev) => (prev && prev.note.id === id ? { ...prev, phase: 'move' } : prev));
+        });
+      });
+      floatTimerRef.current = setTimeout(() => {
+        floatTimerRef.current = null;
+        clearDrillDimming(threadListRef.current);
+        setFloatOpen(null);
+        setReplyStagger(true);
+        setFocusId(id);
+        setSearchParams({ thread: threadRootId, focus: id });
+      }, 480);
+    },
+    [
+      loadingThread,
+      thread,
+      actualRootId,
+      focusId,
+      threadRootId,
+      applyFocusImmediate,
+      setSearchParams,
+    ]
+  );
+
+  const onFocusNote = useCallback(
+    (id, e) => {
+      if (!threadRootId) return;
+      if (id === actualRootId) {
+        focusFromUrlApplied.current = '';
+        if (focusId && focusId !== actualRootId) {
+          animateToFullThread();
+        } else {
+          setFocusId(null);
+          setSearchParams({ thread: threadRootId });
+        }
+        return;
+      }
+      const canAnimate = Boolean(e?.currentTarget && threadListRef.current && !loadingThread);
+      if (canAnimate) {
+        beginDrillFocus(id, e);
+      } else {
+        applyFocusImmediate(id);
+      }
+    },
+    [
+      threadRootId,
+      actualRootId,
+      focusId,
+      loadingThread,
+      beginDrillFocus,
+      applyFocusImmediate,
+      animateToFullThread,
+      setSearchParams,
+    ]
   );
 
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
@@ -426,7 +764,7 @@ export default function StreamPage() {
                 <p className="stream-page-muted">Thread not found.</p>
               ) : (
                 <div
-                  className={`stream-page-thread-enter ${threadExiting ? 'stream-page-thread-enter--exit' : ''}`}
+                  className={`stream-page-thread-enter ${threadExiting ? 'stream-page-thread-enter--exit' : ''} ${levelDropDelays ? 'stream-page-thread-enter--level-drop' : ''}`}
                   key={threadRootId}
                   ref={threadAnchorRef}
                 >
@@ -438,7 +776,7 @@ export default function StreamPage() {
                       </span>
                     </div>
                   )}
-                  <ul className="stream-page-list">
+                  <ul className="stream-page-list" ref={threadListRef}>
                     <StreamList
                       nodes={displayTree}
                       depth={0}
@@ -450,6 +788,8 @@ export default function StreamPage() {
                         loadRoots();
                       }}
                       staggerDelays={replyStaggerDelays}
+                      levelDropDelays={levelDropDelays}
+                      branchHeadExiting={branchHeadExiting}
                     />
                   </ul>
                 </div>
