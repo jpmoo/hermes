@@ -66,7 +66,7 @@
 .stream-page-float .note-card {
   pointer-events: none;
   box-shadow:
-    4px 4px 0 rgba(28, 27, 24, 0.1),
+    4px 4px 4px -4px rgba(28, 27, 24, 0.14),
     0 12px 40px rgba(0, 0, 0, 0.18);
 }
 
@@ -309,7 +309,7 @@
   scroll-margin-top: 0.5rem;
 }
 
-/* Offset drop shadow: ~4px right + down on every root bubble and reply */
+/* Soft shadow: 4px offset, blur ≤4px, spread keeps falloff tight */
 .stream-page-scroll article.note-card {
-  box-shadow: 4px 4px 0 rgba(28, 27, 24, 0.1);
+  box-shadow: 4px 4px 4px -4px rgba(28, 27, 24, 0.12);
 }
