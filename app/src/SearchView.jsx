@@ -63,7 +63,6 @@ export default function SearchView() {
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
-        { to: '/orphans', label: 'Orphan files' },
       ]}
     >
       <div className="search-view">

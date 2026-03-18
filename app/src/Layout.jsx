@@ -31,7 +31,7 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
             </button>
             <Link
               to="/orphans"
-              className="layout-orphans-link"
+              className={`layout-orphans-link${location.pathname === '/orphans' ? ' layout-orphans-link--active' : ''}`}
               title="Attachments whose note was deleted"
             >
               Orphans

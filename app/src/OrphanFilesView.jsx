@@ -62,7 +62,7 @@ export default function OrphanFilesView() {
 
   return (
     <Layout
-      title="Orphan files"
+      title="Orphans"
       starredOnly={false}
       onStarredOnlyChange={() => {}}
       onLogout={logout}
@@ -71,7 +71,6 @@ export default function OrphanFilesView() {
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
-        { to: '/orphans', label: 'Orphan files' },
       ]}
     >
       <div className="orphan-files">

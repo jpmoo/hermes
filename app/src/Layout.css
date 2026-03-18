@@ -93,6 +93,11 @@
   background: rgba(201, 162, 39, 0.08);
 }
 
+.layout-orphans-link--active {
+  color: var(--accent);
+  background: rgba(201, 162, 39, 0.12);
+}
+
 .layout-toggle {
   padding: 0.4rem 0.75rem;
   background: var(--bg-card);

@@ -142,7 +142,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (hybrid text + semantic; 503 only if Ollama fails and nothing matches the substring)
 - `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
 - `GET /api/queue?minConfidence=`, `GET /api/queue/count`, `POST /api/queue/:id/approve`, `POST /api/queue/:id/reject`
-- `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphan files**)
+- `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphans**)
 
 ## MCP (Claude)
 
@@ -203,7 +203,7 @@ Optional: set **`HERMES_PUBLIC_API_URL`** in `server/.env` so MCP tool **`hermes
 
 **Reading files:** **`hermes_get_thread`** / feed responses include per-note **`attachments`** (metadata: id, filename, mime_type, byte_size). Download uses the authenticated note-file API in the web app; MCP returns metadata only unless you add a dedicated fetch tool later.
 
-**Orphan blobs** (note deleted but file row left): **`hermes_list_orphan_attachments`**, then **`hermes_delete_orphan_attachment`** with **`blob_id`** (same as web **Orphan files** and `GET/DELETE /api/note-files/orphans`).
+**Orphan blobs** (note deleted but file row left): **`hermes_list_orphan_attachments`**, then **`hermes_delete_orphan_attachment`** with **`blob_id`** (same as web **Orphans** and `GET/DELETE /api/note-files/orphans`).
 
 ### external_anchor
 
