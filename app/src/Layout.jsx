@@ -1,9 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './Layout.css';
+import { LayoutNavIcon, hasLayoutNavIcon } from './icons/NavIcons.jsx';
+
+const LAYOUT_THEME_COLOR = '#f4f3f0';
 
 export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogout, viewLinks, children }) {
   const location = useLocation();
+
+  useEffect(() => {
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', LAYOUT_THEME_COLOR);
+  }, [location.pathname]);
 
   return (
     <div className="layout">
@@ -21,9 +28,15 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
               <Link
                 key={to}
                 to={to}
-                className={`layout-nav-link ${location.pathname === to || (to !== '/' && location.pathname.startsWith(to)) ? 'layout-nav-link--active' : ''}`}
+                className={`layout-nav-link ${
+                  location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
+                    ? 'layout-nav-link--active'
+                    : ''
+                }`}
+                aria-label={label}
+                title={label}
               >
-                {label}
+                {hasLayoutNavIcon(to) ? <LayoutNavIcon to={to} /> : label}
               </Link>
             ))}
           </nav>

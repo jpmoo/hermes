@@ -63,11 +63,22 @@
 }
 
 .layout-nav-link {
-  padding: 0.4rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.55rem;
   border-radius: 6px;
   color: var(--text-muted);
   font-size: 0.9rem;
   text-decoration: none;
+}
+
+.layout-nav-icon {
+  width: 1.3rem;
+  height: 1.3rem;
+  flex-shrink: 0;
 }
 
 .layout-nav-link:hover {
@@ -138,4 +149,7 @@
 
 .layout-main {
   flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: light;
 }

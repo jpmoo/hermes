@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { login, register } from './api';
@@ -11,6 +11,10 @@ export default function Login() {
   const [error, setError] = useState('');
   const { login: setAuth } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f4f3f0');
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();

@@ -1,10 +1,10 @@
 .search-view-error {
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
-  background: rgba(180, 120, 60, 0.12);
-  border: 1px solid rgba(180, 120, 60, 0.35);
+  background: var(--status-warning-bg);
+  border: 1px solid var(--status-warning-border);
   border-radius: 8px;
-  color: #dba;
+  color: var(--status-warning-text);
   font-size: 0.9rem;
   line-height: 1.4;
 }
@@ -13,6 +13,9 @@
   max-width: 640px;
   margin: 0 auto;
   padding: 1rem 0 3rem;
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: light;
 }
 
 .search-view-form {
@@ -42,7 +45,7 @@
 .search-view-field-row button {
   padding: 0.75rem 1rem;
   background: var(--accent);
-  color: var(--bg);
+  color: var(--on-accent);
   border: none;
   border-radius: 8px;
   font-weight: 500;

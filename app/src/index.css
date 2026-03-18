@@ -18,6 +18,19 @@ html {
   --depth-3: 3;
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  /* Text on accent-filled buttons (light cream on gold) */
+  --on-accent: #f4f3f0;
+  /* Status / alerts — tuned for light page bg */
+  --status-warning-bg: rgba(130, 95, 25, 0.09);
+  --status-warning-border: rgba(110, 80, 20, 0.28);
+  --status-warning-text: #5c4200;
+  --status-danger-bg: rgba(160, 45, 45, 0.08);
+  --status-danger-border: rgba(140, 40, 40, 0.3);
+  --status-danger-text: #8f2424;
+  --status-danger-hover: #7a1f1f;
+  --status-danger-btn-bg: #a33636;
+  --status-danger-btn-hover: #8f2d2d;
+  --on-danger-btn: #fff;
 }
 
 * {
@@ -36,6 +49,9 @@ body {
 
 #root {
   min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: light;
 }
 
 button {
