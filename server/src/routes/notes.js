@@ -248,24 +248,39 @@ router.get('/search-by-tags', async (req, res) => {
   }
 });
 
-// Semantic search: embed query, similarity search
+// Semantic search: hybrid = substring matches first, then vector similarity (short queries often miss in pure dense search)
 router.get('/search-semantic', async (req, res) => {
   try {
     const q = req.query.q?.trim();
     const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
     const userId = req.userId;
     if (!q) return res.json([]);
-    const { embed } = await import('../services/ollama.js');
-    const vec = await embed(q);
-    if (!vec) {
-      return res.status(503).json({
-        error: 'Semantic search unavailable (Ollama embed failed or returned nothing). Use GET /api/notes/search-content?q=... for text substring search.',
-        code: 'EMBED_UNAVAILABLE',
-      });
-    }
-    const vecStr = `[${vec.join(',')}]`;
-    const r = await pool.query(
-      `WITH roots AS (
+    const escaped = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const pattern = `%${escaped}%`;
+    const textFetchLimit = Math.min(100, Math.max(limit * 3, limit));
+    const textSql = `WITH RECURSIVE roots AS (
+        SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $1
+        UNION ALL
+        SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
+      )
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+             r.root_id,
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+      FROM notes n
+      JOIN roots r ON r.id = n.id
+      WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
+      ORDER BY n.last_activity_at DESC
+      LIMIT $3`;
+    const textR = await pool.query(textSql, [userId, pattern, textFetchLimit]);
+
+    const { embed, inputForQuery } = await import('../services/ollama.js');
+    const vec = await embed(inputForQuery(q));
+    const semFetchLimit = Math.min(100, Math.max(limit * 3, limit + 10));
+    let semRows = [];
+    if (vec) {
+      const vecStr = `[${vec.join(',')}]`;
+      const semR = await pool.query(
+        `WITH roots AS (
         SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $2
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
@@ -278,12 +293,37 @@ router.get('/search-semantic', async (req, res) => {
       WHERE n.user_id = $2 AND n.embedding IS NOT NULL
       ORDER BY n.embedding <=> $1::vector
       LIMIT $3`,
-      [vecStr, userId, limit]
-    );
-    const notes = r.rows.map((row) => {
-      const { similarity, root_id, ...note } = row;
-      return { ...note, similarity, root_id };
-    });
+        [vecStr, userId, semFetchLimit]
+      );
+      semRows = semR.rows;
+    }
+
+    const seen = new Set();
+    const notes = [];
+    for (const row of textR.rows) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      const { root_id, ...note } = row;
+      notes.push({ ...note, root_id, similarity: 1, textMatch: true });
+      if (notes.length >= limit) break;
+    }
+    if (notes.length < limit && semRows.length > 0) {
+      for (const row of semRows) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        const { similarity, root_id, ...note } = row;
+        notes.push({ ...note, similarity, root_id, textMatch: false });
+        if (notes.length >= limit) break;
+      }
+    }
+
+    if (notes.length === 0 && !vec) {
+      return res.status(503).json({
+        error: 'Semantic search unavailable (Ollama embed failed or returned nothing). Use GET /api/notes/search-content?q=... for text substring search.',
+        code: 'EMBED_UNAVAILABLE',
+      });
+    }
+
     if (notes.length > 0) {
       const ids = notes.map((n) => n.id);
       const tagRows = await pool.query(
@@ -295,7 +335,9 @@ router.get('/search-semantic', async (req, res) => {
         if (!byNote[row.note_id]) byNote[row.note_id] = [];
         byNote[row.note_id].push({ id: row.tag_id, name: row.name });
       });
-      notes.forEach((n) => { n.tags = byNote[n.id] || []; });
+      notes.forEach((n) => {
+        n.tags = byNote[n.id] || [];
+      });
     }
     await attachBlobListToNotes(notes, userId);
     res.json(notes);

@@ -18,7 +18,8 @@
   padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
 }
 
 .layout-logo {
@@ -35,7 +36,22 @@
 
 .layout-nav {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .layout-nav {
+    flex: 1 1 100%;
+    order: 3;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--border);
+  }
+  .layout-actions {
+    margin-left: 0;
+  }
 }
 
 .layout-nav-link {
@@ -59,7 +75,22 @@
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.layout-orphans-link {
+  padding: 0.4rem 0.65rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.layout-orphans-link:hover {
+  color: var(--accent);
+  background: rgba(201, 162, 39, 0.08);
 }
 
 .layout-toggle {

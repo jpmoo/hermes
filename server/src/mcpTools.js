@@ -2,20 +2,49 @@
  * Shared Hermes MCP tool definitions and call handler (stdio + Streamable HTTP).
  */
 
+const ATTACH_FILES_SCHEMA = {
+  type: 'object',
+  properties: {
+    note_id: {
+      type: 'string',
+      description: 'UUID of the target note (returned by hermes_create_note as id, or from search/thread).',
+    },
+    files: {
+      type: 'array',
+      description:
+        'One object per file. Required: base64 (standard base64 of raw file bytes) or data (same). Optional: filename, mime_type. Max 20 files.',
+      items: {
+        type: 'object',
+        properties: {
+          filename: { type: 'string' },
+          mime_type: { type: 'string' },
+          base64: { type: 'string', description: 'File contents as base64 string' },
+          data: { type: 'string', description: 'Alias for base64' },
+        },
+      },
+    },
+  },
+  required: ['note_id', 'files'],
+};
+
 export const TOOL_DEFS = [
   {
     name: 'hermes_create_note',
     description:
-      'Create a root note or reply. Optional attachments: pass attachments or files (same as hermes_add_attachments) to upload base64-encoded files in one step. Alternatively create empty then call hermes_add_attachments.',
+      'Create a root note or a reply (set parent_id). To add files: either include attachments or files array here (same shape as hermes_attach_files), OR create the note then call hermes_attach_files with the returned id.',
     inputSchema: {
       type: 'object',
       properties: {
-        content: { type: 'string' },
-        parent_id: { type: 'string' },
-        external_anchor: { type: 'string' },
+        content: { type: 'string', description: 'Note body text' },
+        parent_id: { type: 'string', description: 'If set, this note is a reply under that note id' },
+        external_anchor: {
+          type: 'string',
+          description:
+            'Optional free-text link to something outside Hermes (e.g. Jira URL, ticket id, Google Doc id). Stored on the note; returned in API/thread JSON. Web app does not show a dedicated field for it yet—use for sync or your own reference.',
+        },
         attachments: {
           type: 'array',
-          description: 'Optional files to attach immediately (base64 per file). Same shape as hermes_add_attachments files.',
+          description: 'Optional: upload files in the same call. Each item: { base64 or data, filename?, mime_type? }',
           items: {
             type: 'object',
             properties: {
@@ -28,7 +57,7 @@ export const TOOL_DEFS = [
         },
         files: {
           type: 'array',
-          description: 'Alias for attachments',
+          description: 'Same as attachments',
           items: {
             type: 'object',
             properties: {
@@ -43,9 +72,15 @@ export const TOOL_DEFS = [
     },
   },
   {
+    name: 'hermes_attach_files',
+    description:
+      'Upload files (images, PDFs, documents) and attach them to an existing Hermes note. Requires note_id plus files array with base64-encoded bytes per file. This is the main MCP tool for attachments. Same behavior as hermes_add_attachments.',
+    inputSchema: ATTACH_FILES_SCHEMA,
+  },
+  {
     name: 'hermes_get_thread',
     description:
-      'Get a note and all replies under it (subtree). Pass the note id of any message in the thread — not only the root. Returns that note plus every descendant.',
+      'Get a note and all replies under it (subtree). Pass the note id of any message in the thread — not only the root. Each note may include an attachments array (uploaded files: id, filename, mime_type, byte_size).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -78,27 +113,26 @@ export const TOOL_DEFS = [
   },
   {
     name: 'hermes_add_attachments',
+    description: 'Alias for hermes_attach_files — upload base64 files to a note.',
+    inputSchema: ATTACH_FILES_SCHEMA,
+  },
+  {
+    name: 'hermes_list_orphan_attachments',
     description:
-      'Attach one or more files to an existing note. Each file must be base64-encoded (standard encoding). Max 20 files per call; same size limits as the web app.',
+      'List file blobs whose note was deleted (orphan attachments). Each row: id (blob id for delete), note_id (dead reference), filename, mime_type, byte_size, created_at. Use hermes_delete_orphan_attachment to remove storage.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'hermes_delete_orphan_attachment',
+    description:
+      'Permanently delete one orphan attachment by blob id (from hermes_list_orphan_attachments). Only succeeds if the note no longer exists; cannot delete files still attached to a live note.',
     inputSchema: {
       type: 'object',
       properties: {
-        note_id: { type: 'string', description: 'UUID of the note to attach files to' },
-        files: {
-          type: 'array',
-          description: 'Each entry: base64 (or data) required; filename and mime_type optional',
-          items: {
-            type: 'object',
-            properties: {
-              filename: { type: 'string' },
-              mime_type: { type: 'string' },
-              base64: { type: 'string', description: 'File bytes as base64' },
-              data: { type: 'string', description: 'Alias for base64' },
-            },
-          },
-        },
+        blob_id: { type: 'string', description: 'UUID of the note_file_blobs row (field id from list orphans)' },
+        id: { type: 'string', description: 'Alias for blob_id' },
       },
-      required: ['note_id', 'files'],
+      required: [],
     },
   },
 ];
@@ -142,7 +176,7 @@ export async function callTool(ctx, req) {
                     {
                       ...body,
                       attachment_warning:
-                        'Note created but this MCP session cannot upload files here; call hermes_add_attachments with note id.',
+                        'Note created but this MCP session cannot upload files here; call hermes_attach_files (or hermes_add_attachments) with this note id.',
                     },
                     null,
                     2
@@ -170,7 +204,7 @@ export async function callTool(ctx, req) {
                     {
                       error: uploadErr.message,
                       note_created: body,
-                      hint: 'Note exists; retry with hermes_add_attachments using note id above.',
+                      hint: 'Note exists; retry with hermes_attach_files using note id above.',
                     },
                     null,
                     2
@@ -235,10 +269,18 @@ export async function callTool(ctx, req) {
         const body = await api('/notes/roots');
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       }
+      case 'hermes_attach_files':
       case 'hermes_add_attachments': {
         if (!uploadAttachments) {
           return {
-            content: [{ type: 'text', text: JSON.stringify({ error: 'Attachments upload not available' }) }],
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'File upload is not available on this MCP path (multipart upload missing). Use Streamable HTTP MCP on the Hermes server or stdio MCP with upload support.',
+                }),
+              },
+            ],
             isError: true,
           };
         }
@@ -246,6 +288,29 @@ export async function callTool(ctx, req) {
         const list = Array.isArray(files) ? files : [];
         const body = await uploadAttachments(note_id, list);
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
+      }
+      case 'hermes_list_orphan_attachments': {
+        const body = await api('/note-files/orphans');
+        const list = Array.isArray(body) ? body : [];
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ count: list.length, orphans: list }, null, 2),
+            },
+          ],
+        };
+      }
+      case 'hermes_delete_orphan_attachment': {
+        const blobId = args?.blob_id || args?.id;
+        if (!blobId || !String(blobId).trim()) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'blob_id (or id) required' }) }],
+            isError: true,
+          };
+        }
+        await api(`/note-files/orphans/${encodeURIComponent(String(blobId).trim())}`, { method: 'DELETE' });
+        return { content: [{ type: 'text', text: JSON.stringify({ ok: true, deleted: blobId }) }] };
       }
       default:
         return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown tool: ${name}` }) }], isError: true };

@@ -29,6 +29,13 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
             >
               {starredOnly ? 'Starred' : 'All'}
             </button>
+            <Link
+              to="/orphans"
+              className="layout-orphans-link"
+              title="Attachments whose note was deleted"
+            >
+              Orphans
+            </Link>
             <button type="button" className="layout-logout" onClick={onLogout}>
               Sign out
             </button>

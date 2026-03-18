@@ -30,7 +30,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Regions view (spatial clusters by embedding) | Not yet |
 | Tag Canvas (graph of tags + edges) | Not yet |
 | Attachments (BYTEA in DB, Stream upload, clickable URLs) | Done |
-| external_anchor in UI | Not yet |
+| external_anchor (API field; optional link to ticket/URL outside Hermes) | API only; UI field not yet |
 | Suggested threading / duplicate / orphan rescue | Not yet |
 
 ## Quick start (local)
@@ -64,6 +64,8 @@ A note-taking system built around conversation and tree structure. Specification
    ```
 
    Verifies Ollama is reachable, the embed model is installed, a live `/api/embed` call works, and how many notes have `embedding IS NOT NULL` vs missing. Needs `curl`, `psql`, and ideally `jq`.
+
+   **Semantic search** combines **substring matches** with **vector similarity**, so exact words (e.g. “Yup”) still rank at the top even when dense embeddings alone would miss them. For **Nomic** models, optional **`HERMES_EMBED_NOMIC_PREFIXES=1`** uses `search_document:` / `search_query:` as intended; after turning that on, run once from `server/`: **`npm run reembed`** so existing note vectors match query embeddings.
 
 3. **Web app (dev)**
 
@@ -136,7 +138,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `PATCH /api/notes/:id` — update `{ content?, starred?, external_anchor? }`
 - `POST /api/notes/:id/star`, `DELETE /api/notes/:id/star`
 - `GET /api/tags`, `POST /api/tags`, `GET /api/tags/relationships`, `POST /api/tags/relationships`
-- `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (503 if Ollama embed unavailable)
+- `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (hybrid text + semantic; 503 only if Ollama fails and nothing matches the substring)
 - `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
 - `GET /api/queue?minConfidence=`, `GET /api/queue/count`, `POST /api/queue/:id/approve`, `POST /api/queue/:id/reject`
 - `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphan files**)
@@ -164,7 +166,19 @@ Tools call your Hermes REST API **as a specific user**. That user is determined 
 
 The MCP spec requires clients to send an `Accept` header listing both `application/json` and `text/event-stream`. Many clients send `*/*` only; the server now normalizes `Accept` and uses **JSON responses** for MCP POSTs so remote connectors can list tools reliably. **Redeploy/restart** the Hermes server after updating. Claude’s own `web_fetch` to your MCP URL will still fail — that’s normal; tools use the MCP channel, not a browser GET.
 
-**Attachments:** **`hermes_create_note`** may include **`attachments`** or **`files`** (array of `{ base64, filename?, mime_type? }`) to create and upload in one call. Or create the note, then **`hermes_add_attachments`** with the returned `id`.
+### Attachments (MCP)
+
+Claude should use **`hermes_attach_files`** (or alias **`hermes_add_attachments`**): pass **`note_id`** and **`files`**: `[{ "base64": "<standard base64>", "filename": "photo.png", "mime_type": "image/png" }]` (up to 20 files). Works from **Hermes `/mcp`** (Streamable HTTP) and from **`mcp/server.js`** (stdio) — both wire multipart upload to the API.
+
+**One-step alternative:** **`hermes_create_note`** with optional **`attachments`** or **`files`** (same shape) uploads in the same call after the note is created.
+
+**Reading files:** **`hermes_get_thread`** / feed responses include per-note **`attachments`** (metadata: id, filename, mime_type, byte_size). Download uses the authenticated note-file API in the web app; MCP returns metadata only unless you add a dedicated fetch tool later.
+
+**Orphan blobs** (note deleted but file row left): **`hermes_list_orphan_attachments`**, then **`hermes_delete_orphan_attachment`** with **`blob_id`** (same as web **Orphan files** and `GET/DELETE /api/note-files/orphans`).
+
+### external_anchor
+
+Optional string on create/update note: **stable reference outside Hermes** (e.g. Jira ticket URL, Linear issue id, Google Doc id). It is stored and returned in JSON from the API and threads; the **web UI does not show a dedicated field yet** — useful for bots, MCP, or future UI.
 
 **Tool for “what are my top-level notes?”** → **`hermes_get_root_feed`** (lists root threads like the Feed view). If Claude says “authorization error” on any Hermes tool, the JWT is missing or expired — set **`HERMES_MCP_TOKEN`** and restart (see above).
 
