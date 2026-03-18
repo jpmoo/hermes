@@ -1,3 +1,13 @@
+.root-feed-error {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(180, 60, 60, 0.15);
+  border: 1px solid rgba(180, 60, 60, 0.4);
+  border-radius: 8px;
+  color: #e88;
+  font-size: 0.9rem;
+}
+
 .root-feed {
   max-width: 640px;
   margin: 0 auto;
@@ -25,8 +35,31 @@
   border-color: var(--accent-dim);
 }
 
-.root-feed-compose button {
+.root-feed-compose-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
   margin-top: 0.5rem;
+}
+
+.root-feed-file-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.root-feed-file-label input {
+  display: none;
+}
+
+.root-feed-file-hint {
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.root-feed-compose-row button[type='submit'] {
+  margin-left: auto;
   padding: 0.5rem 1rem;
   background: var(--accent);
   color: var(--bg);
@@ -35,7 +68,7 @@
   font-weight: 500;
 }
 
-.root-feed-compose button:disabled {
+.root-feed-compose-row button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
