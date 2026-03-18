@@ -23,15 +23,23 @@
 }
 
 .layout-logo {
-  font-weight: 600;
-  font-size: 1.25rem;
-  color: var(--accent);
+  display: flex;
+  align-items: center;
+  line-height: 0;
   text-decoration: none;
 }
 
 .layout-logo:hover {
   text-decoration: none;
-  filter: brightness(1.1);
+  filter: brightness(1.05);
+}
+
+.layout-logo-img {
+  display: block;
+  height: 32px;
+  width: auto;
+  max-width: min(140px, 35vw);
+  object-fit: contain;
 }
 
 .layout-nav {

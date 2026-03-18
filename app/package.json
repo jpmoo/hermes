@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run copy-logos",
     "dev": "vite",
+    "copy-logos": "cp ../assets/HermesLogo.png ../assets/HermesLogoSmall.png public/",
+    "prebuild": "npm run copy-logos",
     "build": "vite build",
     "preview": "vite preview"
   },

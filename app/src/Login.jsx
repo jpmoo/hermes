@@ -28,7 +28,11 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1 className="login-title">Hermes</h1>
+        <img
+          className="login-logo-full"
+          src={`${import.meta.env.BASE_URL}HermesLogo.png`}
+          alt="Hermes"
+        />
         <p className="login-subtitle">Personal Knowledge Messenger</p>
         <form onSubmit={submit} className="login-form">
           <input

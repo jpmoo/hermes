@@ -9,7 +9,13 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
     <div className="layout">
       <header className="layout-header">
         <div className="layout-header-inner">
-          <Link to="/" className="layout-logo">Hermes</Link>
+          <Link to="/" className="layout-logo" aria-label="Hermes home">
+            <img
+              className="layout-logo-img"
+              src={`${import.meta.env.BASE_URL}HermesLogoSmall.png`}
+              alt=""
+            />
+          </Link>
           <nav className="layout-nav">
             {viewLinks?.map(({ to, label }) => (
               <Link
