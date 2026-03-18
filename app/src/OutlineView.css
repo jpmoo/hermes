@@ -17,6 +17,28 @@
   color: var(--accent);
 }
 
+.outline-view-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.outline-view-tool-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.875rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.outline-view-tool-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
 .outline-view-loading,
 .outline-view-empty {
   color: var(--text-muted);
@@ -45,17 +67,34 @@
 }
 
 .outline-toggle {
-  width: 1.25rem;
+  min-width: 1.75rem;
+  height: 1.75rem;
   padding: 0;
-  background: none;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
   color: var(--text-muted);
-  font-size: 0.65rem;
+  font-size: 0.7rem;
+  line-height: 1;
   flex-shrink: 0;
+  cursor: pointer;
+}
+
+.outline-toggle:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
+.outline-toggle:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .outline-spacer {
-  width: 1.25rem;
+  width: 1.75rem;
   flex-shrink: 0;
 }
 
