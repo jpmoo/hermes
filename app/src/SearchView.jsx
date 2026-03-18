@@ -134,7 +134,14 @@ export default function SearchView() {
                   onOpenThread={() =>
                     navigate(`/thread/${n.root_id || n.parent_id || n.id}`)
                   }
-                  onStarredChange={reloadResults}
+                  onStarredChange={() => {
+                    const id = n.id;
+                    setResults((prev) =>
+                      prev.map((x) =>
+                        x.id === id ? { ...x, starred: !x.starred } : x
+                      )
+                    );
+                  }}
                   onNoteUpdate={reloadResults}
                   onNoteDelete={reloadResults}
                 />
