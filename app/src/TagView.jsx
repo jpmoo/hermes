@@ -63,7 +63,7 @@ export default function TagView() {
       viewLinks={[
         { to: '/', label: 'Stream' },
         { to: '/outline', label: 'Outline' },
-        { to: '/queue', label: 'Queue' },
+        { to: '/queue', label: 'Queue', tooltip: 'Autotagging Approval' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
       ]}

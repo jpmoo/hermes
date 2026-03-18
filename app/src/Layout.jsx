@@ -1,7 +1,13 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './Layout.css';
-import { LayoutNavIcon, hasLayoutNavIcon } from './icons/NavIcons.jsx';
+import {
+  LayoutNavIcon,
+  hasLayoutNavIcon,
+  NavIconOrphan,
+  NavIconStar,
+  NavIconSignOut,
+} from './icons/NavIcons.jsx';
 
 const LAYOUT_THEME_COLOR = '#f4f3f0';
 
@@ -24,7 +30,7 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
             />
           </Link>
           <nav className="layout-nav">
-            {viewLinks?.map(({ to, label }) => (
+            {viewLinks?.map(({ to, label, tooltip }) => (
               <Link
                 key={to}
                 to={to}
@@ -34,7 +40,7 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
                     : ''
                 }`}
                 aria-label={label}
-                title={label}
+                title={tooltip ?? label}
               >
                 {hasLayoutNavIcon(to) ? <LayoutNavIcon to={to} /> : label}
               </Link>
@@ -45,18 +51,31 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
               type="button"
               className={`layout-toggle ${starredOnly ? 'layout-toggle--on' : ''}`}
               onClick={() => onStarredOnlyChange?.(!starredOnly)}
+              aria-label={starredOnly ? 'Show all notes' : 'Show starred only'}
+              title={
+                starredOnly
+                  ? 'Starred only — click to show all notes'
+                  : 'All notes — click to show starred only'
+              }
             >
-              {starredOnly ? 'Starred' : 'All'}
+              <NavIconStar className="layout-action-icon" />
             </button>
             <Link
               to="/orphans"
               className={`layout-orphans-link${location.pathname === '/orphans' ? ' layout-orphans-link--active' : ''}`}
+              aria-label="Orphans"
               title="Attachments whose note was deleted"
             >
-              Orphans
+              <NavIconOrphan className="layout-action-icon" />
             </Link>
-            <button type="button" className="layout-logout" onClick={onLogout}>
-              Sign out
+            <button
+              type="button"
+              className="layout-logout"
+              onClick={onLogout}
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <NavIconSignOut className="layout-action-icon" />
             </button>
           </div>
         </div>
