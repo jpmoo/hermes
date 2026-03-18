@@ -5,10 +5,41 @@
 export const TOOL_DEFS = [
   {
     name: 'hermes_create_note',
-    description: 'Create a root note or reply.',
+    description:
+      'Create a root note or reply. Optional attachments: pass attachments or files (same as hermes_add_attachments) to upload base64-encoded files in one step. Alternatively create empty then call hermes_add_attachments.',
     inputSchema: {
       type: 'object',
-      properties: { content: { type: 'string' }, parent_id: { type: 'string' }, external_anchor: { type: 'string' } },
+      properties: {
+        content: { type: 'string' },
+        parent_id: { type: 'string' },
+        external_anchor: { type: 'string' },
+        attachments: {
+          type: 'array',
+          description: 'Optional files to attach immediately (base64 per file). Same shape as hermes_add_attachments files.',
+          items: {
+            type: 'object',
+            properties: {
+              filename: { type: 'string' },
+              mime_type: { type: 'string' },
+              base64: { type: 'string' },
+              data: { type: 'string' },
+            },
+          },
+        },
+        files: {
+          type: 'array',
+          description: 'Alias for attachments',
+          items: {
+            type: 'object',
+            properties: {
+              filename: { type: 'string' },
+              mime_type: { type: 'string' },
+              base64: { type: 'string' },
+              data: { type: 'string' },
+            },
+          },
+        },
+      },
     },
   },
   { name: 'hermes_get_thread', description: 'Retrieve a thread by root note ID.', inputSchema: { type: 'object', properties: { root_id: { type: 'string' } }, required: ['root_id'] } },
@@ -69,8 +100,65 @@ export async function callTool(ctx, req) {
   try {
     switch (name) {
       case 'hermes_create_note': {
-        const { content, parent_id, external_anchor } = args || {};
-        const body = await api('/notes', { method: 'POST', body: JSON.stringify({ content: content || '', parent_id: parent_id || null, external_anchor: external_anchor || null }) });
+        const { content, parent_id, external_anchor, attachments, files: filesArg } = args || {};
+        const fileList = Array.isArray(attachments) && attachments.length ? attachments : Array.isArray(filesArg) ? filesArg : [];
+        const body = await api('/notes', {
+          method: 'POST',
+          body: JSON.stringify({
+            content: content || '',
+            parent_id: parent_id || null,
+            external_anchor: external_anchor || null,
+          }),
+        });
+        if (fileList.length > 0) {
+          if (!uploadAttachments) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      ...body,
+                      attachment_warning:
+                        'Note created but this MCP session cannot upload files here; call hermes_add_attachments with note id.',
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+          try {
+            const uploaded = await uploadAttachments(body.id, fileList);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ ...body, attachments_uploaded: uploaded }, null, 2),
+                },
+              ],
+            };
+          } catch (uploadErr) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    {
+                      error: uploadErr.message,
+                      note_created: body,
+                      hint: 'Note exists; retry with hermes_add_attachments using note id above.',
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       }
       case 'hermes_get_thread': {
