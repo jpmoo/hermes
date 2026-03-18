@@ -17,7 +17,7 @@ export default function TagView() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getTags().then(setAllTags).catch(() => setAllTags([]));
+    getTags({ inUseOnly: true }).then(setAllTags).catch(() => setAllTags([]));
   }, []);
 
   useEffect(() => {
@@ -36,8 +36,22 @@ export default function TagView() {
   };
 
   const load = () => {
-    if (selectedIds.length === 0) return;
-    searchByTags(selectedIds, mode, starredOnly).then(setNotes).catch(() => setNotes([]));
+    getTags({ inUseOnly: true })
+      .then((tags) => {
+        setAllTags(tags);
+        const valid = selectedIds.filter((id) => tags.some((t) => t.id === id));
+        setSelectedIds(valid);
+        if (valid.length === 0) {
+          setNotes([]);
+          return;
+        }
+        setLoading(true);
+        return searchByTags(valid, mode, starredOnly)
+          .then(setNotes)
+          .catch(() => setNotes([]))
+          .finally(() => setLoading(false));
+      })
+      .catch(() => setAllTags([]));
   };
 
   return (

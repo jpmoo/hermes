@@ -5,10 +5,27 @@ import { requireAuth } from '../middleware/auth.js';
 const router = Router();
 router.use(requireAuth);
 
-// List all tags (for typeahead / add-tag UI)
+// List tags: all (typeahead) or ?in_use=1 = only tags with ≥1 approved link to this user's notes
 router.get('/', async (req, res) => {
   try {
-    const r = await pool.query('SELECT id, name, created_at FROM tags ORDER BY name');
+    const userId = req.userId;
+    const inUseOnly =
+      req.query.in_use === '1' ||
+      req.query.in_use === 'true' ||
+      req.query.used === '1';
+    let r;
+    if (inUseOnly) {
+      r = await pool.query(
+        `SELECT DISTINCT t.id, t.name, t.created_at
+         FROM tags t
+         INNER JOIN note_tags nt ON nt.tag_id = t.id AND nt.status = 'approved'
+         INNER JOIN notes n ON n.id = nt.note_id AND n.user_id = $1
+         ORDER BY t.name`,
+        [userId]
+      );
+    } else {
+      r = await pool.query('SELECT id, name, created_at FROM tags ORDER BY name');
+    }
     res.json(r.rows);
   } catch (err) {
     console.error(err);

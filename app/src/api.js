@@ -92,8 +92,10 @@ export async function unstarNote(id) {
   return r.json();
 }
 
-export async function getTags() {
-  const r = await fetch(`${API}/tags`, { headers: headers() });
+/** @param {{ inUseOnly?: boolean }} opts - inUseOnly: tags that appear on at least one of your notes (approved) */
+export async function getTags(opts = {}) {
+  const q = opts.inUseOnly ? '?in_use=1' : '';
+  const r = await fetch(`${API}/tags${q}`, { headers: headers() });
   if (!r.ok) throw new Error('Failed to load tags');
   return r.json();
 }
