@@ -4,7 +4,6 @@ import './Layout.css';
 import {
   LayoutNavIcon,
   hasLayoutNavIcon,
-  NavIconOrphan,
   NavIconStar,
   NavIconSignOut,
 } from './icons/NavIcons.jsx';
@@ -60,14 +59,6 @@ export default function Layout({ title, starredOnly, onStarredOnlyChange, onLogo
             >
               <NavIconStar className="layout-action-icon" />
             </button>
-            <Link
-              to="/orphans"
-              className={`layout-orphans-link${location.pathname === '/orphans' ? ' layout-orphans-link--active' : ''}`}
-              aria-label="Orphans"
-              title="Attachments whose note was deleted"
-            >
-              <NavIconOrphan className="layout-action-icon" />
-            </Link>
             <button
               type="button"
               className="layout-logout"

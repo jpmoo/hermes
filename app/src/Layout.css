@@ -105,30 +105,6 @@
   display: block;
 }
 
-.layout-orphans-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.35rem;
-  min-height: 2.35rem;
-  padding: 0.4rem 0.55rem;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  text-decoration: none;
-  line-height: 0;
-}
-
-.layout-orphans-link:hover {
-  color: var(--accent);
-  background: rgba(201, 162, 39, 0.08);
-}
-
-.layout-orphans-link--active {
-  color: var(--accent);
-  background: rgba(201, 162, 39, 0.12);
-}
-
 .layout-toggle {
   display: inline-flex;
   align-items: center;
