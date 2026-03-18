@@ -277,10 +277,12 @@ router.get('/search-semantic', async (req, res) => {
     const vec = await embed(inputForQuery(q));
     const semFetchLimit = Math.min(100, Math.max(limit * 3, limit + 10));
     let semRows = [];
+    let vectorSearchError = null;
     if (vec) {
       const vecStr = `[${vec.join(',')}]`;
-      const semR = await pool.query(
-        `WITH roots AS (
+      try {
+        const semR = await pool.query(
+          `WITH roots AS (
         SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $2
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
@@ -293,9 +295,13 @@ router.get('/search-semantic', async (req, res) => {
       WHERE n.user_id = $2 AND n.embedding IS NOT NULL
       ORDER BY n.embedding <=> $1::vector
       LIMIT $3`,
-        [vecStr, userId, semFetchLimit]
-      );
-      semRows = semR.rows;
+          [vecStr, userId, semFetchLimit]
+        );
+        semRows = semR.rows;
+      } catch (semErr) {
+        console.error('search-semantic vector query:', semErr.message);
+        vectorSearchError = semErr.message || String(semErr);
+      }
     }
 
     const seen = new Set();
@@ -323,6 +329,16 @@ router.get('/search-semantic', async (req, res) => {
         code: 'EMBED_UNAVAILABLE',
       });
     }
+    if (notes.length === 0 && vec && vectorSearchError) {
+      const dimHint =
+        /dimension|expected/i.test(vectorSearchError)
+          ? ' Your DB column notes.embedding must match the embed model size (e.g. 768 for nomic-embed-text). Fix OLLAMA_EMBED_MODEL or alter vector(N), then run npm run reembed.'
+          : '';
+      return res.status(503).json({
+        error: `Vector search failed.${dimHint} Detail: ${vectorSearchError}. Try Keyword search, or fix embeddings and retry.`,
+        code: 'VECTOR_SEARCH_FAILED',
+      });
+    }
 
     if (notes.length > 0) {
       const ids = notes.map((n) => n.id);
@@ -342,8 +358,11 @@ router.get('/search-semantic', async (req, res) => {
     await attachBlobListToNotes(notes, userId);
     res.json(notes);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to search' });
+    console.error('search-semantic:', err);
+    res.status(500).json({
+      error: err.message ? `Failed to search: ${err.message}` : 'Failed to search',
+      code: 'SEARCH_ERROR',
+    });
   }
 });
 

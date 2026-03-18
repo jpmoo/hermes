@@ -42,8 +42,12 @@ export async function embed(text) {
     });
     if (!r.ok) return null;
     const data = await r.json();
-    const vec = data.embeddings?.[0];
-    return Array.isArray(vec) ? vec : null;
+    const vec = Array.isArray(data.embeddings?.[0])
+      ? data.embeddings[0]
+      : Array.isArray(data.embedding)
+        ? data.embedding
+        : null;
+    return Array.isArray(vec) && vec.length > 0 ? vec : null;
   } catch (err) {
     console.error('Ollama embed error:', err.message);
     return null;
