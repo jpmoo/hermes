@@ -79,7 +79,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-/** Approve a pending proposal; cascades inheritance and enqueues complements */
+/** Approve a pending proposal; enqueues complement tags on that note only */
 router.post('/:id/approve', async (req, res) => {
   try {
     const id = req.params.id;

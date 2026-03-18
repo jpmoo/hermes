@@ -8,7 +8,7 @@ import './QueueView.css';
 export default function QueueView() {
   const [items, setItems] = useState([]);
   const [count, setCount] = useState(0);
-  const [minConfidence, setMinConfidence] = useState(0);
+  const [minConfidencePercent, setMinConfidencePercent] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState(new Set());
   const { logout } = useAuth();
@@ -16,7 +16,10 @@ export default function QueueView() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([getQueue(minConfidence), getQueueCount(minConfidence)])
+    Promise.all([
+      getQueue(minConfidencePercent / 100),
+      getQueueCount(minConfidencePercent / 100),
+    ])
       .then(([list, { count: c }]) => {
         setItems(list);
         setCount(c);
@@ -27,7 +30,7 @@ export default function QueueView() {
 
   useEffect(() => {
     load();
-  }, [minConfidence]);
+  }, [minConfidencePercent]);
 
   const handleApprove = async (id) => {
     setActioning((s) => new Set(s).add(id));
@@ -79,12 +82,12 @@ export default function QueueView() {
             <input
               type="range"
               min="0"
-              max="1"
-              step="0.1"
-              value={minConfidence}
-              onChange={(e) => setMinConfidence(parseFloat(e.target.value))}
+              max="100"
+              step="10"
+              value={minConfidencePercent}
+              onChange={(e) => setMinConfidencePercent(Number(e.target.value))}
             />
-            <span>{minConfidence.toFixed(1)}</span>
+            <span>{minConfidencePercent}%</span>
           </label>
           {items.length > 0 && (
             <button type="button" className="queue-view-approve-all" onClick={handleApproveAll}>

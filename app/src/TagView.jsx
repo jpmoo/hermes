@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getTags, searchByTags } from './api';
+import { getTags, searchByTags, resubmitTaglessNotes } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import './TagView.css';
@@ -12,6 +12,8 @@ export default function TagView() {
   const [mode, setMode] = useState('and');
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [resubmitBusy, setResubmitBusy] = useState(false);
+  const [resubmitMsg, setResubmitMsg] = useState(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -53,6 +55,29 @@ export default function TagView() {
       .catch(() => setAllTags([]));
   };
 
+  const handleResubmitTagless = async () => {
+    setResubmitMsg(null);
+    const ok = window.confirm(
+      'Send notes that have no approved tags through AI tag suggestion again? Up to 150 notes per run (most recent first). Proposals appear in the Queue; Ollama runs in the background.'
+    );
+    if (!ok) return;
+    setResubmitBusy(true);
+    try {
+      const { queued, totalTagless, hasMore } = await resubmitTaglessNotes(150);
+      if (queued === 0) {
+        setResubmitMsg('No tagless notes with text to process.');
+      } else {
+        setResubmitMsg(
+          `Queued ${queued} note${queued === 1 ? '' : 's'} for suggestions${hasMore ? ` (${totalTagless} tagless total — run again for more)` : ''}. Check the Queue in a few minutes.`
+        );
+      }
+    } catch (e) {
+      setResubmitMsg(e.message || 'Request failed');
+    } finally {
+      setResubmitBusy(false);
+    }
+  };
+
   return (
     <Layout
       title="Tags"
@@ -67,7 +92,18 @@ export default function TagView() {
     >
       <div className="tag-view">
         <div className="tag-view-picker">
-          <p className="tag-view-label">Select tags (click to filter notes)</p>
+          <div className="tag-view-toolbar">
+            <p className="tag-view-label">Select tags (click to filter notes)</p>
+            <button
+              type="button"
+              className="tag-view-resubmit"
+              disabled={resubmitBusy}
+              onClick={handleResubmitTagless}
+            >
+              {resubmitBusy ? 'Queueing…' : 'Resubmit tagless notes'}
+            </button>
+          </div>
+          {resubmitMsg && <p className="tag-view-resubmit-msg">{resubmitMsg}</p>}
           <div className="tag-view-tags">
             {allTags.map((t) => (
               <button

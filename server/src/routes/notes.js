@@ -432,6 +432,55 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
   }
 });
 
+/** Queue AI tag proposals for notes with no approved tags (non-empty body). Processes up to `limit` per call in the background. */
+router.post('/resubmit-tagless', async (req, res) => {
+  try {
+    const userId = req.userId;
+    const limit = Math.min(300, Math.max(1, parseInt(req.body?.limit ?? req.query?.limit ?? '150', 10) || 150));
+    const countR = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM notes n
+       WHERE n.user_id = $1
+       AND TRIM(COALESCE(n.content, '')) <> ''
+       AND NOT EXISTS (
+         SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.status = 'approved'
+       )`,
+      [userId]
+    );
+    const totalTagless = countR.rows[0].c;
+    const r = await pool.query(
+      `SELECT n.id, n.content FROM notes n
+       WHERE n.user_id = $1
+       AND TRIM(COALESCE(n.content, '')) <> ''
+       AND NOT EXISTS (
+         SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.status = 'approved'
+       )
+       ORDER BY n.last_activity_at DESC
+       LIMIT $2`,
+      [userId, limit]
+    );
+    const rows = r.rows;
+    res.json({
+      queued: rows.length,
+      totalTagless,
+      hasMore: totalTagless > rows.length,
+    });
+    setImmediate(() => {
+      (async () => {
+        for (const row of rows) {
+          try {
+            await proposeTagsForNote(row.id, row.content, userId);
+          } catch (e) {
+            console.error('resubmit-tagless', row.id, e);
+          }
+        }
+      })();
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to queue tag suggestions' });
+  }
+});
+
 // Get single note (with tags)
 router.get('/:id', async (req, res) => {
   try {

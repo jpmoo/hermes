@@ -1,21 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { starNote, unstarNote, updateNote, deleteNote, getTags, addNoteTag, removeNoteTag, deleteNoteFile, uploadNoteFiles } from './api';
+import {
+  starNote,
+  unstarNote,
+  updateNote,
+  deleteNote,
+  getTags,
+  getNoteTags,
+  addNoteTag,
+  removeNoteTag,
+  deleteNoteFile,
+  uploadNoteFiles,
+} from './api';
 import LinkifiedText from './LinkifiedText';
 import NoteAttachments from './NoteAttachments';
 import './NoteCard.css';
 
-export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete, hasReplies }) {
+export default function NoteCard({
+  note,
+  depth = 0,
+  onOpenThread,
+  onStarredChange,
+  onNoteUpdate,
+  onNoteDelete,
+  hasReplies,
+  /** When set, parent’s tags for inherit (stream). Omit to load parent tags via API when note has parent_id. */
+  parentTagsForInherit,
+}) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [addingTag, setAddingTag] = useState(false);
   const [tagOptions, setTagOptions] = useState([]);
   const [newTagName, setNewTagName] = useState('');
+  const [dropdownParentTags, setDropdownParentTags] = useState([]);
+  const [inheritLoading, setInheritLoading] = useState(false);
 
   const tags = note.tags || [];
 
   useEffect(() => {
     setEditContent(note.content || '');
   }, [note.id, note.content]);
+
+  useEffect(() => {
+    setDropdownParentTags([]);
+  }, [note.id]);
 
   const handleStar = async (e) => {
     e.preventDefault();
@@ -84,10 +111,37 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
     }
     try {
       const list = await getTags({ inUseOnly: true });
+      let pTags = [];
+      if (parentTagsForInherit !== undefined) {
+        pTags = parentTagsForInherit;
+      } else if (note.parent_id) {
+        pTags = await getNoteTags(note.parent_id);
+      }
+      setDropdownParentTags(pTags);
       setTagOptions(list);
       setAddingTag(true);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const tagsMissingFromParent = dropdownParentTags.filter((t) => !tags.some((x) => x.id === t.id));
+
+  const handleInheritParentTags = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (tagsMissingFromParent.length === 0) return;
+    setInheritLoading(true);
+    try {
+      for (const t of tagsMissingFromParent) {
+        await addNoteTag(note.id, { tag_id: t.id });
+      }
+      setAddingTag(false);
+      onNoteUpdate?.();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setInheritLoading(false);
     }
   };
 
@@ -242,6 +296,26 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
                 <div className="note-card-tag-add">
                   {addingTag ? (
                     <ul className="note-card-tag-dropdown">
+                      {dropdownParentTags.length > 0 && (
+                        <li className="note-card-tag-inherit">
+                          <button
+                            type="button"
+                            disabled={tagsMissingFromParent.length === 0 || inheritLoading}
+                            onClick={handleInheritParentTags}
+                            title={
+                              tagsMissingFromParent.length === 0
+                                ? 'This note already has all tags from its parent'
+                                : `Add ${tagsMissingFromParent.length} tag(s) from parent`
+                            }
+                          >
+                            {inheritLoading
+                              ? 'Adding…'
+                              : tagsMissingFromParent.length === 0
+                                ? 'Parent tags already on note'
+                                : 'Inherit parent tags'}
+                          </button>
+                        </li>
+                      )}
                       {tagOptions.filter((t) => !tags.some((x) => x.id === t.id)).map((t) => (
                         <li key={t.id}>
                           <button type="button" onClick={(e) => handleAddTag(e, t)}>{t.name}</button>

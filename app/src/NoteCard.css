@@ -219,6 +219,27 @@
   background: var(--bg);
 }
 
+.note-card-tag-inherit {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+
+.note-card-tag-inherit button {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.note-card-tag-inherit button:disabled {
+  color: var(--text-muted);
+  font-weight: 400;
+  cursor: default;
+}
+
+.note-card-tag-inherit button:disabled:hover {
+  background: none;
+}
+
 .note-card-tag-dropdown-empty,
 .note-card-tag-create {
   padding: 0.35rem 0.75rem;

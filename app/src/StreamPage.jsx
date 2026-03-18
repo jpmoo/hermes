@@ -144,6 +144,8 @@ function StreamList({
   levelDropDelays,
   branchHeadExiting,
   indexInParent = 0,
+  parentTags = [],
+  threadById,
 }) {
   return (
     <>
@@ -153,6 +155,12 @@ function StreamList({
         const delayMs = levelDropMs ?? replyMs;
         const animClass = levelDropMs != null ? 'stream-page-level-drop' : replyMs != null ? 'stream-page-reply-stagger' : undefined;
         const headExit = Boolean(branchHeadExiting && depth === 0 && (indexInParent + i) === 0);
+        const parentTagsForInherit =
+          depth > 0
+            ? parentTags
+            : n.parent_id
+              ? threadById?.get(n.parent_id)?.tags ?? []
+              : [];
         return (
           <li
             key={n.id}
@@ -164,6 +172,7 @@ function StreamList({
               note={n}
               depth={depth}
               hasReplies={(n.children?.length ?? 0) > 0}
+              parentTagsForInherit={parentTagsForInherit}
               onOpenThread={(ev) => onFocusNote(n.id, ev)}
               onStarredChange={onStarredChange}
               onNoteUpdate={onNoteUpdate}
@@ -174,6 +183,8 @@ function StreamList({
                 <StreamList
                   nodes={n.children}
                   depth={depth + 1}
+                  parentTags={n.tags || []}
+                  threadById={threadById}
                   onFocusNote={onFocusNote}
                   onStarredChange={onStarredChange}
                   onNoteUpdate={onNoteUpdate}
@@ -496,6 +507,8 @@ export default function StreamPage() {
       ? [{ ...focusedNode, children: focusedNode.children || [] }]
       : tree;
 
+  const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
+
   const replyStaggerDelays = useMemo(() => {
     if (!replyStagger || !thread.length) return null;
     const t = buildTree(thread);
@@ -781,6 +794,8 @@ export default function StreamPage() {
                     <StreamList
                       nodes={displayTree}
                       depth={0}
+                      parentTags={[]}
+                      threadById={threadById}
                       onFocusNote={onFocusNote}
                       onStarredChange={refreshAll}
                       onNoteUpdate={() => loadThread(true)}

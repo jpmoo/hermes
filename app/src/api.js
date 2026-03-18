@@ -100,6 +100,17 @@ export async function getTags(opts = {}) {
   return r.json();
 }
 
+export async function resubmitTaglessNotes(limit = 150) {
+  const r = await fetch(`${API}/notes/resubmit-tagless`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limit }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to queue tag suggestions');
+  return data;
+}
+
 export async function searchByTags(tagIds, mode = 'and', starredOnly = false) {
   const params = new URLSearchParams({ tagIds: tagIds.join(','), mode, starred: starredOnly });
   const r = await fetch(`${API}/notes/search-by-tags?${params}`, { headers: headers() });
@@ -122,6 +133,14 @@ export async function searchContent(q, limit = 40) {
   const r = await fetch(`${API}/notes/search-content?q=${encodeURIComponent(q)}&limit=${limit}`, { headers: headers() });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Text search failed');
+  return Array.isArray(data) ? data : [];
+}
+
+/** Approved tags on a note (for parent lookup when inheriting). */
+export async function getNoteTags(noteId) {
+  const r = await fetch(`${API}/notes/${noteId}/tags`, { headers: headers() });
+  if (!r.ok) return [];
+  const data = await r.json().catch(() => []);
   return Array.isArray(data) ? data : [];
 }
 
