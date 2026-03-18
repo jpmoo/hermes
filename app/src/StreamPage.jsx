@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api';
@@ -31,34 +31,50 @@ function findNode(nodes, id) {
   return null;
 }
 
-function StreamList({ nodes, depth, onFocusNote, onStarredChange, onNoteUpdate, onNoteDelete }) {
+function StreamList({
+  nodes,
+  depth,
+  onFocusNote,
+  onStarredChange,
+  onNoteUpdate,
+  onNoteDelete,
+  staggerDelays,
+}) {
   return (
     <>
-      {nodes.map((n) => (
-        <li key={n.id}>
-          <NoteCard
-            note={n}
-            depth={depth}
-            hasReplies={(n.children?.length ?? 0) > 0}
-            onOpenThread={() => onFocusNote(n.id)}
-            onStarredChange={onStarredChange}
-            onNoteUpdate={onNoteUpdate}
-            onNoteDelete={onNoteDelete}
-          />
-          {n.children?.length > 0 && (
-            <ul className="stream-page-replies">
-              <StreamList
-                nodes={n.children}
-                depth={depth + 1}
-                onFocusNote={onFocusNote}
-                onStarredChange={onStarredChange}
-                onNoteUpdate={onNoteUpdate}
-                onNoteDelete={onNoteDelete}
-              />
-            </ul>
-          )}
-        </li>
-      ))}
+      {nodes.map((n) => {
+        const delayMs = depth > 0 && staggerDelays?.get(n.id);
+        return (
+          <li
+            key={n.id}
+            className={delayMs != null ? 'stream-page-reply-stagger' : undefined}
+            style={delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined}
+          >
+            <NoteCard
+              note={n}
+              depth={depth}
+              hasReplies={(n.children?.length ?? 0) > 0}
+              onOpenThread={() => onFocusNote(n.id)}
+              onStarredChange={onStarredChange}
+              onNoteUpdate={onNoteUpdate}
+              onNoteDelete={onNoteDelete}
+            />
+            {n.children?.length > 0 && (
+              <ul className="stream-page-replies">
+                <StreamList
+                  nodes={n.children}
+                  depth={depth + 1}
+                  onFocusNote={onFocusNote}
+                  onStarredChange={onStarredChange}
+                  onNoteUpdate={onNoteUpdate}
+                  onNoteDelete={onNoteDelete}
+                  staggerDelays={staggerDelays}
+                />
+              </ul>
+            )}
+          </li>
+        );
+      })}
     </>
   );
 }
@@ -86,7 +102,12 @@ export default function StreamPage() {
   const replyFileRef = useRef(null);
   const threadAnchorRef = useRef(null);
   const focusFromUrlApplied = useRef('');
+  const floatTimerRef = useRef(null);
   const { logout } = useAuth();
+
+  const [floatOpen, setFloatOpen] = useState(null);
+  const [replyStagger, setReplyStagger] = useState(false);
+  const [threadExiting, setThreadExiting] = useState(false);
 
   const loadRoots = useCallback(() => {
     setLoadError(null);
@@ -128,6 +149,15 @@ export default function StreamPage() {
       loadRoots();
       setThread([]);
       setFocusId(null);
+      setReplyStagger(false);
+      if (floatTimerRef.current) {
+        clearTimeout(floatTimerRef.current);
+        floatTimerRef.current = null;
+      }
+      setFloatOpen(null);
+      document.querySelectorAll('.stream-page-root-item').forEach((el) => {
+        el.classList.remove('stream-page-root-fading', 'stream-page-root-item--picked');
+      });
     }
   }, [threadRootId, starredOnly, loadRoots]);
 
@@ -159,16 +189,79 @@ export default function StreamPage() {
     });
   }, [threadRootId, thread[0]?.id, loadingThread]);
 
-  const openThread = (rootId) => {
-    setSearchParams({ thread: rootId });
-    setFocusId(null);
-  };
+  const openThreadDirect = useCallback(
+    (rootId) => {
+      if (floatTimerRef.current) {
+        clearTimeout(floatTimerRef.current);
+        floatTimerRef.current = null;
+      }
+      setFloatOpen(null);
+      setReplyStagger(false);
+      setSearchParams({ thread: rootId });
+      setFocusId(null);
+    },
+    [setSearchParams]
+  );
 
-  const closeThread = () => {
-    setSearchParams({});
+  const beginOpenThread = useCallback(
+    (rootId, e) => {
+      const n = roots.find((r) => r.id === rootId);
+      const li = e?.currentTarget?.closest?.('li.stream-page-root-item');
+      if (!n || !li || typeof li.getBoundingClientRect !== 'function') {
+        openThreadDirect(rootId);
+        return;
+      }
+      if (floatTimerRef.current) {
+        clearTimeout(floatTimerRef.current);
+        floatTimerRef.current = null;
+      }
+      const r = li.getBoundingClientRect();
+      li.classList.add('stream-page-root-item--picked');
+      document.querySelectorAll('.stream-page-root-item').forEach((el) => {
+        if (el !== li) el.classList.add('stream-page-root-fading');
+      });
+      setFloatOpen({
+        note: { ...n },
+        top: r.top,
+        left: r.left,
+        width: r.width,
+        phase: 'idle',
+      });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setFloatOpen((prev) => (prev && prev.note.id === rootId ? { ...prev, phase: 'move' } : prev));
+        });
+      });
+      floatTimerRef.current = setTimeout(() => {
+        floatTimerRef.current = null;
+        document.querySelectorAll('.stream-page-root-item').forEach((el) => {
+          el.classList.remove('stream-page-root-fading', 'stream-page-root-item--picked');
+        });
+        setFloatOpen(null);
+        setReplyStagger(true);
+        setSearchParams({ thread: rootId });
+        setFocusId(null);
+      }, 480);
+    },
+    [roots, openThreadDirect, setSearchParams]
+  );
+
+  const closeThread = useCallback(() => {
+    setThreadExiting(true);
+    setTimeout(() => {
+      setSearchParams({});
+      setFocusId(null);
+      setThreadExiting(false);
+      setReplyStagger(false);
+      loadRoots();
+    }, 220);
+  }, [setSearchParams, loadRoots]);
+
+  const upOneLevel = useCallback(() => {
+    focusFromUrlApplied.current = '';
     setFocusId(null);
-    loadRoots();
-  };
+    if (threadRootId) setSearchParams({ thread: threadRootId });
+  }, [threadRootId, setSearchParams]);
 
   const tree = buildTree(thread);
   const actualRootId = thread[0]?.id;
@@ -177,6 +270,46 @@ export default function StreamPage() {
     focusedNode && focusId !== actualRootId
       ? [{ ...focusedNode, children: focusedNode.children || [] }]
       : tree;
+
+  const replyStaggerDelays = useMemo(() => {
+    if (!replyStagger || !thread.length) return null;
+    const t = buildTree(thread);
+    const tr = thread[0]?.id;
+    const fn = focusId && tr ? findNode(t, focusId) : null;
+    const dt =
+      fn && focusId !== tr ? [{ ...fn, children: fn.children || [] }] : t;
+    const m = new Map();
+    let i = 0;
+    function walk(nodes, depth) {
+      for (const n of nodes) {
+        if (depth > 0) m.set(n.id, i++ * 42);
+        walk(n.children || [], depth + 1);
+      }
+    }
+    walk(dt, 0);
+    return m;
+  }, [replyStagger, thread, focusId]);
+
+  useEffect(() => {
+    if (!replyStagger || !threadReady) return;
+    const t = setTimeout(() => setReplyStagger(false), 1400);
+    return () => clearTimeout(t);
+  }, [replyStagger, threadReady, threadRootId]);
+
+  const onFocusNote = useCallback(
+    (id) => {
+      setFocusId(id);
+      if (!threadRootId) return;
+      const rid = thread[0]?.id;
+      if (id && id !== rid) {
+        setSearchParams({ thread: threadRootId, focus: id });
+      } else {
+        setSearchParams({ thread: threadRootId });
+      }
+    },
+    [threadRootId, thread, setSearchParams]
+  );
+
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
   const focusSnippet = focusedNode?.content?.slice(0, 50) || '';
 
@@ -201,7 +334,7 @@ export default function StreamPage() {
       setPendingRootFiles([]);
       if (rootFileRef.current) rootFileRef.current.value = '';
       setRoots((prev) => [full, ...prev.filter((x) => x.id !== full.id)]);
-      openThread(full.id);
+      openThreadDirect(full.id);
     } catch (err) {
       console.error(err);
     } finally {
@@ -253,52 +386,70 @@ export default function StreamPage() {
       viewLinks={navLinks}
     >
       <div className="stream-page">
+        {floatOpen && (
+          <div
+            className={`stream-page-float ${floatOpen.phase === 'move' ? 'stream-page-float--move' : ''}`}
+            style={{
+              '--fp-top': `${floatOpen.top}px`,
+              '--fp-left': `${floatOpen.left}px`,
+              '--fp-w': `${floatOpen.width}px`,
+            }}
+            aria-hidden
+          >
+            <NoteCard
+              note={floatOpen.note}
+              depth={0}
+              hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
+              onOpenThread={() => {}}
+              onStarredChange={() => {}}
+              onNoteUpdate={() => {}}
+              onNoteDelete={() => {}}
+            />
+          </div>
+        )}
         <div className="stream-page-scroll">
           {threadRootId ? (
             <>
-              <button type="button" className="stream-page-back" onClick={closeThread}>
-                ← All threads
-              </button>
+              <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
+                {focusId && focusId !== actualRootId ? (
+                  <button type="button" className="stream-page-nav-btn" onClick={upOneLevel}>
+                    ↑ One level
+                  </button>
+                ) : null}
+                <button type="button" className="stream-page-nav-btn stream-page-nav-btn--root" onClick={closeThread}>
+                  All threads
+                </button>
+              </div>
               {loadingThread ? (
                 <p className="stream-page-muted">Loading thread…</p>
               ) : thread.length === 0 ? (
                 <p className="stream-page-muted">Thread not found.</p>
               ) : (
                 <div
-                  className="stream-page-thread-enter"
+                  className={`stream-page-thread-enter ${threadExiting ? 'stream-page-thread-enter--exit' : ''}`}
                   key={threadRootId}
                   ref={threadAnchorRef}
                 >
                   {focusId && focusId !== actualRootId && (
                     <div className="stream-page-focus-bar">
                       <span className="stream-page-focus-label">
-                        Focused: {focusSnippet}
+                        Branch: {focusSnippet}
                         {focusedNode?.content?.length > 50 ? '…' : ''}
                       </span>
-                      <button
-                        type="button"
-                        className="stream-page-focus-clear"
-                        onClick={() => {
-                          focusFromUrlApplied.current = '';
-                          setFocusId(null);
-                          setSearchParams({ thread: threadRootId });
-                        }}
-                      >
-                        Show full thread
-                      </button>
                     </div>
                   )}
                   <ul className="stream-page-list">
                     <StreamList
                       nodes={displayTree}
                       depth={0}
-                      onFocusNote={setFocusId}
+                      onFocusNote={onFocusNote}
                       onStarredChange={refreshAll}
                       onNoteUpdate={() => loadThread(true)}
                       onNoteDelete={() => {
                         loadThread(true);
                         loadRoots();
                       }}
+                      staggerDelays={replyStaggerDelays}
                     />
                   </ul>
                 </div>
@@ -325,7 +476,7 @@ export default function StreamPage() {
                         note={n}
                         depth={0}
                         hasReplies={(n.reply_count ?? 0) > 0}
-                        onOpenThread={() => openThread(n.id)}
+                        onOpenThread={(ev) => beginOpenThread(n.id, ev)}
                         onStarredChange={loadRoots}
                         onNoteUpdate={loadRoots}
                         onNoteDelete={loadRoots}

@@ -160,10 +160,19 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
     <article
       className={cardClass}
       style={{ borderLeftWidth: borderWidth }}
-      onClick={editing ? undefined : () => onOpenThread?.()}
+      onClick={editing ? undefined : (ev) => onOpenThread?.(ev)}
       role={editing ? undefined : 'button'}
       tabIndex={editing ? undefined : 0}
-      onKeyDown={editing ? undefined : (e) => e.key === 'Enter' && onOpenThread?.()}
+      onKeyDown={
+        editing
+          ? undefined
+          : (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onOpenThread?.(e);
+              }
+            }
+      }
     >
       <div className="note-card-body">
         {editing ? (
