@@ -710,7 +710,7 @@ export default function StreamPage() {
     ...(threadRootId
       ? [{ to: `/outline/${threadRootId}`, label: 'Outline' }]
       : [{ to: '/outline', label: 'Outline' }]),
-    { to: '/queue', label: 'Queue', tooltip: 'Autotagging Approval' },
+    { to: '/queue', label: 'Queue', tooltip: 'Autotagging approval' },
     { to: '/tags', label: 'Tags' },
     { to: '/search', label: 'Search' },
   ];

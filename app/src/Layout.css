@@ -136,25 +136,39 @@
   min-width: 2.35rem;
   min-height: 2.35rem;
   padding: 0.4rem 0.55rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: none;
+  border: none;
   border-radius: 6px;
   color: var(--text-muted);
   font-size: 0.85rem;
   line-height: 0;
+  cursor: pointer;
 }
 
-.layout-toggle:not(.layout-toggle--on) .layout-action-icon {
-  opacity: 0.5;
+.layout-toggle .layout-action-icon {
+  opacity: 0.4;
 }
 
 .layout-toggle:hover {
   color: var(--text);
+  background: rgba(201, 162, 39, 0.08);
+}
+
+.layout-toggle:hover .layout-action-icon {
+  opacity: 0.65;
 }
 
 .layout-toggle--on {
   color: var(--star);
-  border-color: var(--accent-dim);
+}
+
+.layout-toggle--on .layout-action-icon {
+  opacity: 1;
+}
+
+.layout-toggle--on:hover {
+  color: var(--star);
+  background: rgba(201, 162, 39, 0.1);
 }
 
 .layout-logout {
