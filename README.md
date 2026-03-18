@@ -57,6 +57,14 @@ A note-taking system built around conversation and tree structure. Specification
    cd server && npm install && npm start
    ```
 
+   **Check Ollama + embeddings on the host** (from `server/` with `.env` present):
+
+   ```bash
+   ./scripts/check-hermes-embeddings.sh
+   ```
+
+   Verifies Ollama is reachable, the embed model is installed, a live `/api/embed` call works, and how many notes have `embedding IS NOT NULL` vs missing. Needs `curl`, `psql`, and ideally `jq`.
+
 3. **Web app (dev)**
 
    ```bash
@@ -128,7 +136,8 @@ A note-taking system built around conversation and tree structure. Specification
 - `PATCH /api/notes/:id` — update `{ content?, starred?, external_anchor? }`
 - `POST /api/notes/:id/star`, `DELETE /api/notes/:id/star`
 - `GET /api/tags`, `POST /api/tags`, `GET /api/tags/relationships`, `POST /api/tags/relationships`
-- `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...`
+- `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (503 if Ollama embed unavailable)
+- `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
 - `GET /api/queue?minConfidence=`, `GET /api/queue/count`, `POST /api/queue/:id/approve`, `POST /api/queue/:id/reject`
 - `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphan files**)
 

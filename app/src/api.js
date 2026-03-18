@@ -107,8 +107,20 @@ export async function searchByTags(tagIds, mode = 'and', starredOnly = false) {
 
 export async function searchSemantic(q, limit = 20) {
   const r = await fetch(`${API}/notes/search-semantic?q=${encodeURIComponent(q)}&limit=${limit}`, { headers: headers() });
-  if (!r.ok) throw new Error('Failed to search');
-  return r.json();
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const err = new Error(data.error || 'Semantic search failed');
+    err.code = data.code;
+    throw err;
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+export async function searchContent(q, limit = 40) {
+  const r = await fetch(`${API}/notes/search-content?q=${encodeURIComponent(q)}&limit=${limit}`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Text search failed');
+  return Array.isArray(data) ? data : [];
 }
 
 export async function addNoteTag(noteId, { tag_id, name }) {

@@ -1,3 +1,14 @@
+.search-view-error {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(180, 120, 60, 0.12);
+  border: 1px solid rgba(180, 120, 60, 0.35);
+  border-radius: 8px;
+  color: #dba;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .search-view {
   max-width: 640px;
   margin: 0 auto;
@@ -6,8 +17,10 @@
 
 .search-view-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
+  align-items: center;
 }
 
 .search-view-input {

@@ -42,8 +42,30 @@ export const TOOL_DEFS = [
       },
     },
   },
-  { name: 'hermes_get_thread', description: 'Retrieve a thread by root note ID.', inputSchema: { type: 'object', properties: { root_id: { type: 'string' } }, required: ['root_id'] } },
-  { name: 'hermes_search_semantic', description: 'Query notes by semantic similarity.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, limit: { type: 'number' } }, required: ['q'] } },
+  {
+    name: 'hermes_get_thread',
+    description:
+      'Get a note and all replies under it (subtree). Pass the note id of any message in the thread — not only the root. Returns that note plus every descendant.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        root_id: { type: 'string', description: 'Any note UUID in the branch' },
+        note_id: { type: 'string', description: 'Alias for root_id' },
+      },
+    },
+  },
+  {
+    name: 'hermes_search_semantic',
+    description:
+      'Semantic similarity search (needs Ollama embeddings). If this fails, use hermes_search_content.',
+    inputSchema: { type: 'object', properties: { q: { type: 'string' }, limit: { type: 'number' } }, required: ['q'] },
+  },
+  {
+    name: 'hermes_search_content',
+    description:
+      'Find notes whose body contains the given text (case-insensitive substring). Works without Ollama. Use to locate a note by exact phrase, then hermes_get_thread with that note id for replies.',
+    inputSchema: { type: 'object', properties: { q: { type: 'string' }, limit: { type: 'number' } }, required: ['q'] },
+  },
   { name: 'hermes_search_tags', description: 'Query notes by tag(s).', inputSchema: { type: 'object', properties: { tag_ids: { type: 'array', items: { type: 'string' } }, mode: { type: 'string', enum: ['and', 'or'] } } } },
   { name: 'hermes_get_queue', description: 'Get pending tag proposals.', inputSchema: { type: 'object', properties: { min_confidence: { type: 'number' } } } },
   { name: 'hermes_approve_tag', description: 'Approve or reject a pending tag.', inputSchema: { type: 'object', properties: { proposal_id: { type: 'string' }, approve: { type: 'boolean' } }, required: ['proposal_id'] } },
@@ -162,13 +184,24 @@ export async function callTool(ctx, req) {
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       }
       case 'hermes_get_thread': {
-        const { root_id } = args || {};
-        const body = await api(`/notes/thread/${root_id}`);
+        const threadId = args?.root_id || args?.note_id;
+        if (!threadId) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'root_id or note_id required' }) }],
+            isError: true,
+          };
+        }
+        const body = await api(`/notes/thread/${threadId}`);
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       }
       case 'hermes_search_semantic': {
         const { q, limit } = args || {};
         const body = await api(`/notes/search-semantic?q=${encodeURIComponent(q || '')}&limit=${limit || 20}`);
+        return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
+      }
+      case 'hermes_search_content': {
+        const { q, limit } = args || {};
+        const body = await api(`/notes/search-content?q=${encodeURIComponent(q || '')}&limit=${limit || 40}`);
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
       }
       case 'hermes_search_tags': {

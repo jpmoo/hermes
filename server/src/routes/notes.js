@@ -145,6 +145,57 @@ router.get('/thread/:id', async (req, res) => {
   }
 });
 
+// Substring search in note body (no Ollama; use when semantic search unavailable)
+router.get('/search-content', async (req, res) => {
+  try {
+    const raw = req.query.q?.trim();
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 40));
+    const userId = req.userId;
+    if (!raw) {
+      return res.status(400).json({ error: 'Query parameter q required' });
+    }
+    const escaped = raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const pattern = `%${escaped}%`;
+    const r = await pool.query(
+      `WITH RECURSIVE roots AS (
+        SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $1
+        UNION ALL
+        SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
+      )
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+             r.root_id,
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+      FROM notes n
+      JOIN roots r ON r.id = n.id
+      WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
+      ORDER BY n.last_activity_at DESC
+      LIMIT $3`,
+      [userId, pattern, limit]
+    );
+    const notes = r.rows;
+    if (notes.length > 0) {
+      const ids = notes.map((n) => n.id);
+      const tagRows = await pool.query(
+        `SELECT nt.note_id, t.id AS tag_id, t.name FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = ANY($1) AND nt.status = 'approved' ORDER BY t.name`,
+        [ids]
+      );
+      const byNote = {};
+      tagRows.rows.forEach((row) => {
+        if (!byNote[row.note_id]) byNote[row.note_id] = [];
+        byNote[row.note_id].push({ id: row.tag_id, name: row.name });
+      });
+      notes.forEach((n) => {
+        n.tags = byNote[n.id] || [];
+      });
+    }
+    await attachBlobListToNotes(notes, userId);
+    res.json(notes);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to search content' });
+  }
+});
+
 // Flat / Tag view: notes matching tag(s), mode = and | or
 router.get('/search-by-tags', async (req, res) => {
   try {
@@ -206,7 +257,12 @@ router.get('/search-semantic', async (req, res) => {
     if (!q) return res.json([]);
     const { embed } = await import('../services/ollama.js');
     const vec = await embed(q);
-    if (!vec) return res.json([]);
+    if (!vec) {
+      return res.status(503).json({
+        error: 'Semantic search unavailable (Ollama embed failed or returned nothing). Use GET /api/notes/search-content?q=... for text substring search.',
+        code: 'EMBED_UNAVAILABLE',
+      });
+    }
     const vecStr = `[${vec.join(',')}]`;
     const r = await pool.query(
       `WITH roots AS (

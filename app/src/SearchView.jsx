@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { searchSemantic } from './api';
+import { searchSemantic, searchContent } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import './SearchView.css';
@@ -10,6 +10,7 @@ export default function SearchView() {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -17,18 +18,40 @@ export default function SearchView() {
     e.preventDefault();
     if (!q.trim()) return;
     setLoading(true);
+    setSearchError(null);
     try {
       const list = await searchSemantic(q.trim(), 25);
       setResults(list);
     } catch (err) {
       setResults([]);
+      setSearchError(err.message || 'Semantic search failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTextSearch = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setSearchError(null);
+    try {
+      const list = await searchContent(q.trim(), 40);
+      setResults(list);
+    } catch (err) {
+      setResults([]);
+      setSearchError(err.message || 'Text search failed');
     } finally {
       setLoading(false);
     }
   };
 
   const load = () => {
-    if (q.trim()) searchSemantic(q.trim(), 25).then(setResults).catch(() => setResults([]));
+    if (!q.trim()) return;
+    setSearchError(null);
+    searchSemantic(q.trim(), 25).then(setResults).catch((err) => {
+      setResults([]);
+      setSearchError(err.message);
+    });
   };
 
   return (
@@ -45,15 +68,25 @@ export default function SearchView() {
       ]}
     >
       <div className="search-view">
+        {searchError && (
+          <p className="search-view-error" role="alert">
+            {searchError}
+          </p>
+        )}
         <form className="search-view-form" onSubmit={handleSearch}>
           <input
             type="search"
-            placeholder="Search by meaning…"
+            placeholder="Search notes…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="search-view-input"
           />
-          <button type="submit" disabled={loading}>Search</button>
+          <button type="submit" disabled={loading}>
+            Semantic
+          </button>
+          <button type="button" disabled={loading} onClick={handleTextSearch}>
+            Text contains
+          </button>
         </form>
         {loading && <p className="search-view-loading">Searching…</p>}
         {!loading && results.length > 0 && (
