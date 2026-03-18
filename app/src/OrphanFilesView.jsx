@@ -67,7 +67,7 @@ export default function OrphanFilesView() {
       onStarredOnlyChange={() => {}}
       onLogout={logout}
       viewLinks={[
-        { to: '/', label: 'Feed' },
+        { to: '/', label: 'Stream' },
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },

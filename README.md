@@ -5,7 +5,7 @@ A note-taking system built around conversation and tree structure. Specification
 ## Structure
 
 - **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth, embedding + AI tag pipeline, queue, semantic search. Serves the built web app and REST + WebSocket.
-- **`app/`** — React (Vite) web app: Stream, Outline, Root feed, **Tag/Flat view**, **Approval queue**, All/Starred toggle, edit/delete notes, tags on notes.
+- **`app/`** — React (Vite) web app: **Stream** (thread list + in-thread view on one page, `?thread=`), Outline, Tag view, queue, search, etc.
 - **`client/`** — Electron desktop app that loads the web app from the server (or dev Vite server).
 - **`mcp/`** — Optional stdio MCP for Claude Desktop. The main server also exposes **Streamable HTTP MCP** at **`/mcp`** (same tools).
 - **`telegram/`** — Telegram bot (capture messages as notes; `/thread`, `/reply`, `/star`, `/tags`).
@@ -73,7 +73,7 @@ A note-taking system built around conversation and tree structure. Specification
    cd app && npm install && npm run dev
    ```
 
-   Open http://localhost:5173 (proxies API to :3000).
+   Open http://localhost:5173 (proxies API to :3000). **Stream** is the home page: thread list + composer at bottom; open a thread with `?thread=<root-id>` (old `/thread/:id` URLs redirect there).
 
 4. **Electron (optional)**
 

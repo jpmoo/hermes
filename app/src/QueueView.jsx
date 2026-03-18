@@ -65,7 +65,7 @@ export default function QueueView() {
       title="Tag approval queue"
       onLogout={logout}
       viewLinks={[
-        { to: '/', label: 'Feed' },
+        { to: '/', label: 'Stream' },
         { to: '/outline', label: 'Outline' },
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
@@ -114,7 +114,12 @@ export default function QueueView() {
                     {it.ancestry.map((a, i) => (
                       <span key={a.id}>
                         {i > 0 && ' → '}
-                        <button type="button" onClick={() => navigate(`/thread/${it.ancestry[0].id}`)}>
+                        <button type="button" onClick={() =>
+                          navigate({
+                            pathname: '/',
+                            search: `?thread=${it.ancestry[0].id}`,
+                          })
+                        }>
                           {a.content?.slice(0, 50)}{a.content?.length > 50 ? '…' : ''}
                         </button>
                       </span>

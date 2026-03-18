@@ -1,9 +1,8 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Login from './Login';
-import RootFeed from './RootFeed';
-import StreamView from './StreamView';
+import StreamPage from './StreamPage';
 import OutlineView from './OutlineView';
 import QueueView from './QueueView';
 import TagView from './TagView';
@@ -17,6 +16,11 @@ function PrivateRoute({ children }) {
   return children;
 }
 
+function LegacyThreadRedirect() {
+  const { rootId } = useParams();
+  return <Navigate to={{ pathname: '/', search: `?thread=${encodeURIComponent(rootId)}` }} replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -25,7 +29,7 @@ function AppRoutes() {
         path="/"
         element={
           <PrivateRoute>
-            <RootFeed />
+            <StreamPage />
           </PrivateRoute>
         }
       />
@@ -33,7 +37,7 @@ function AppRoutes() {
         path="/thread/:rootId"
         element={
           <PrivateRoute>
-            <StreamView />
+            <LegacyThreadRedirect />
           </PrivateRoute>
         }
       />

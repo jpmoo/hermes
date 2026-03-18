@@ -58,7 +58,7 @@ export default function SearchView() {
       title="Search"
       onLogout={logout}
       viewLinks={[
-        { to: '/', label: 'Feed' },
+        { to: '/', label: 'Stream' },
         { to: '/outline', label: 'Outline' },
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
@@ -130,9 +130,14 @@ export default function SearchView() {
                   note={n}
                   depth={0}
                   hasReplies={(n.reply_count ?? 0) > 0}
-                  onOpenThread={() =>
-                    navigate(`/thread/${n.root_id || n.parent_id || n.id}`)
-                  }
+                  onOpenThread={() => {
+                    const root = n.root_id || n.id;
+                    const search =
+                      n.parent_id && n.root_id
+                        ? `?thread=${root}&focus=${n.id}`
+                        : `?thread=${root}`;
+                    navigate({ pathname: '/', search });
+                  }}
                   onStarredChange={() => {
                     const id = n.id;
                     setResults((prev) =>

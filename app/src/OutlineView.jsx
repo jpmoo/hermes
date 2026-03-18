@@ -86,7 +86,7 @@ export default function OutlineView() {
       onStarredOnlyChange={setStarredOnly}
       onLogout={logout}
       viewLinks={[
-        { to: '/', label: 'Feed' },
+        { to: '/', label: 'Stream' },
         { to: '/outline', label: 'Outline' },
         { to: '/queue', label: 'Queue' },
         { to: '/tags', label: 'Tags' },
@@ -112,8 +112,17 @@ export default function OutlineView() {
                 node={node}
                 depth={0}
                 onSelect={(id) => {
-                  if (isThread) navigate(`/thread/${rootId}`);
-                  else navigate(`/outline/${id}`);
+                  if (isThread) {
+                    navigate({
+                      pathname: '/',
+                      search:
+                        id === rootId
+                          ? `?thread=${rootId}`
+                          : `?thread=${rootId}&focus=${id}`,
+                    });
+                  } else {
+                    navigate(`/outline/${id}`);
+                  }
                 }}
               />
             ))}
