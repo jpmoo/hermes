@@ -33,7 +33,6 @@ export default function Login() {
           src={`${import.meta.env.BASE_URL}HermesLogo.png`}
           alt="Hermes"
         />
-        <p className="login-subtitle">Personal Knowledge Messenger</p>
         <form onSubmit={submit} className="login-form">
           <input
             type="text"

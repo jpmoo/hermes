@@ -11,31 +11,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.75rem;
 }
 
 .login-card {
   width: 100%;
-  max-width: 360px;
+  max-width: min(calc(100vw - 1.5rem), 620px);
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 2rem;
+  padding: 25px;
+  box-sizing: border-box;
 }
 
 .login-logo-full {
   display: block;
-  width: min(100%, 280px);
+  width: min(100%, 560px);
   height: auto;
-  margin: 0 auto 0.75rem;
+  margin: 0 auto 25px;
   object-fit: contain;
-}
-
-.login-subtitle {
-  margin: 0 0 1.5rem;
-  text-align: center;
-  font-size: 0.9rem;
-  color: var(--text-muted);
 }
 
 .login-form input {
