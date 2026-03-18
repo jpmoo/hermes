@@ -125,7 +125,6 @@ export default function RootFeed() {
                   onStarredChange={load}
                   onNoteUpdate={load}
                   onNoteDelete={load}
-                  allowAttachmentDelete
                 />
               </li>
             ))}

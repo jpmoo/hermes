@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { starNote, unstarNote, updateNote, deleteNote, getTags, addNoteTag, removeNoteTag, deleteNoteFile } from './api';
+import { starNote, unstarNote, updateNote, deleteNote, getTags, addNoteTag, removeNoteTag, deleteNoteFile, uploadNoteFiles } from './api';
 import LinkifiedText from './LinkifiedText';
 import NoteAttachments from './NoteAttachments';
 import './NoteCard.css';
 
-export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete, hasReplies, allowAttachmentDelete }) {
+export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChange, onNoteUpdate, onNoteDelete, hasReplies }) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [addingTag, setAddingTag] = useState(false);
@@ -127,9 +127,29 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
     ? `note-card note-card--depth-${Math.min(depth, 3)}`
     : 'note-card note-card--leaf';
 
-  const handleDeleteAttachment = async (fileId) => {
+  const handleDeleteAttachment = async (att) => {
+    if (
+      !window.confirm(
+        `Remove “${att.filename}” from this note?\n\nThe file will be permanently deleted from the server.`
+      )
+    ) {
+      return;
+    }
     try {
-      await deleteNoteFile(fileId);
+      await deleteNoteFile(att.id);
+      onNoteUpdate?.();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditAddFiles = async (e) => {
+    e.stopPropagation();
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    try {
+      await uploadNoteFiles(note.id, files);
       onNoteUpdate?.();
     } catch (err) {
       console.error(err);
@@ -154,6 +174,23 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
               rows={3}
               autoFocus
             />
+            <div className="note-card-edit-attachments">
+              <p className="note-card-edit-attachments-label">Attachments</p>
+              {note.attachments?.length > 0 ? (
+                <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
+              ) : (
+                <p className="note-card-edit-no-files">No files yet.</p>
+              )}
+              <label className="note-card-edit-add-files">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
+                  onChange={handleEditAddFiles}
+                />
+                Add files
+              </label>
+            </div>
             <div className="note-card-edit-actions">
               <button type="submit">Save</button>
               <button type="button" onClick={handleCancelEdit}>Cancel</button>
@@ -164,10 +201,7 @@ export default function NoteCard({ note, depth = 0, onOpenThread, onStarredChang
             <p className="note-card-content">
               {note.content?.trim() ? <LinkifiedText text={note.content} /> : note.attachments?.length ? null : '—'}
             </p>
-            <NoteAttachments
-              attachments={note.attachments}
-              onDeleted={allowAttachmentDelete ? handleDeleteAttachment : undefined}
-            />
+            <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
             {tags.length > 0 && (
               <div className="note-card-tags" onClick={(e) => e.stopPropagation()}>
                 {tags.map((t) => (

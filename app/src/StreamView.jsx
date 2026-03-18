@@ -45,7 +45,6 @@ function StreamList({ nodes, depth, onFocusNote, onStarredChange, onNoteUpdate, 
             onStarredChange={onStarredChange}
             onNoteUpdate={onNoteUpdate}
             onNoteDelete={onNoteDelete}
-            allowAttachmentDelete
           />
           {n.children?.length > 0 && (
             <ul className="stream-view-replies">

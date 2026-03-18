@@ -58,7 +58,15 @@ function AttachmentItem({ att, onDeleted }) {
         </button>
       )}
       {onDeleted && (
-        <button type="button" className="note-attachment-remove" onClick={(e) => { e.stopPropagation(); onDeleted(att.id); }} aria-label="Remove file">
+        <button
+          type="button"
+          className="note-attachment-remove"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleted(att);
+          }}
+          aria-label={`Remove ${att.filename}`}
+        >
           ×
         </button>
       )}

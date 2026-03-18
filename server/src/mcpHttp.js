@@ -13,6 +13,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { listTools, callTool } from './mcpTools.js';
+import { hermesApiFetcher } from './mcpApiClient.js';
 
 const mcpRequestStore = new AsyncLocalStorage();
 
@@ -33,15 +34,6 @@ function pruneSessions() {
 }
 setInterval(pruneSessions, PRUNE_INTERVAL_MS).unref();
 
-function makeApi(baseUrl, getToken) {
-  return (path, options = {}) => {
-    const url = `${baseUrl.replace(/\/$/, '')}/api${path}`;
-    const token = getToken();
-    const headers = { ...options.headers, 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    return fetch(url, { ...options, headers }).then((r) => (r.status === 204 ? {} : r.json()));
-  };
-}
 
 function isInitializeBody(body) {
   if (body == null) return false;
@@ -70,7 +62,7 @@ export function mountMcpHttp(app, opts) {
     return process.env.HERMES_MCP_TOKEN || '';
   };
 
-  const api = makeApi(internalBase, getToken);
+  const api = hermesApiFetcher(internalBase, getToken);
 
   app.use('/mcp', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

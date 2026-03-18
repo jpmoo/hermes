@@ -3,7 +3,14 @@
  */
 
 export const TOOL_DEFS = [
-  { name: 'hermes_create_note', description: 'Create a root note or reply.', inputSchema: { type: 'object', properties: { content: { type: 'string' }, parent_id: { type: 'string' }, external_anchor: { type: 'string' } }, required: ['content'] } },
+  {
+    name: 'hermes_create_note',
+    description: 'Create a root note or reply.',
+    inputSchema: {
+      type: 'object',
+      properties: { content: { type: 'string' }, parent_id: { type: 'string' }, external_anchor: { type: 'string' } },
+    },
+  },
   { name: 'hermes_get_thread', description: 'Retrieve a thread by root note ID.', inputSchema: { type: 'object', properties: { root_id: { type: 'string' } }, required: ['root_id'] } },
   { name: 'hermes_search_semantic', description: 'Query notes by semantic similarity.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, limit: { type: 'number' } }, required: ['q'] } },
   { name: 'hermes_search_tags', description: 'Query notes by tag(s).', inputSchema: { type: 'object', properties: { tag_ids: { type: 'array', items: { type: 'string' } }, mode: { type: 'string', enum: ['and', 'or'] } } } },
@@ -11,7 +18,11 @@ export const TOOL_DEFS = [
   { name: 'hermes_approve_tag', description: 'Approve or reject a pending tag.', inputSchema: { type: 'object', properties: { proposal_id: { type: 'string' }, approve: { type: 'boolean' } }, required: ['proposal_id'] } },
   { name: 'hermes_star_note', description: 'Star or unstar a note.', inputSchema: { type: 'object', properties: { note_id: { type: 'string' }, starred: { type: 'boolean' } }, required: ['note_id'] } },
   { name: 'hermes_get_starred', description: 'Get starred roots.' },
-  { name: 'hermes_get_root_feed', description: 'Get root feed (reverse chron).' },
+  {
+    name: 'hermes_get_root_feed',
+    description:
+      'List all top-level notes (root threads / main feed), newest first. Use for: what notes do I have, show my threads, root-level list.',
+  },
 ];
 
 export async function listTools() {
@@ -79,6 +90,29 @@ export async function callTool(api, req) {
         return { content: [{ type: 'text', text: JSON.stringify({ error: `Unknown tool: ${name}` }) }], isError: true };
     }
   } catch (err) {
+    const st = err.status;
+    if (st === 401 || st === 403) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: 'Hermes API unauthorized (JWT missing or invalid).',
+                fix: [
+                  'On the Hermes server: add HERMES_MCP_TOKEN=<jwt> to server/.env (same value as browser localStorage key hermes_token after you log in to the web app), then restart Hermes.',
+                  'If your MCP client supports headers: send Authorization: Bearer <that_jwt> on MCP requests.',
+                  'Tokens expire; log in again and update HERMES_MCP_TOKEN if this used to work.',
+                ],
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
     return { content: [{ type: 'text', text: JSON.stringify({ error: err.message }) }], isError: true };
   }
 }
