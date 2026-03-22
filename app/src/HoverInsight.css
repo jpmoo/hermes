@@ -132,6 +132,11 @@
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* New tag suggestions: no × button — don’t pull row left for missing dismiss column */
+.hover-insight-tag-row--no-dismiss {
+  margin-left: 0;
+}
+
 .hover-insight-tag-name {
   flex: 1;
   min-width: 0;

@@ -88,6 +88,7 @@ function HoverInsightTagSection({
   dismissTag,
   addTag,
   addingKey,
+  showDismiss = true,
 }) {
   if (tags.length === 0) return null;
   return (
@@ -96,15 +97,20 @@ function HoverInsightTagSection({
       <ul className="hover-insight-tag-list">
         {tags.map((t) => {
           return (
-            <li key={t.key} className="hover-insight-tag-row">
-              <button
-                type="button"
-                className="hover-insight-icon-btn"
-                aria-label={`Dismiss ${t.name}`}
-                onClick={() => dismissTag(t.key)}
-              >
-                ×
-              </button>
+            <li
+              key={t.key}
+              className={`hover-insight-tag-row${showDismiss ? '' : ' hover-insight-tag-row--no-dismiss'}`}
+            >
+              {showDismiss ? (
+                <button
+                  type="button"
+                  className="hover-insight-icon-btn"
+                  aria-label={`Dismiss ${t.name}`}
+                  onClick={() => dismissTag(t.key)}
+                >
+                  ×
+                </button>
+              ) : null}
               <span className="hover-insight-tag-name" title={tagSuggestionTitle(t)}>
                 {t.name}
               </span>
@@ -544,6 +550,7 @@ function HoverInsightPanels() {
                     dismissTag={dismissTag}
                     addTag={addTag}
                     addingKey={addingKey}
+                    showDismiss={false}
                   />
                 </div>
               )}
