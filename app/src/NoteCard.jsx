@@ -297,7 +297,10 @@ export default function NoteCard({
   return (
     <article
       className={cardClassNames}
-      style={{ borderLeftWidth: borderWidth }}
+      style={{
+        borderLeftWidth: borderWidth,
+        ...(hasConnections ? { borderRightWidth: borderWidth } : {}),
+      }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
       role={editing ? undefined : 'button'}

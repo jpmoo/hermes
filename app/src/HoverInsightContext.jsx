@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -576,36 +577,70 @@ function HoverInsightPanels() {
     return (a.content || '').localeCompare(b.content || '');
   });
 
-  /** Below the card, shifted ~40px past its right edge; L-connector path in viewport coords. */
-  const LINK_STACK_OUTSET = 40;
+  const note = hover?.note;
+
+  /** Below the card; stack’s right edge aligns with note’s right + 60px (viewport coords). */
+  const LINK_STACK_RIGHT_OUTSET = 60;
   const connectionLayout =
     rect && persisted.length > 0
       ? (() => {
           const gap = 6;
           const margin = 8;
-          const elbowY = rect.bottom + 5;
           const stackW = Math.min(280, Math.max(200, rect.width), window.innerWidth - 2 * margin);
-          let left = rect.right + LINK_STACK_OUTSET;
+          const stackRight = rect.right + LINK_STACK_RIGHT_OUTSET;
+          let left = stackRight - stackW;
           if (left + stackW > window.innerWidth - margin) {
             left = Math.max(margin, window.innerWidth - margin - stackW);
           }
           if (left < margin) left = margin;
-          const top = rect.bottom + gap;
-          const roomBelow = window.innerHeight - top - margin;
-          const connectorPath = `M ${rect.right} ${elbowY} L ${left} ${elbowY} L ${left} ${top}`;
+          const stackTopPx = rect.bottom + gap;
+          const roomBelow = window.innerHeight - stackTopPx - margin;
           return {
             stackStyle: {
-              top,
+              top: stackTopPx,
               left,
               width: stackW,
               maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
             },
-            connectorPath,
+            stackTopPx,
+            /* Vertical line from anchor note’s right edge; runs behind opaque cards (z-index). */
+            spineX: rect.right,
+            spineYStart: rect.bottom + 4,
           };
         })()
       : null;
 
-  const note = hover?.note;
+  const connectionStackRef = useRef(null);
+  const [connectionStackHeight, setConnectionStackHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (!connectionLayout || persisted.length === 0) {
+      setConnectionStackHeight(0);
+      return undefined;
+    }
+    const el = connectionStackRef.current;
+    if (!el) return undefined;
+    const measure = () => setConnectionStackHeight(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [
+    connectionLayout?.stackTopPx,
+    connectionLayout?.stackStyle?.left,
+    connectionLayout?.stackStyle?.width,
+    persisted.length,
+    layoutRev,
+    note?.id,
+  ]);
+
+  const connectionSpinePath = useMemo(() => {
+    if (!connectionLayout || persisted.length === 0) return null;
+    const { stackTopPx, spineX, spineYStart } = connectionLayout;
+    const estH = persisted.length * 92 + Math.max(0, persisted.length - 1) * 7 + 8;
+    const h = Math.max(connectionStackHeight, estH, 40);
+    const yEnd = stackTopPx + h;
+    return `M ${spineX} ${spineYStart} L ${spineX} ${yEnd}`;
+  }, [connectionLayout, connectionStackHeight, persisted.length]);
 
   return (
     <>
@@ -711,7 +746,7 @@ function HoverInsightPanels() {
                       className="hover-insight-similar-btn"
                       onMouseEnter={() => setConnectionTagSourceId(sn.id)}
                       onClick={() => linkSimilar(sn)}
-                      title="Save link — appears in the linked stack below the note (past its right edge)"
+                      title="Save link — appears in the linked stack below the note (right-aligned, +60px)"
                     >
                       <span className="hover-insight-similar-snippet">
                         {(sn.content || '—').slice(0, 100)}
@@ -731,17 +766,13 @@ function HoverInsightPanels() {
 
       {hover && rect && persisted.length > 0 && connectionLayout && note && (
         <>
-          <svg
-            className="hover-insight-link-connector"
-            aria-hidden
-            data-insight-ui
-          >
-            <path
-              d={connectionLayout.connectorPath}
-              className="hover-insight-link-connector-path"
-            />
-          </svg>
+          {connectionSpinePath ? (
+            <svg className="hover-insight-connection-spine" aria-hidden data-insight-ui>
+              <path d={connectionSpinePath} className="hover-insight-connection-spine-path" />
+            </svg>
+          ) : null}
         <div
+          ref={connectionStackRef}
           className="hover-insight-connection-stack"
           data-insight-ui
           style={connectionLayout.stackStyle}

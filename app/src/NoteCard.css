@@ -21,9 +21,8 @@
   border-left-color: var(--border);
 }
 
-/* Right edge: note has one or more saved connections (see connection_count from API); width stays 1px like other sides */
+/* Right edge: linked notes use same width as left threadline (set inline with borderRightWidth) */
 .note-card--linked {
-  border-right-width: 1px;
   border-right-color: var(--accent-dim, rgba(201, 162, 39, 0.55));
 }
 
