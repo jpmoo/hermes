@@ -19,6 +19,31 @@ import './HoverInsight.css';
 const CONFIRM_UNLINK =
   'Remove the link between these two notes? The notes are not deleted—only the connection is removed.';
 
+/** Last “min. similarity” for Stream insight; persists across sessions after the user moves the slider. */
+const SIMILARITY_STORAGE_KEY = 'hermes_insight_similarity_min';
+const SIM_SLIDER_MIN = 0.4;
+const SIM_SLIDER_MAX = 0.9;
+const SIM_SLIDER_STEP = 0.05;
+const SIM_SLIDER_DEFAULT = 0.5;
+
+function clampSimilaritySlider(x) {
+  const n = Number(x);
+  if (!Number.isFinite(n)) return SIM_SLIDER_DEFAULT;
+  const s =
+    Math.round(Math.min(SIM_SLIDER_MAX, Math.max(SIM_SLIDER_MIN, n)) / SIM_SLIDER_STEP) * SIM_SLIDER_STEP;
+  return s;
+}
+
+function readStoredSimilarityMin() {
+  try {
+    const v = parseFloat(localStorage.getItem(SIMILARITY_STORAGE_KEY) ?? '', 10);
+    if (Number.isFinite(v)) return clampSimilaritySlider(v);
+  } catch (_) {
+    /* ignore */
+  }
+  return SIM_SLIDER_DEFAULT;
+}
+
 /** Split flat tag list into neighbor / similar / new (ollama) groups. */
 function partitionTagSuggestions(list) {
   const neighbor = [];
@@ -119,7 +144,9 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const [addingKey, setAddingKey] = useState(null);
   const [connectionModal, setConnectionModal] = useState(null);
   const [connectionTagSourceId, setConnectionTagSourceId] = useState(null);
+  const [similarityMin, setSimilarityMin] = useState(() => readStoredSimilarityMin());
   const fetchTimer = useRef(null);
+  const sliderInsightTimerRef = useRef(null);
   const reqId = useRef(0);
   const activeHoverId = useRef(null);
   /** Selected card element for layout (connection stack / scroll sync). */
@@ -130,6 +157,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     activeHoverId.current = null;
     insightAnchorRef.current = null;
     if (fetchTimer.current) clearTimeout(fetchTimer.current);
+    if (sliderInsightTimerRef.current) clearTimeout(sliderInsightTimerRef.current);
+    sliderInsightTimerRef.current = null;
     setHover(null);
     setInsight(null);
     setLoading(false);
@@ -144,6 +173,45 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     clearInsightSelection();
   }, [clearInsightSelection]);
 
+  /** Update slider state and write to localStorage (survives reloads / new tabs on same origin). */
+  const persistSimilarityMin = useCallback((raw) => {
+    const c = clampSimilaritySlider(raw);
+    setSimilarityMin(c);
+    try {
+      localStorage.setItem(SIMILARITY_STORAGE_KEY, String(c));
+    } catch (_) {
+      /* private mode / quota */
+    }
+    return c;
+  }, []);
+
+  const onSimilaritySliderChange = useCallback(
+    (rawValue) => {
+      const c = persistSimilarityMin(rawValue);
+      const noteId = activeHoverId.current;
+      if (!noteId) return;
+      if (sliderInsightTimerRef.current) clearTimeout(sliderInsightTimerRef.current);
+      sliderInsightTimerRef.current = setTimeout(() => {
+        sliderInsightTimerRef.current = null;
+        const id = ++reqId.current;
+        setLoading(true);
+        fetchHoverInsight(noteId, c)
+          .then((data) => {
+            if (reqId.current !== id) return;
+            setInsight(data);
+          })
+          .catch(() => {
+            if (reqId.current !== id) return;
+            setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
+          })
+          .finally(() => {
+            if (reqId.current === id) setLoading(false);
+          });
+      }, 320);
+    },
+    [persistSimilarityMin]
+  );
+
   /**
    * Single-click: show tag / connection UI for this note. Click again on the same note to dismiss.
    * @param {number} depth Stream depth (≥ 0 for insight-enabled cards).
@@ -155,6 +223,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         clearInsightSelection();
         return;
       }
+      if (sliderInsightTimerRef.current) {
+        clearTimeout(sliderInsightTimerRef.current);
+        sliderInsightTimerRef.current = null;
+      }
       insightAnchorRef.current = anchorEl;
       setHover({ note });
       activeHoverId.current = note.id;
@@ -164,23 +236,24 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       if (fetchTimer.current) clearTimeout(fetchTimer.current);
       setInsight(null);
       setLoading(true);
+      const minSim = similarityMin;
       fetchTimer.current = setTimeout(() => {
         const id = ++reqId.current;
-        fetchHoverInsight(note.id)
+        fetchHoverInsight(note.id, minSim)
           .then((data) => {
             if (reqId.current !== id) return;
             setInsight(data);
           })
           .catch(() => {
             if (reqId.current !== id) return;
-            setInsight({ tagSuggestions: [], similarNotes: [] });
+            setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
           })
           .finally(() => {
             if (reqId.current === id) setLoading(false);
           });
       }, 220);
     },
-    [clearInsightSelection]
+    [clearInsightSelection, similarityMin]
   );
 
   /** Pointer / Escape: dismiss when clicking outside insight UI and the selected card. */
@@ -316,6 +389,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       navigateToConnection,
       connectionTagSourceId,
       setConnectionTagSourceId,
+      similarityMin,
+      onSimilaritySliderChange,
     }),
     [
       selectInsightNote,
@@ -334,6 +409,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       navigateToConnection,
       connectionTagSourceId,
       setConnectionTagSourceId,
+      similarityMin,
+      onSimilaritySliderChange,
     ]
   );
 
@@ -365,6 +442,8 @@ function HoverInsightPanels() {
     connectionTagSourceId,
     setConnectionTagSourceId,
     insightAnchorRef,
+    similarityMin,
+    onSimilaritySliderChange,
   } = ctx;
 
   const [layoutRev, setLayoutRev] = useState(0);
@@ -462,8 +541,36 @@ function HoverInsightPanels() {
           >
             <div className={`hover-insight-panel hover-insight-panel--right ${loading ? 'hover-insight-panel--loading' : ''}`}>
               <p className="hover-insight-title">Similar notes</p>
+              <div
+                className="hover-insight-similar-slider-wrap"
+                data-insight-ui
+                title="Default 50% until you change it; your choice is saved in this browser."
+              >
+                <label className="hover-insight-similar-slider-label" htmlFor="hover-insight-similarity-slider">
+                  Min. similarity{' '}
+                  <span className="hover-insight-similar-slider-value">
+                    {Math.round(similarityMin * 100)}%
+                  </span>
+                </label>
+                <input
+                  id="hover-insight-similarity-slider"
+                  type="range"
+                  className="hover-insight-similar-slider"
+                  min={SIM_SLIDER_MIN}
+                  max={SIM_SLIDER_MAX}
+                  step={SIM_SLIDER_STEP}
+                  value={similarityMin}
+                  onChange={(e) => onSimilaritySliderChange(parseFloat(e.target.value, 10))}
+                />
+                <div className="hover-insight-similar-slider-ticks" aria-hidden>
+                  <span>40%</span>
+                  <span>90%</span>
+                </div>
+              </div>
               {!loading && similar.length === 0 && (
-                <p className="hover-insight-muted">None above threshold</p>
+                <p className="hover-insight-muted">
+                  None above {Math.round(similarityMin * 100)}% similarity
+                </p>
               )}
               <ul className="hover-insight-similar-list">
                 {similar.map((sn) => (

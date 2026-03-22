@@ -31,6 +31,7 @@ export default function NoteCard({
 }) {
   const hoverInsight = useHoverInsight();
   const insightClickTimerRef = useRef(null);
+  const tagDropdownRef = useRef(null);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [addingTag, setAddingTag] = useState(false);
@@ -55,6 +56,25 @@ export default function NoteCard({
     },
     []
   );
+
+  useEffect(() => {
+    if (!addingTag) return undefined;
+    const close = () => setAddingTag(false);
+    const onPointerDown = (e) => {
+      const root = tagDropdownRef.current;
+      if (root?.contains(e.target)) return;
+      close();
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [addingTag]);
 
   const insightSelectedId = hoverInsightEnabled ? hoverInsight?.hover?.note?.id : null;
   const insightActive = Boolean(insightSelectedId);
@@ -364,9 +384,9 @@ export default function NoteCard({
                 <button type="button" className="note-card-btn note-card-btn-delete" onClick={handleDelete}>
                   Delete
                 </button>
-                <div className="note-card-tag-add">
+                <div className="note-card-tag-add" ref={tagDropdownRef}>
                   {addingTag ? (
-                    <ul className="note-card-tag-dropdown">
+                    <ul className="note-card-tag-dropdown" role="listbox" aria-label="Add tag">
                       {dropdownParentTags.length > 0 && (
                         <li className="note-card-tag-inherit">
                           <button
@@ -403,7 +423,6 @@ export default function NoteCard({
                           <button type="submit">Add</button>
                         </form>
                       </li>
-                      <li><button type="button" onClick={() => setAddingTag(false)}>Close</button></li>
                     </ul>
                   ) : (
                     <button type="button" className="note-card-tag-add-btn" onClick={openTagDropdown}>+ Tag</button>

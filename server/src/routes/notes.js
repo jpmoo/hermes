@@ -432,12 +432,12 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
   }
 });
 
-/** Hover insight: Ollama tags + embedding-similar tags + similar notes (for Stream hover UI). */
+/** Hover insight: Ollama tags + embedding-similar tags + similar notes (for Stream UI). Optional body.minSimilarity 0.4–0.9 (0.05 steps). */
 router.post('/hover-insight', async (req, res) => {
   try {
     const noteId = req.body?.noteId;
     if (!noteId) return res.status(400).json({ error: 'noteId required' });
-    const data = await getHoverInsight(noteId, req.userId);
+    const data = await getHoverInsight(noteId, req.userId, { minSimilarity: req.body?.minSimilarity });
     if (!data) return res.status(404).json({ error: 'Note not found' });
     res.json(data);
   } catch (err) {

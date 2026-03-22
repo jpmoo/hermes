@@ -1,8 +1,19 @@
 import pool from '../db/pool.js';
 import { generate } from './ollama.js';
 
-const SIM_THRESHOLD = 0.65;
 const VECTOR_CANDIDATES = 30;
+const SIM_MIN_BOUND = 0.4;
+const SIM_MAX_BOUND = 0.9;
+const SIM_MIN_STEP = 0.05;
+const SIM_MIN_DEFAULT = 0.5;
+
+/** Clamp + snap client-provided minimum cosine similarity for “similar notes”. */
+export function normalizeMinSimilarity(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return SIM_MIN_DEFAULT;
+  const snapped = Math.round(n / SIM_MIN_STEP) * SIM_MIN_STEP;
+  return Math.min(SIM_MAX_BOUND, Math.max(SIM_MIN_BOUND, snapped));
+}
 
 function normalizeTagName(s) {
   return (s || '').toString().trim().toLowerCase().replace(/\s+/g, '-');
@@ -10,11 +21,12 @@ function normalizeTagName(s) {
 
 /**
  * Tag suggestions + similar notes + persisted links for Stream hover (any note, including thread roots).
- * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (>0.65) not on note.
+ * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (cosine similarity > minSimilarity) not on note.
  * Root notes: no parent block; siblings = other root-level notes; children = direct replies only (no deeper thread).
  * Tag harvest from vector-similar notes skips grandchildren+ of the hovered note (immediate children may still appear if similar).
  */
-export async function getHoverInsight(noteId, userId) {
+export async function getHoverInsight(noteId, userId, opts = {}) {
+  const minSimilarity = normalizeMinSimilarity(opts.minSimilarity ?? SIM_MIN_DEFAULT);
   const noteR = await pool.query(
     `SELECT id, parent_id, content, embedding::text AS emb_text
      FROM notes WHERE id = $1 AND user_id = $2`,
@@ -152,7 +164,7 @@ JSON array only, no markdown:`;
        LIMIT $4`,
       [embText, userId, id, VECTOR_CANDIDATES]
     );
-    similarRows = simR.rows.filter((r) => Number(r.similarity) > SIM_THRESHOLD).slice(0, 10);
+    similarRows = simR.rows.filter((r) => Number(r.similarity) > minSimilarity).slice(0, 10);
   }
 
   const similarIds = similarRows.map((r) => r.id);
@@ -298,5 +310,6 @@ JSON array only, no markdown:`;
     tagSuggestions,
     similarNotes: similarNotesWithTags,
     persistedLinks: persistedLinksWithTags,
+    similarityMin,
   };
 }

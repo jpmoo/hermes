@@ -18,7 +18,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Notes CRUD, threading, root feed | Done |
 | Starred notes, All/Starred toggle | Done |
 | Embedding pipeline (Ollama → pgvector) | Done |
-| Stream insight: click a note for tag/connection panels (others dim); double-click opens thread | Done |
+| Stream insight: click a note for tag/connection panels (others dim); double-click opens thread; similar-note **min. similarity** slider (default 0.5, **saved in `localStorage`** after you change it) | Done |
 | Inherit parent tags from note UI | Done |
 | Tag relationships (exclusion, complement) API | Done |
 | Flat / Tag view (filter by tags, AND/OR) | Done |
@@ -140,7 +140,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/tags` (all tags for typeahead), `GET /api/tags?in_use=1` (tags with ≥1 approved use on your notes — Tags page), `POST /api/tags`, relationships endpoints
 - `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (hybrid text + semantic; 503 only if Ollama fails and nothing matches the substring)
 - `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
-- `POST /api/notes/hover-insight` — `{ noteId }` → `tagSuggestions[]` (each: `key`, `name`, `source` `ollama`|`similar`, optional `tagId`, and for Ollama `fromVocab` — UI groups into **neighbor** (thread context + vocab), **similar** (tags from embedding-similar notes), **new** (model-proposed tags)); plus similar notes and **bidirectional** persisted links (other note whether you created anchor→peer or peer→anchor; `tags[]`, `threadRootId`, …) (requires Ollama + embeddings)
+- `POST /api/notes/hover-insight` — body `{ noteId, minSimilarity? }`. Optional **minSimilarity** in **0.4–0.9** (snapped to **0.05**), default **0.5**; similar-note list and embedding-derived tag suggestions use cosine similarity **>** that value. Response: `tagSuggestions[]` (neighbor / similar / new groupings in UI), `similarNotes`, `persistedLinks`, `similarityMin` (echo). Stream: slider in Similar notes panel; the app stores the last slider value in **`localStorage`** key `hermes_insight_similarity_min` after the user changes it. Requires Ollama + embeddings.
 - `GET /api/notes/:id/thread-root` — resolves thread root id for any note (used when opening a linked note from hover)
 - `GET /api/notes/:id/connections` — `{ outgoing, incoming }` (same undirected link appears in both notes’ API; row is stored once with an anchor/linked orientation)
 - `POST /api/notes/:id/connections` — `{ linkedNoteId }` — connect two notes (one DB row; idempotent — if a link already exists in either direction, returns it)
