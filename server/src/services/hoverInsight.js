@@ -24,8 +24,8 @@ function normalizeTagName(s) {
  * Tag suggestions + similar notes + persisted links for Stream hover (any note, including thread roots).
  * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (cosine similarity > minSimilarity) not on note.
  * Root notes: no parent block; siblings = other root-level notes; children = direct replies only (no deeper thread).
- * Similar notes: all nearest neighbors above minSimilarity (siblings are not excluded — they were hiding the whole list for replies).
- * Tag harvest from vector-similar notes skips grandchildren+ of the hovered note (immediate children may still appear if similar).
+ * Similar notes: nearest neighbors above minSimilarity, excluding parent, immediate children, and (for replies) siblings.
+ * Tag harvest from vector-similar notes skips grandchildren+ of the hovered note.
  */
 export async function getHoverInsight(noteId, userId, opts = {}) {
   const minSimilarity = normalizeMinSimilarity(opts.minSimilarity ?? SIM_MIN_DEFAULT);
@@ -169,8 +169,17 @@ JSON array only, no markdown:`;
      LIMIT $3`,
     [id, userId, VECTOR_CANDIDATES]
   );
+  const hoveredParentId = parentId ?? null;
+  const sameNote = (a, b) => a != null && b != null && String(a) === String(b);
   similarRows = simR.rows
     .filter((r) => Number(r.similarity) >= minSimilarity)
+    .filter((r) => {
+      const rp = r.parent_id ?? null;
+      if (parentId && sameNote(r.id, parentId)) return false; // parent
+      if (sameNote(rp, id)) return false; // immediate child of hovered
+      if (hoveredParentId !== null && sameNote(rp, hoveredParentId)) return false; // sibling (same parent)
+      return true;
+    })
     .slice(0, 10);
 
   const similarIds = similarRows.map((r) => r.id);
