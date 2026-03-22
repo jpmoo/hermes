@@ -21,7 +21,7 @@ const CONFIRM_UNLINK =
 
 /** Last “min. similarity” for Stream insight; persists across sessions after the user moves the slider. */
 const SIMILARITY_STORAGE_KEY = 'hermes_insight_similarity_min';
-const SIM_SLIDER_MIN = 0.4;
+const SIM_SLIDER_MIN = 0.1;
 const SIM_SLIDER_MAX = 0.9;
 const SIM_SLIDER_STEP = 0.05;
 const SIM_SLIDER_DEFAULT = 0.5;
@@ -484,6 +484,25 @@ function HoverInsightPanels() {
     const sb = b.similarity != null ? b.similarity : -1;
     return sb - sa;
   });
+
+  /** Keep connection stack on-screen (was fixed right of card; often off-viewport on narrow layouts). */
+  const connectionStackStyle =
+    rect && persisted.length > 0
+      ? (() => {
+          const gap = 8;
+          const stackW = Math.min(280, window.innerWidth * 0.38);
+          let left = rect.right + gap;
+          if (left + stackW > window.innerWidth - gap) {
+            left = Math.max(gap, rect.left - stackW - gap);
+          }
+          return {
+            top: Math.max(8, rect.top),
+            left,
+            maxHeight: `min(${Math.max(120, window.innerHeight - rect.top - 16)}px, 72vh)`,
+          };
+        })()
+      : null;
+
   const note = hover?.note;
 
   return (
@@ -563,7 +582,7 @@ function HoverInsightPanels() {
                   onChange={(e) => onSimilaritySliderChange(parseFloat(e.target.value, 10))}
                 />
                 <div className="hover-insight-similar-slider-ticks" aria-hidden>
-                  <span>40%</span>
+                  <span>10%</span>
                   <span>90%</span>
                 </div>
               </div>
@@ -598,15 +617,11 @@ function HoverInsightPanels() {
         </>
       )}
 
-      {hover && rect && persisted.length > 0 && (
+      {hover && rect && persisted.length > 0 && connectionStackStyle && (
         <div
           className="hover-insight-connection-stack"
           data-insight-ui
-          style={{
-            top: Math.max(8, rect.top),
-            left: rect.right + 8,
-            maxHeight: `min(${Math.max(120, window.innerHeight - rect.top - 16)}px, 72vh)`,
-          }}
+          style={connectionStackStyle}
         >
           {persisted.map((pn) => (
             <div

@@ -432,7 +432,7 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
   }
 });
 
-/** Hover insight: Ollama tags + embedding-similar tags + similar notes (for Stream UI). Optional body.minSimilarity 0.4–0.9 (0.05 steps). */
+/** Hover insight: Ollama tags + embedding-similar tags + similar notes (for Stream UI). Optional body.minSimilarity 0.1–0.9 (0.05 steps). */
 router.post('/hover-insight', async (req, res) => {
   try {
     const noteId = req.body?.noteId;

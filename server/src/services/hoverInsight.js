@@ -2,7 +2,7 @@ import pool from '../db/pool.js';
 import { generate } from './ollama.js';
 
 const VECTOR_CANDIDATES = 30;
-const SIM_MIN_BOUND = 0.4;
+const SIM_MIN_BOUND = 0.1;
 const SIM_MAX_BOUND = 0.9;
 const SIM_MIN_STEP = 0.05;
 const SIM_MIN_DEFAULT = 0.5;
@@ -224,14 +224,10 @@ JSON array only, no markdown:`;
 
   const tagSuggestions = [...ollamaTags, ...embeddingTags];
 
+  /* Per-peer thread root via walk up parent chain — avoids dropping links when a note
+   * is missing from the global thread_roots CTE (orphan/broken parent chain, etc.). */
   const pl = await pool.query(
-    `WITH RECURSIVE thread_roots AS (
-       SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $1
-       UNION ALL
-       SELECT n.id, r.root_id FROM notes n JOIN thread_roots r ON n.parent_id = r.id WHERE n.user_id = $1
-     ),
-     anchor AS (SELECT embedding FROM notes WHERE id = $2 AND user_id = $1),
-     raw_links AS (
+    `WITH raw_links AS (
        SELECT nc.id AS connection_id,
               CASE
                 WHEN nc.anchor_note_id = $2::uuid THEN nc.linked_note_id
@@ -251,17 +247,31 @@ JSON array only, no markdown:`;
             nb.id,
             nb.content,
             nb.parent_id,
-            tr.root_id AS thread_root_id,
+            COALESCE(tr.root_id, nb.id) AS thread_root_id,
             CASE
-              WHEN a.embedding IS NOT NULL AND nb.embedding IS NOT NULL
-              THEN 1 - (nb.embedding <=> a.embedding)
+              WHEN an.embedding IS NOT NULL AND nb.embedding IS NOT NULL
+              THEN 1 - (nb.embedding <=> an.embedding)
               ELSE NULL
             END AS similarity,
             d.created_at
      FROM dedup d
      JOIN notes nb ON nb.id = d.peer_id AND nb.user_id = $1
-     JOIN thread_roots tr ON tr.id = nb.id
-     CROSS JOIN anchor a
+     LEFT JOIN LATERAL (
+       WITH RECURSIVE up_chain AS (
+         SELECT n.id, n.parent_id
+         FROM notes n
+         WHERE n.id = nb.id AND n.user_id = $1
+         UNION ALL
+         SELECT p.id, p.parent_id
+         FROM notes p
+         INNER JOIN up_chain u ON p.id = u.parent_id AND p.user_id = $1
+       )
+       SELECT uc.id AS root_id
+       FROM up_chain uc
+       WHERE uc.parent_id IS NULL
+       LIMIT 1
+     ) tr ON true
+     LEFT JOIN notes an ON an.id = $2::uuid AND an.user_id = $1
      ORDER BY similarity DESC NULLS LAST, d.created_at DESC`,
     [userId, id]
   );
