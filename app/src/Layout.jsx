@@ -21,6 +21,7 @@ export default function Layout({
   children,
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', LAYOUT_THEME_COLOR);

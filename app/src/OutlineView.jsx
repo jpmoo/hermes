@@ -204,6 +204,20 @@ export default function OutlineView() {
     await p;
   }, []);
 
+  /** Re-fetch thread bodies for roots saved as expanded (otherwise ▼ shows but children are empty). */
+  useEffect(() => {
+    if (loading || roots.length === 0) return;
+    const map = readOutlineExpansion();
+    const needLoad = roots.filter(
+      (r) =>
+        map[r.id] === true &&
+        (r.reply_count ?? 0) > 0 &&
+        !rootThreads[r.id]
+    );
+    if (needLoad.length === 0) return;
+    void Promise.all(needLoad.map((r) => loadThreadForRoot(r.id)));
+  }, [loading, roots, rootThreads, loadThreadForRoot]);
+
   const tree = roots.map((r) => {
     const loaded = rootThreads[r.id];
     return {
