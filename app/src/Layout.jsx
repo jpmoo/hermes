@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { clearStreamNavMemory, getLastStreamSearch } from './streamNavMemory';
 import './Layout.css';
 import {
   LayoutNavIcon,
@@ -29,7 +30,15 @@ export default function Layout({
     <div className="layout">
       <header className="layout-header">
         <div className="layout-header-inner">
-          <Link to="/" className="layout-logo" aria-label="Hermes home">
+          <Link
+            to="/"
+            className="layout-logo"
+            aria-label="Hermes home — Stream root"
+            title="Stream root (all threads)"
+            onClick={() => {
+              clearStreamNavMemory();
+            }}
+          >
             <img
               className="layout-logo-img"
               src={`${import.meta.env.BASE_URL}HermesLogoSmall.png`}
@@ -37,21 +46,40 @@ export default function Layout({
             />
           </Link>
           <nav className="layout-nav">
-            {viewLinks?.map(({ to, label, tooltip }) => (
-              <Link
-                key={to}
-                to={to}
-                className={`layout-nav-link ${
-                  location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
-                    ? 'layout-nav-link--active'
-                    : ''
-                }`}
-                aria-label={label}
-                title={tooltip ?? label}
-              >
-                {hasLayoutNavIcon(to) ? <LayoutNavIcon to={to} /> : label}
-              </Link>
-            ))}
+            {viewLinks?.map(({ to, label, tooltip }) =>
+              to === '/' ? (
+                <Link
+                  key={to}
+                  to="/"
+                  className={`layout-nav-link ${
+                    location.pathname === '/' ? 'layout-nav-link--active' : ''
+                  }`}
+                  aria-label={label}
+                  title={tooltip ?? 'Return to last Stream level'}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const s = getLastStreamSearch();
+                    navigate(s ? { pathname: '/', search: s } : { pathname: '/' });
+                  }}
+                >
+                  {hasLayoutNavIcon(to) ? <LayoutNavIcon to={to} /> : label}
+                </Link>
+              ) : (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`layout-nav-link ${
+                    location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
+                      ? 'layout-nav-link--active'
+                      : ''
+                  }`}
+                  aria-label={label}
+                  title={tooltip ?? label}
+                >
+                  {hasLayoutNavIcon(to) ? <LayoutNavIcon to={to} /> : label}
+                </Link>
+              )
+            )}
           </nav>
           <div className="layout-actions">
             <button

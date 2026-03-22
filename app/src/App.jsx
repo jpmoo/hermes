@@ -41,7 +41,11 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/outline/:rootId?"
+        path="/outline/:rootId"
+        element={<Navigate to="/outline" replace />}
+      />
+      <Route
+        path="/outline"
         element={
           <PrivateRoute>
             <OutlineView />

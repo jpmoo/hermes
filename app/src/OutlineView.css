@@ -27,8 +27,8 @@
 .outline-view-tool-btn {
   padding: 0.4rem 0.75rem;
   font-size: 0.875rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: none;
+  border: none;
   border-radius: 8px;
   color: var(--text-muted);
   cursor: pointer;
@@ -36,7 +36,6 @@
 
 .outline-view-tool-btn:hover {
   color: var(--accent);
-  border-color: var(--accent-dim);
 }
 
 .outline-view-loading,
@@ -73,8 +72,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: none;
+  border: none;
   border-radius: 4px;
   color: var(--text-muted);
   font-size: 0.7rem;
@@ -85,7 +84,6 @@
 
 .outline-toggle:hover:not(:disabled) {
   color: var(--accent);
-  border-color: var(--accent-dim);
 }
 
 .outline-toggle:disabled {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext, createContext, useCallback, useRef, useLayoutEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getRoots, getThread } from './api';
 import Layout from './Layout';
+import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from './outlineExpansionStorage';
 import './OutlineView.css';
 
 const OutlineExpandContext = createContext({
@@ -26,13 +27,25 @@ function buildTree(flat) {
   return roots;
 }
 
+function collectNoteIds(nodes) {
+  const ids = [];
+  for (const n of nodes) {
+    ids.push(n.id);
+    if (n.children?.length) ids.push(...collectNoteIds(n.children));
+  }
+  return ids;
+}
+
 function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThread, isMultiRoot }) {
   const { expandAllTick, collapseAllTick } = useContext(OutlineExpandContext);
   const rc = node.reply_count ?? 0;
   const cc = node.children?.length ?? 0;
-  const [open, setOpen] = useState(
-    () => !(isMultiRoot && depth === 0 && rc > 0 && cc === 0)
-  );
+  const [open, setOpen] = useState(() => {
+    const saved = readOutlineExpansion()[node.id];
+    if (typeof saved === 'boolean') return saved;
+    /* No auto-expand: opening a parent only reveals direct rows; nested parents stay closed until toggled. */
+    return false;
+  });
   const [loading, setLoading] = useState(false);
   const prevExpandTick = useRef(expandAllTick);
   const prevCollapseTick = useRef(collapseAllTick);
@@ -68,9 +81,14 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
         setLoading(false);
       }
       setOpen(true);
+      setOutlineExpanded(node.id, true);
       return;
     }
-    setOpen((o) => !o);
+    setOpen((prev) => {
+      const next = !prev;
+      setOutlineExpanded(node.id, next);
+      return next;
+    });
   };
 
   const handleToggleClick = (e) => {
@@ -84,7 +102,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
       return;
     }
     if (streamThreadRootId) {
-      onGoToStream?.(streamThreadRootId);
+      onGoToStream?.(streamThreadRootId, node.id);
     }
   };
 
@@ -145,9 +163,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
 }
 
 export default function OutlineView() {
-  const { rootId } = useParams();
   const [roots, setRoots] = useState([]);
-  const [thread, setThread] = useState([]);
   const [rootThreads, setRootThreads] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandAllTick, setExpandAllTick] = useState(0);
@@ -165,12 +181,8 @@ export default function OutlineView() {
     setLoading(true);
     setRootThreads({});
     loadRootInflight.current = new Map();
-    if (rootId) {
-      getThread(rootId, false).then(setThread).finally(() => setLoading(false));
-    } else {
-      getRoots(false).then(setRoots).finally(() => setLoading(false));
-    }
-  }, [rootId]);
+    getRoots(false).then(setRoots).finally(() => setLoading(false));
+  }, []);
 
   const loadThreadForRoot = useCallback(async (id) => {
     if (rootThreadsRef.current[id]) return;
@@ -192,16 +204,47 @@ export default function OutlineView() {
     await p;
   }, []);
 
-  const isThread = Boolean(rootId);
-  const tree = isThread
-    ? buildTree(thread)
-    : roots.map((r) => {
-        const loaded = rootThreads[r.id];
-        return {
-          ...r,
-          children: loaded?.children ?? [],
-        };
+  const tree = roots.map((r) => {
+    const loaded = rootThreads[r.id];
+    return {
+      ...r,
+      children: loaded?.children ?? [],
+    };
+  });
+
+  const treeRef = useRef(tree);
+  treeRef.current = tree;
+
+  useEffect(() => {
+    if (expandAllTick === 0) return;
+    let cancelled = false;
+    const persist = () => {
+      if (cancelled) return;
+      const ids = collectNoteIds(treeRef.current);
+      setAllOutlineExpansion(ids, true);
+    };
+    const id0 = requestAnimationFrame(() => {
+      if (cancelled) return;
+      persist();
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        persist();
       });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(id0);
+    };
+  }, [expandAllTick]);
+
+  useEffect(() => {
+    if (collapseAllTick === 0) return;
+    const id = requestAnimationFrame(() => {
+      const ids = collectNoteIds(treeRef.current);
+      setAllOutlineExpansion(ids, false);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [collapseAllTick]);
 
   const hasAnyExpandable = useCallback(() => {
     function walk(nodes) {
@@ -214,10 +257,8 @@ export default function OutlineView() {
   }, [tree]);
 
   const handleExpandAll = async () => {
-    if (!isThread) {
-      const needLoad = roots.filter((r) => (r.reply_count ?? 0) > 0 && !rootThreads[r.id]);
-      await Promise.all(needLoad.map((r) => loadThreadForRoot(r.id)));
-    }
+    const needLoad = roots.filter((r) => (r.reply_count ?? 0) > 0 && !rootThreads[r.id]);
+    await Promise.all(needLoad.map((r) => loadThreadForRoot(r.id)));
     setExpandAllTick((t) => t + 1);
   };
 
@@ -227,7 +268,7 @@ export default function OutlineView() {
 
   return (
     <Layout
-      title={isThread ? 'Outline' : 'All notes (outline)'}
+      title="Outline"
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },
@@ -237,12 +278,6 @@ export default function OutlineView() {
       ]}
     >
       <div className="outline-view">
-        {rootId && (
-          <button type="button" className="outline-view-back" onClick={() => navigate('/outline')}>
-            ← All threads
-          </button>
-        )}
-
         {!loading && tree.length > 0 && hasAnyExpandable() && (
           <div className="outline-view-toolbar">
             <button type="button" className="outline-view-tool-btn" onClick={handleExpandAll}>
@@ -266,11 +301,14 @@ export default function OutlineView() {
                   key={node.id}
                   node={node}
                   depth={0}
-                  isMultiRoot={!isThread}
-                  streamThreadRootId={isThread ? rootId : node.id}
-                  onLoadThread={!isThread ? loadThreadForRoot : null}
-                  onGoToStream={(threadRoot) => {
-                    navigate({ pathname: '/', search: `?thread=${threadRoot}` });
+                  isMultiRoot
+                  streamThreadRootId={node.id}
+                  onLoadThread={loadThreadForRoot}
+                  onGoToStream={(threadRoot, noteId) => {
+                    const q = new URLSearchParams();
+                    q.set('thread', threadRoot);
+                    if (noteId) q.set('focus', noteId);
+                    navigate({ pathname: '/', search: q.toString() });
                   }}
                 />
               ))}

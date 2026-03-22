@@ -5,6 +5,7 @@ import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import { HoverInsightProvider } from './HoverInsightContext';
+import { setLastStreamSearchFromParams } from './streamNavMemory';
 import './StreamPage.css';
 
 function buildTree(flat) {
@@ -209,6 +210,10 @@ export default function StreamPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
+
+  useEffect(() => {
+    setLastStreamSearchFromParams(searchParams);
+  }, [searchParams]);
 
   const [roots, setRoots] = useState([]);
   const [thread, setThread] = useState([]);
@@ -739,9 +744,7 @@ export default function StreamPage() {
 
   const navLinks = [
     { to: '/', label: 'Stream' },
-    ...(threadRootId
-      ? [{ to: `/outline/${threadRootId}`, label: 'Outline' }]
-      : [{ to: '/outline', label: 'Outline' }]),
+    { to: '/outline', label: 'Outline' },
     { to: '/tags', label: 'Tags' },
     { to: '/search', label: 'Search' },
   ];
