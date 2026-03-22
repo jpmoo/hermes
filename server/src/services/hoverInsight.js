@@ -23,9 +23,11 @@ function normalizeTagName(s) {
 const THREAD_PATH_SEGMENT_MAX = 36;
 
 /**
- * Breadcrumb from thread root → note: truncated note snippets joined by " > ".
+ * Breadcrumb: truncated note snippets joined by " > ", root → … → note.
+ * @param {{ excludeLeaf?: boolean }} options — if true, omit the starting note (parent chain only; for linked-note cards where the snippet is shown separately).
  */
-export async function getNoteThreadPathDisplay(noteId, userId) {
+export async function getNoteThreadPathDisplay(noteId, userId, options = {}) {
+  const excludeLeaf = options.excludeLeaf === true;
   const segments = [];
   let cur = noteId;
   const seen = new Set();
@@ -37,10 +39,13 @@ export async function getNoteThreadPathDisplay(noteId, userId) {
     );
     if (!r.rows.length) break;
     const { parent_id: p, content } = r.rows[0];
-    const text = (content || '').trim().replace(/\s+/g, ' ');
-    const piece =
-      text.length > THREAD_PATH_SEGMENT_MAX ? `${text.slice(0, THREAD_PATH_SEGMENT_MAX)}…` : text || '—';
-    segments.unshift(piece);
+    const skipThisNote = excludeLeaf && depth === 0;
+    if (!skipThisNote) {
+      const text = (content || '').trim().replace(/\s+/g, ' ');
+      const piece =
+        text.length > THREAD_PATH_SEGMENT_MAX ? `${text.slice(0, THREAD_PATH_SEGMENT_MAX)}…` : text || '—';
+      segments.unshift(piece);
+    }
     cur = p;
   }
   return segments.join(' > ');
@@ -100,7 +105,7 @@ export async function loadPersistedLinksMetadata(anchorNoteId, userId) {
       threadRootId: r.thread_root_id,
       similarity: r.similarity != null ? Number(r.similarity) : null,
       persisted: true,
-      threadPath: await getNoteThreadPathDisplay(r.id, userId),
+      threadPath: await getNoteThreadPathDisplay(r.id, userId, { excludeLeaf: true }),
     }))
   );
   return { persistedLinks, persistedLinkIds };

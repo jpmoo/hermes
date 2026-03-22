@@ -299,7 +299,12 @@ export default function NoteCard({
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
-        ...(hasConnections ? { borderRightWidth: borderWidth } : {}),
+        ...(hasConnections
+          ? {
+              borderRightWidth: borderWidth,
+              borderRightStyle: 'solid',
+            }
+          : {}),
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}

@@ -600,7 +600,9 @@ router.get('/:id/thread-path', async (req, res) => {
     const userId = req.userId;
     const own = await pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
     if (own.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
-    const threadPath = await getNoteThreadPathDisplay(id, userId);
+    const excludeLeaf =
+      req.query.excludeLeaf === '1' || req.query.excludeLeaf === 'true' || req.query.excludeLeaf === 'yes';
+    const threadPath = await getNoteThreadPathDisplay(id, userId, { excludeLeaf });
     res.json({ threadPath });
   } catch (err) {
     console.error(err);

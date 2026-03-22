@@ -603,8 +603,8 @@ function HoverInsightPanels() {
               maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
             },
             stackTopPx,
-            /* Vertical line from anchor note’s right edge; runs behind opaque cards (z-index). */
-            spineX: rect.right,
+            /* Vertical spine centered on the connected-note column; runs behind cards (z-index). */
+            spineX: left + stackW / 2,
             spineYStart: rect.bottom + 4,
           };
         })()

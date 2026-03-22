@@ -21,9 +21,24 @@
   border-left-color: var(--border);
 }
 
-/* Right edge: linked notes use same width as left threadline (set inline with borderRightWidth) */
+/* Right edge: match left threadline weight + hue (left uses opaque depth colors; avoid faded rgba so it doesn’t look thinner) */
 .note-card--linked {
-  border-right-color: var(--accent-dim, rgba(201, 162, 39, 0.55));
+  border-right-style: solid;
+  border-right-color: var(--accent-dim);
+}
+
+.note-card--leaf.note-card--linked {
+  border-right-color: var(--border);
+}
+
+.note-card--depth-1.note-card--linked {
+  border-right-color: #5a4a2a;
+}
+.note-card--depth-2.note-card--linked {
+  border-right-color: #4a3a1a;
+}
+.note-card--depth-3.note-card--linked {
+  border-right-color: #3a2a12;
 }
 
 /* Stream insight: no focus ring on the selected card */

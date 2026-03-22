@@ -139,8 +139,9 @@ export async function getNoteThreadRoot(noteId) {
 }
 
 /** Root → note breadcrumb (truncated snippets, " > " separators). */
-export async function getNoteThreadPath(noteId) {
-  const r = await fetch(`${API}/notes/${noteId}/thread-path`, { headers: headers() });
+export async function getNoteThreadPath(noteId, { excludeLeaf = true } = {}) {
+  const q = excludeLeaf ? '?excludeLeaf=1' : '';
+  const r = await fetch(`${API}/notes/${noteId}/thread-path${q}`, { headers: headers() });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Could not load thread path');
   return data.threadPath || '';
