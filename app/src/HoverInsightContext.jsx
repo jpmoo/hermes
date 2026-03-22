@@ -3,7 +3,6 @@ import React, {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -504,53 +503,9 @@ function HoverInsightPanels() {
               width: stackW,
               maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
             },
-            stackTopPx,
-            spineX: left + stackW / 2,
           };
         })()
       : null;
-
-  const connectionStackRef = useRef(null);
-  const [connectionStackHeight, setConnectionStackHeight] = useState(0);
-  useLayoutEffect(() => {
-    if (!connectionLayout || persisted.length === 0) {
-      setConnectionStackHeight(0);
-      return undefined;
-    }
-    const el = connectionStackRef.current;
-    if (!el) return undefined;
-    const measure = () => {
-      const kids = el.children;
-      if (kids.length === 0) {
-        setConnectionStackHeight(0);
-        return;
-      }
-      const stackRect = el.getBoundingClientRect();
-      const lastRect = kids[kids.length - 1].getBoundingClientRect();
-      setConnectionStackHeight(Math.max(0, lastRect.bottom - stackRect.top));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [
-    connectionLayout?.stackTopPx,
-    connectionLayout?.stackStyle?.left,
-    connectionLayout?.stackStyle?.width,
-    persisted.length,
-    layoutRev,
-    note?.id,
-  ]);
-
-  const connectionSpinePath = useMemo(() => {
-    if (!connectionLayout || persisted.length === 0) return null;
-    const { stackTopPx, spineX } = connectionLayout;
-    const estH = persisted.length * 92 + Math.max(0, persisted.length - 1) * 7 + 8;
-    const contentH = connectionStackHeight > 0 ? connectionStackHeight : estH;
-    const yEnd = stackTopPx + contentH;
-    /* Single vertical at stack center (no horizontal segment along anchor bottom). */
-    return `M ${spineX} ${stackTopPx} L ${spineX} ${yEnd}`;
-  }, [connectionLayout, connectionStackHeight, persisted.length]);
 
   return (
     <>
@@ -663,13 +618,7 @@ function HoverInsightPanels() {
 
       {hover && rect && persisted.length > 0 && connectionLayout && note && (
         <>
-          {connectionSpinePath ? (
-            <svg className="hover-insight-connection-spine" aria-hidden data-insight-ui>
-              <path d={connectionSpinePath} className="hover-insight-connection-spine-path" />
-            </svg>
-          ) : null}
         <div
-          ref={connectionStackRef}
           className="hover-insight-connection-stack"
           data-insight-ui
           style={connectionLayout.stackStyle}

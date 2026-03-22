@@ -21,10 +21,7 @@
   border-left-color: var(--border);
 }
 
-/*
- * Connected notes: right edge matches the left “threadline” pattern — same border width (inline on
- * <article> as borderRightWidth) and the same colors as border-left-color for leaf / depth.
- */
+/* Connected notes: right stripe matches left threadline (width via inline borderRightWidth on <article>). */
 .note-card.note-card--linked.note-card--leaf {
   border-right-color: var(--border);
 }
