@@ -309,7 +309,7 @@
   font-family: var(--font-mono);
 }
 
-/* Stacked linked notes — flush beside selected card (position + width from inline style) */
+/* Stacked linked notes — below selected card, right-aligned (position + width from inline style) */
 .hover-insight-connection-stack {
   position: fixed;
   z-index: 270;
@@ -318,6 +318,7 @@
   pointer-events: auto;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 0.45rem;
   padding-right: 2px;
   animation: hover-insight-connect 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -326,11 +327,11 @@
 @keyframes hover-insight-connect {
   from {
     opacity: 0;
-    transform: translateX(20px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 

@@ -510,22 +510,25 @@ function HoverInsightPanels() {
     return (a.content || '').localeCompare(b.content || '');
   });
 
-  /** Flush to selected card’s right edge; flip left if it would leave the viewport. */
+  /** Below the selected card, width capped, right edge aligned with the card (viewport-clamped). */
   const connectionStackStyle =
     rect && persisted.length > 0
       ? (() => {
-          const gap = 2;
-          const stackW = Math.min(280, window.innerWidth * 0.38);
-          let left = rect.right + gap;
-          if (left + stackW > window.innerWidth - 8) {
-            left = Math.max(8, rect.left - stackW - gap);
+          const gap = 6;
+          const margin = 8;
+          const stackW = Math.min(280, Math.max(200, rect.width), window.innerWidth - 2 * margin);
+          let left = rect.right - stackW;
+          if (left < margin) left = margin;
+          if (left + stackW > window.innerWidth - margin) {
+            left = Math.max(margin, window.innerWidth - margin - stackW);
           }
-          const roomBelow = window.innerHeight - rect.top - 8;
+          const top = rect.bottom + gap;
+          const roomBelow = window.innerHeight - top - margin;
           return {
-            top: Math.max(0, rect.top),
+            top,
             left,
             width: stackW,
-            maxHeight: `${Math.max(100, Math.min(roomBelow, window.innerHeight * 0.72))}px`,
+            maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
           };
         })()
       : null;
@@ -626,7 +629,7 @@ function HoverInsightPanels() {
                       className="hover-insight-similar-btn"
                       onMouseEnter={() => setConnectionTagSourceId(sn.id)}
                       onClick={() => linkSimilar(sn)}
-                      title="Save link — appears stacked beside the selected note"
+                      title="Save link — appears in a stack below the selected note (right-aligned)"
                     >
                       <span className="hover-insight-similar-snippet">
                         {(sn.content || '—').slice(0, 100)}
