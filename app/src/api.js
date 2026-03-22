@@ -142,7 +142,10 @@ export async function fetchHoverInsight(noteId, minSimilarity = 0.5) {
   const r = await fetch(`${API}/notes/hover-insight`, {
     method: 'POST',
     headers: { ...headers(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ noteId, minSimilarity }),
+    body: JSON.stringify({
+      noteId: noteId != null ? String(noteId) : noteId,
+      minSimilarity,
+    }),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Failed to load suggestions');

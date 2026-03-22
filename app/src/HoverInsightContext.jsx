@@ -44,7 +44,7 @@ function readStoredSimilarityMin() {
   return SIM_SLIDER_DEFAULT;
 }
 
-/** Ensure arrays exist (API / parse edge cases). */
+/** Ensure arrays exist (API / parse edge cases). Accept camelCase or snake_case keys. */
 function normalizeHoverInsightPayload(data) {
   if (!data || typeof data !== 'object') {
     return {
@@ -54,11 +54,14 @@ function normalizeHoverInsightPayload(data) {
       similarityMin: SIM_SLIDER_DEFAULT,
     };
   }
+  const persisted = data.persistedLinks ?? data.persisted_links;
+  const similar = data.similarNotes ?? data.similar_notes;
+  const tags = data.tagSuggestions ?? data.tag_suggestions;
   return {
     ...data,
-    tagSuggestions: Array.isArray(data.tagSuggestions) ? data.tagSuggestions : [],
-    similarNotes: Array.isArray(data.similarNotes) ? data.similarNotes : [],
-    persistedLinks: Array.isArray(data.persistedLinks) ? data.persistedLinks : [],
+    tagSuggestions: Array.isArray(tags) ? tags : [],
+    similarNotes: Array.isArray(similar) ? similar : [],
+    persistedLinks: Array.isArray(persisted) ? persisted : [],
   };
 }
 

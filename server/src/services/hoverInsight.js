@@ -223,57 +223,46 @@ JSON array only, no markdown:`;
 
   const tagSuggestions = [...ollamaTags, ...embeddingTags];
 
-  /* Per-peer thread root via walk up parent chain — avoids dropping links when a note
-   * is missing from the global thread_roots CTE (orphan/broken parent chain, etc.). */
-  const pl = await pool.query(
-    `WITH raw_links AS (
-       SELECT nc.id AS connection_id,
-              CASE
-                WHEN nc.anchor_note_id = $2::uuid THEN nc.linked_note_id
-                ELSE nc.anchor_note_id
-              END AS peer_id,
-              nc.created_at
-       FROM note_connections nc
-       WHERE nc.user_id = $1
-         AND (nc.anchor_note_id = $2::uuid OR nc.linked_note_id = $2::uuid)
-     ),
-     dedup AS (
-       SELECT DISTINCT ON (peer_id) connection_id, peer_id, created_at
-       FROM raw_links
-       ORDER BY peer_id, created_at DESC
-     )
-     SELECT d.connection_id,
-            nb.id,
-            nb.content,
-            nb.parent_id,
-            COALESCE(tr.root_id, nb.id) AS thread_root_id,
-            CASE
-              WHEN an.embedding IS NOT NULL AND nb.embedding IS NOT NULL
-              THEN 1 - (nb.embedding <=> an.embedding)
-              ELSE NULL
-            END AS similarity,
-            d.created_at
-     FROM dedup d
-     JOIN notes nb ON nb.id = d.peer_id AND nb.user_id = $1
-     LEFT JOIN LATERAL (
-       WITH RECURSIVE up_chain AS (
-         SELECT n.id, n.parent_id
-         FROM notes n
-         WHERE n.id = nb.id AND n.user_id = $1
-         UNION ALL
-         SELECT p.id, p.parent_id
-         FROM notes p
-         INNER JOIN up_chain u ON p.id = u.parent_id AND p.user_id = $1
+  /* Linked peers: keep SQL simple (no LATERAL/recursion). Thread root for “go to” is resolved client-side via getNoteThreadRoot when null. */
+  let pl = { rows: [] };
+  try {
+    pl = await pool.query(
+      `WITH raw_links AS (
+         SELECT nc.id AS connection_id,
+                CASE
+                  WHEN nc.anchor_note_id = $2::uuid THEN nc.linked_note_id
+                  ELSE nc.anchor_note_id
+                END AS peer_id,
+                nc.created_at
+         FROM note_connections nc
+         WHERE nc.user_id = $1
+           AND (nc.anchor_note_id = $2::uuid OR nc.linked_note_id = $2::uuid)
+       ),
+       dedup AS (
+         SELECT DISTINCT ON (peer_id) connection_id, peer_id, created_at
+         FROM raw_links
+         ORDER BY peer_id, created_at DESC
        )
-       SELECT uc.id AS root_id
-       FROM up_chain uc
-       WHERE uc.parent_id IS NULL
-       LIMIT 1
-     ) tr ON true
-     LEFT JOIN notes an ON an.id = $2::uuid AND an.user_id = $1
-     ORDER BY similarity DESC NULLS LAST, d.created_at DESC`,
-    [userId, id]
-  );
+       SELECT d.connection_id,
+              nb.id,
+              nb.content,
+              nb.parent_id,
+              NULL::uuid AS thread_root_id,
+              CASE
+                WHEN an.embedding IS NOT NULL AND nb.embedding IS NOT NULL
+                THEN 1 - (nb.embedding <=> an.embedding)
+                ELSE NULL
+              END AS similarity,
+              d.created_at
+       FROM dedup d
+       INNER JOIN notes nb ON nb.id = d.peer_id AND nb.user_id = $1
+       LEFT JOIN notes an ON an.id = $2::uuid AND an.user_id = $1
+       ORDER BY similarity DESC NULLS LAST, d.created_at DESC`,
+      [userId, id]
+    );
+  } catch (err) {
+    console.error('hover-insight persisted links query:', err.message || err);
+  }
   const persistedLinkIds = new Set(pl.rows.map((r) => r.id));
   const persistedLinks = pl.rows.map((r) => ({
     connectionId: r.connection_id,
