@@ -213,7 +213,13 @@ export default function NoteCard({
   const replies = hasReplies ?? ((note.reply_count ?? 0) > 0);
   const showThreadline = replies;
   const borderWidth = showThreadline ? Math.min(depth + 2, 6) : 1;
-  const connectionCount = note.connection_count ?? 0;
+  const rawConn = note?.connection_count ?? note?.connectionCount;
+  const connectionCount =
+    rawConn == null || rawConn === ''
+      ? 0
+      : typeof rawConn === 'string'
+        ? parseInt(rawConn, 10) || 0
+        : Number(rawConn) || 0;
   const hasConnections = connectionCount > 0;
   const cardClass = [
     showThreadline ? `note-card note-card--depth-${Math.min(depth, 3)}` : 'note-card note-card--leaf',
@@ -294,28 +300,21 @@ export default function NoteCard({
         }`
       : undefined;
 
-  /* Right “threadline” via ::after + CSS vars — more reliable than border longhands next to `border:` shorthand. */
-  const linkBarVars = hasConnections
-    ? {
-        '--hermes-link-rw': `${borderWidth}px`,
-        '--hermes-link-rc': !showThreadline
-          ? 'var(--border)'
-          : depth <= 0
-            ? 'var(--accent-dim, #6d5610)'
-            : depth === 1
-              ? '#5a4a2a'
-              : depth === 2
-                ? '#4a3a1a'
-                : '#3a2a12',
-      }
-    : null;
+  const linkBarColor = !showThreadline
+    ? 'var(--border)'
+    : depth <= 0
+      ? 'var(--accent-dim, #6d5610)'
+      : depth === 1
+        ? '#5a4a2a'
+        : depth === 2
+          ? '#4a3a1a'
+          : '#3a2a12';
 
   return (
     <article
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
-        ...(linkBarVars || {}),
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
@@ -468,6 +467,16 @@ export default function NoteCard({
           </div>
         </div>
       </div>
+      {hasConnections ? (
+        <span
+          className="note-card-link-bar"
+          aria-hidden
+          style={{
+            '--hermes-link-rw': `${borderWidth}px`,
+            '--hermes-link-rc': linkBarColor,
+          }}
+        />
+      ) : null}
     </article>
   );
 }

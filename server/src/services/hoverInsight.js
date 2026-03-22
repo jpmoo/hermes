@@ -215,7 +215,7 @@ export async function getHoverInsight(noteId, userId, _opts = {}) {
     activeTagRows.rows.map((t) => t.name).join(', ') || '(no tags in use yet — you may suggest up to 6 new hyphenated tags)';
 
   const contextParts = [
-    content?.trim() ? `--- hovered note ---\n${content.trim()}` : '',
+    `--- hovered note ---\n${content?.trim() || '(empty)'}`,
     parentBlock ? `--- parent note ---\n${parentBlock}` : '',
     siblingsBlock ? `--- sibling notes (same level in thread) ---\n${siblingsBlock}` : '',
     childrenBlock
@@ -225,10 +225,15 @@ export async function getHoverInsight(noteId, userId, _opts = {}) {
   const body = contextParts.join('\n\n');
 
   const ollamaParsed = [];
-  if (body.trim()) {
-    const prompt = `You tag notes in Hermes. The HOVERED NOTE is the focus; parent, sibling, and child sections give thread context. Child notes are ONLY immediate replies (one level under the hovered note), not grandchildren or deeper thread. Suggest tags for the hovered note (and context). Use ACTIVE TAGS when they fit; otherwise at most 6 NEW tags (lowercase, hyphenated).
+  const prompt = `You tag notes in Hermes. The HOVERED NOTE is the focus; parent, sibling, and child sections (when present) are thread neighbors only.
 
-Return ONLY a JSON array: [{"tag":"name","from_vocab":true|false}, ...] with 1–12 items. from_vocab is true only if the tag appears in ACTIVE TAGS **and** it reasonably applies because of the parent, sibling, or child sections (not merely because that tag exists on some other unrelated note in your library).
+Your output must combine:
+1) **Neighbor vocabulary**: from_vocab **true** only for names in ACTIVE TAGS that fit **parent, siblings, or immediate children** context (not tags that only appear on unrelated notes).
+2) **New tags**: up to **6** items with from_vocab **false** — lowercase, hyphenated, helpful for the hovered note (even if the note text is short or empty).
+
+Child notes in context are ONLY immediate replies (one level), not deeper thread.
+
+Return ONLY a JSON array: [{"tag":"name","from_vocab":true|false}, ...] with 1–12 items total.
 
 ACTIVE TAGS: ${tagList}
 
@@ -236,27 +241,26 @@ CONTEXT:
 ${body.slice(0, 5500)}
 
 JSON array only, no markdown:`;
-    const raw = await generate(prompt, { num_predict: 450, temperature: 0.25 });
-    if (raw) {
-      try {
-        const json = raw.replace(/[\s\S]*?(\[[\s\S]*\])\s*$/, '$1');
-        const items = JSON.parse(json);
-        if (Array.isArray(items)) {
-          let newCount = 0;
-          for (const it of items) {
-            const name = normalizeTagName(it.tag || it.name);
-            if (!name) continue;
-            const fromVocab = !!it.from_vocab;
-            if (!fromVocab) {
-              newCount += 1;
-              if (newCount > 6) continue;
-            }
-            ollamaParsed.push({ name, from_vocab: fromVocab });
+  const raw = await generate(prompt, { num_predict: 450, temperature: 0.25 });
+  if (raw) {
+    try {
+      const json = raw.replace(/[\s\S]*?(\[[\s\S]*\])\s*$/, '$1');
+      const items = JSON.parse(json);
+      if (Array.isArray(items)) {
+        let newCount = 0;
+        for (const it of items) {
+          const name = normalizeTagName(it.tag || it.name);
+          if (!name) continue;
+          const fromVocab = !!it.from_vocab;
+          if (!fromVocab) {
+            newCount += 1;
+            if (newCount > 6) continue;
           }
+          ollamaParsed.push({ name, from_vocab: fromVocab });
         }
-      } catch {
-        /* ignore parse errors */
       }
+    } catch {
+      /* ignore parse errors */
     }
   }
 
