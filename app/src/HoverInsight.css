@@ -293,10 +293,20 @@
   border-color: var(--accent-dim);
 }
 
-.hover-insight-similar-snippet {
+.hover-insight-similar-snippet,
+.hover-insight-similar-btn-main {
   flex: 1;
   min-width: 0;
   line-height: 1.35;
+}
+
+.hover-insight-similar-path {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.72rem;
+  color: var(--text-muted);
 }
 
 .hover-insight-sim-pct {

@@ -33,6 +33,7 @@ function AttachmentItem({ att, onDeleted }) {
   }, [att.id, isImage]);
 
   const download = async (e) => {
+    e.preventDefault();
     e.stopPropagation();
     const t = getToken();
     const r = await fetch(fileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
@@ -77,7 +78,7 @@ function AttachmentItem({ att, onDeleted }) {
 export default function NoteAttachments({ attachments, onDeleted }) {
   if (!attachments?.length) return null;
   return (
-    <div className="note-attachments" onClick={(e) => e.stopPropagation()}>
+    <div className="note-attachments">
       {attachments.map((a) => (
         <AttachmentItem key={a.id} att={a} onDeleted={onDeleted} />
       ))}

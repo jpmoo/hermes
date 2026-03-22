@@ -377,12 +377,15 @@ JSON array only, no markdown:`;
     const simR = similarExcludeIds.length
       ? await pool.query(similarSql(true), [id, userId, similarExcludeIds])
       : await pool.query(similarSql(false), [id, userId]);
-    similarNotes = simR.rows.map((row) => ({
-      id: row.id,
-      content: row.content,
-      similarity: row.similarity != null ? Number(row.similarity) : null,
-      threadRootId: row.thread_root_id,
-    }));
+    similarNotes = await Promise.all(
+      simR.rows.map(async (row) => ({
+        id: row.id,
+        content: row.content,
+        similarity: row.similarity != null ? Number(row.similarity) : null,
+        threadRootId: row.thread_root_id,
+        threadPath: await getNoteThreadPathDisplay(row.id, userId, { excludeLeaf: true }),
+      }))
+    );
   } catch (err) {
     console.error('hover similar notes:', err.message || err);
     similarNotes = [];

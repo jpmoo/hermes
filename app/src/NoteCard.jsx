@@ -400,7 +400,7 @@ export default function NoteCard({
             </p>
             <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
             {tags.length > 0 && (
-              <div className="note-card-tags" onClick={(e) => e.stopPropagation()}>
+              <div className="note-card-tags">
                 {tags.map((t) => (
                   <span key={t.id} className="note-card-tag">
                     {t.name}
@@ -411,7 +411,7 @@ export default function NoteCard({
             )}
           </>
         )}
-        <div className="note-card-meta" onClick={(e) => e.stopPropagation()}>
+        <div className="note-card-meta">
           <time className="note-card-time">
             {new Date(note.updated_at).toLocaleDateString(undefined, {
               month: 'short',
@@ -420,7 +420,7 @@ export default function NoteCard({
               minute: '2-digit',
             })}
           </time>
-          <div className="note-card-actions">
+          <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
               <>
                 <button type="button" className="note-card-btn" onClick={(e) => { e.stopPropagation(); setEditing(true); }}>Edit</button>

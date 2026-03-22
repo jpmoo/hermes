@@ -11,6 +11,7 @@ import {
   fetchHoverInsight,
   fetchLinkedNotesQuick,
   addNoteTag,
+  createNoteConnection,
   deleteNoteConnection,
   getNote,
   getNoteThreadPath,
@@ -46,10 +47,16 @@ function normalizeHoverInsightPayload(data) {
   const persisted = data.persistedLinks ?? data.persisted_links;
   const similar = data.similarNotes ?? data.similar_notes;
   const tags = data.tagSuggestions ?? data.tag_suggestions;
+  const similarNorm = Array.isArray(similar)
+    ? similar.map((s) => ({
+        ...s,
+        threadPath: s.threadPath ?? s.thread_path ?? '',
+      }))
+    : [];
   return {
     ...data,
     tagSuggestions: Array.isArray(tags) ? tags : [],
-    similarNotes: Array.isArray(similar) ? similar : [],
+    similarNotes: similarNorm,
     persistedLinks: Array.isArray(persisted) ? persisted : [],
   };
 }
@@ -322,6 +329,28 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [clearAll, onGoToNote]
   );
 
+  /** Connect a similar note to the current insight anchor; refresh panels (does not navigate). */
+  const connectSimilarNote = useCallback(
+    async (similarNoteId) => {
+      const anchorId = activeHoverId.current;
+      if (!anchorId || !similarNoteId || String(anchorId) === String(similarNoteId)) return;
+      try {
+        setLoading(true);
+        await createNoteConnection(anchorId, similarNoteId);
+        onNoteUpdated?.();
+        const data = await fetchHoverInsight(anchorId);
+        if (activeHoverId.current !== anchorId) return;
+        setInsight(normalizeHoverInsightPayload(data));
+      } catch (e) {
+        console.error(e);
+        window.alert(e?.message || 'Could not connect note');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [onNoteUpdated]
+  );
+
   const value = useMemo(
     () => ({
       selectInsightNote,
@@ -338,6 +367,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       connectionModal,
       setConnectionModal,
       navigateToConnection,
+      connectSimilarNote,
     }),
     [
       selectInsightNote,
@@ -353,6 +383,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       connectionModal,
       setConnectionModal,
       navigateToConnection,
+      connectSimilarNote,
     ]
   );
 
@@ -380,6 +411,7 @@ function HoverInsightPanels() {
     connectionModal,
     setConnectionModal,
     navigateToConnection,
+    connectSimilarNote,
     insightAnchorRef,
   } = ctx;
 
@@ -391,7 +423,7 @@ function HoverInsightPanels() {
     return fresh ? { ...l, ...fresh, threadPath: fresh.threadPath ?? l.threadPath, content: fresh.content ?? l.content } : l;
   }, [connectionModal, insight?.persistedLinks]);
 
-  /** Full breadcrumb (includes this note) + authoritative body from API — stack payload can be stale/minimal. */
+  /** Ancestor breadcrumb only (exclude linked note text) + authoritative body from API — stack payload can be stale/minimal. */
   const [connectionModalFetched, setConnectionModalFetched] = useState({
     threadPath: '',
     content: '',
@@ -411,7 +443,7 @@ function HoverInsightPanels() {
       loading: true,
     });
     Promise.all([
-      getNoteThreadPath(linked.id, { excludeLeaf: false }),
+      getNoteThreadPath(linked.id, { excludeLeaf: true }),
       getNote(linked.id).then((n) => (n?.content != null ? String(n.content) : '')),
     ])
       .then(([path, content]) => {
@@ -602,11 +634,19 @@ function HoverInsightPanels() {
                           <button
                             type="button"
                             className="hover-insight-similar-btn"
-                            onClick={() => navigateToConnection(sn)}
+                            title="Add as connected note to the selected card"
+                            onClick={() => connectSimilarNote(sn.id)}
                           >
-                            <span className="hover-insight-similar-snippet">
-                              {(sn.content || '—').trim().replace(/\s+/g, ' ').slice(0, 120)}
-                              {(sn.content?.length || 0) > 120 ? '…' : ''}
+                            <span className="hover-insight-similar-btn-main">
+                              {sn.threadPath ? (
+                                <span className="hover-insight-similar-path" title={sn.threadPath}>
+                                  {sn.threadPath}
+                                </span>
+                              ) : (
+                                <span className="hover-insight-similar-path hover-insight-muted">
+                                  (Thread root)
+                                </span>
+                              )}
                             </span>
                             {sn.similarity != null && (
                               <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
