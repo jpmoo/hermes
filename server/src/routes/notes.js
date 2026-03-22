@@ -67,14 +67,18 @@ router.get('/roots', async (req, res) => {
           JOIN notes n ON n.id = s.note_id AND n.user_id = $1 AND n.starred = true
         )
         SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
-               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+               (SELECT COUNT(*)::int FROM note_connections nc
+                WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
         FROM notes n
         WHERE n.parent_id IS NULL AND n.user_id = $1 AND n.id IN (SELECT root_id FROM starred_roots)
         ORDER BY n.last_activity_at DESC
       `
       : `
         SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
-               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+               (SELECT COUNT(*)::int FROM note_connections nc
+                WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
         FROM notes n
         WHERE n.parent_id IS NULL AND n.user_id = $1
         ORDER BY n.last_activity_at DESC
@@ -111,11 +115,15 @@ router.get('/thread/:id', async (req, res) => {
     const r = await pool.query(
       `WITH RECURSIVE tree AS (
         SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, 0 AS depth,
-               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = notes.id) AS reply_count
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = notes.id) AS reply_count,
+               (SELECT COUNT(*)::int FROM note_connections nc
+                WHERE nc.user_id = $2 AND (nc.anchor_note_id = notes.id OR nc.linked_note_id = notes.id)) AS connection_count
         FROM notes WHERE id = $1 AND user_id = $2
         UNION ALL
         SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, t.depth + 1,
-               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id)
+               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+               (SELECT COUNT(*)::int FROM note_connections nc
+                WHERE nc.user_id = $2 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
         FROM notes n JOIN tree t ON n.parent_id = t.id
         WHERE n.user_id = $2
       )
@@ -164,7 +172,9 @@ router.get('/search-content', async (req, res) => {
       )
       SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
              r.root_id,
-             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+             (SELECT COUNT(*)::int FROM note_connections nc
+              WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
       FROM notes n
       JOIN roots r ON r.id = n.id
       WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
@@ -215,7 +225,9 @@ router.get('/search-by-tags', async (req, res) => {
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
       SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, r.root_id,
-             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+             (SELECT COUNT(*)::int FROM note_connections nc
+              WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
       FROM notes n
       JOIN note_tags nt ON nt.note_id = n.id AND nt.tag_id IN (${placeholders}) AND nt.status = 'approved'
       JOIN roots r ON r.id = n.id
@@ -265,7 +277,9 @@ router.get('/search-semantic', async (req, res) => {
       )
       SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
              r.root_id,
-             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+             (SELECT COUNT(*)::int FROM note_connections nc
+              WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
       FROM notes n
       JOIN roots r ON r.id = n.id
       WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
@@ -289,7 +303,9 @@ router.get('/search-semantic', async (req, res) => {
       )
       SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
              1 - (n.embedding <=> $1::vector) AS similarity, r.root_id,
-             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+             (SELECT COUNT(*)::int FROM note_connections nc
+              WHERE nc.user_id = $2 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
       FROM notes n
       JOIN roots r ON r.id = n.id
       WHERE n.user_id = $2 AND n.embedding IS NOT NULL
@@ -577,7 +593,10 @@ router.get('/:id/thread-root', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const r = await pool.query(
-      'SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor FROM notes WHERE id = $1 AND user_id = $2',
+      `SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor,
+              (SELECT COUNT(*)::int FROM note_connections nc
+               WHERE nc.user_id = $2 AND (nc.anchor_note_id = $1::uuid OR nc.linked_note_id = $1::uuid)) AS connection_count
+       FROM notes WHERE id = $1 AND user_id = $2`,
       [req.params.id, req.userId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Note not found' });

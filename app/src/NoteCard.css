@@ -21,6 +21,11 @@
   border-left-color: var(--border);
 }
 
+/* Right edge: note has one or more saved connections (see connection_count from API) */
+.note-card--linked {
+  border-right-color: var(--accent-dim, rgba(201, 162, 39, 0.55));
+}
+
 /* Stream insight: no focus ring on the selected card */
 .note-card.note-card--insight-selected:focus,
 .note-card.note-card--insight-selected:focus-visible {

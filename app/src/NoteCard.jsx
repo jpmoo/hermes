@@ -213,9 +213,16 @@ export default function NoteCard({
   const replies = hasReplies ?? ((note.reply_count ?? 0) > 0);
   const showThreadline = replies;
   const borderWidth = showThreadline ? Math.min(depth + 2, 6) : 1;
-  const cardClass = showThreadline
-    ? `note-card note-card--depth-${Math.min(depth, 3)}`
-    : 'note-card note-card--leaf';
+  const connectionCount = note.connection_count ?? 0;
+  const hasConnections = connectionCount > 0;
+  /** Mirror left “has children” thickness: 1 link → 2px, then +1 per extra link (cap 6). */
+  const rightBorderWidth = hasConnections ? Math.min(connectionCount + 1, 6) : 1;
+  const cardClass = [
+    showThreadline ? `note-card note-card--depth-${Math.min(depth, 3)}` : 'note-card note-card--leaf',
+    hasConnections ? 'note-card--linked' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const handleDeleteAttachment = async (att) => {
     if (
@@ -282,20 +289,23 @@ export default function NoteCard({
     .filter(Boolean)
     .join(' ');
 
+  const streamTitle =
+    hoverInsightEnabled && !editing
+      ? `Click: tag & connection suggestions · Double-click: open thread${
+          hasConnections ? ` · ${connectionCount} linked note${connectionCount === 1 ? '' : 's'}` : ''
+        }`
+      : undefined;
+
   return (
     <article
       className={cardClassNames}
-      style={{ borderLeftWidth: borderWidth }}
+      style={{ borderLeftWidth: borderWidth, borderRightWidth: rightBorderWidth }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
       role={editing ? undefined : 'button'}
       tabIndex={editing ? undefined : 0}
       aria-pressed={hoverInsightEnabled && isInsightSelected ? true : undefined}
-      title={
-        hoverInsightEnabled && !editing
-          ? 'Click: tag & connection suggestions · Double-click: open thread'
-          : undefined
-      }
+      title={streamTitle}
       onKeyDown={
         editing
           ? undefined

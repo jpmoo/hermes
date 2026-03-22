@@ -330,10 +330,11 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
           similarNotes: (p.similarNotes || []).filter((x) => x.id !== sn.id),
         };
       });
+      onNoteUpdated?.();
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [onNoteUpdated]);
 
   const unlinkPersisted = useCallback(async (anchorNoteId, linkedNoteId) => {
     try {
@@ -350,10 +351,11 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         return linkedId === linkedNoteId ? null : cur;
       });
       setConnectionTagSourceId((cur) => (cur === linkedNoteId ? null : cur));
+      onNoteUpdated?.();
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [onNoteUpdated]);
 
   const navigateToConnection = useCallback(
     async (n) => {

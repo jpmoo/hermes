@@ -18,7 +18,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Notes CRUD, threading, root feed | Done |
 | Starred notes, All/Starred toggle | Done |
 | Embedding pipeline (Ollama → pgvector) | Done |
-| Stream insight: click a note for tag/connection panels (others dim); double-click opens thread; similar-note **min. similarity** slider (default 0.5, **saved in `localStorage`** after you change it) | Done |
+| Stream insight: click a note for tag/connection panels (others dim); double-click opens thread; similar-note **min. similarity** slider (default 0.5, **saved in `localStorage`** after you change it); notes with **linked** peers show a **thicker right border** (API `connection_count`) | Done |
 | Inherit parent tags from note UI | Done |
 | Tag relationships (exclusion, complement) API | Done |
 | Flat / Tag view (filter by tags, AND/OR) | Done |

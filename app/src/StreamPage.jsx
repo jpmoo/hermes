@@ -687,7 +687,12 @@ export default function StreamPage() {
       const full =
         pendingRootFiles.length > 0
           ? await getNote(note.id)
-          : { ...note, reply_count: note.reply_count ?? 0, attachments: note.attachments || [] };
+          : {
+              ...note,
+              reply_count: note.reply_count ?? 0,
+              connection_count: note.connection_count ?? 0,
+              attachments: note.attachments || [],
+            };
       setNewRootContent('');
       setPendingRootFiles([]);
       if (rootFileRef.current) rootFileRef.current.value = '';
