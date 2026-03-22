@@ -83,12 +83,14 @@
   color: var(--text-muted);
 }
 
-/* Flex + gap avoids margin collapse between sections (margins on titles had little visible effect). */
+/* Flex + gap avoids margin collapse; padding-top matches gap so space above first section too. */
 .hover-insight-tag-groups {
+  --hi-tag-gap: calc(0.75rem - 2px);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--hi-tag-gap);
   margin-top: 0.2rem;
+  padding-top: var(--hi-tag-gap);
 }
 
 .hover-insight-tag-section {

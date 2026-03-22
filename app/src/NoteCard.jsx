@@ -300,25 +300,29 @@ export default function NoteCard({
         }`
       : undefined;
 
-  /** Full right-border shorthand (width + color) so it wins over `border: 1px` and actually shows. */
-  const linkedRightBorder = hasConnections
-    ? !showThreadline
-      ? `${borderWidth}px solid var(--border)`
-      : depth <= 0
-        ? `${borderWidth}px solid var(--accent-dim, #6d5610)`
-        : depth === 1
-          ? `${borderWidth}px solid #5a4a2a`
-          : depth === 2
-            ? `${borderWidth}px solid #4a3a1a`
-            : `${borderWidth}px solid #3a2a12`
-    : undefined;
+  /** Custom props + CSS !important on border-right longhands (inline `borderRight` still lost to cascade in some cases). */
+  const linkedBorderVars =
+    hasConnections
+      ? {
+          '--hermes-link-rw': `${borderWidth}px`,
+          '--hermes-link-rc': !showThreadline
+            ? 'var(--border)'
+            : depth <= 0
+              ? 'var(--accent-dim, #6d5610)'
+              : depth === 1
+                ? '#5a4a2a'
+                : depth === 2
+                  ? '#4a3a1a'
+                  : '#3a2a12',
+        }
+      : null;
 
   return (
     <article
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
-        ...(linkedRightBorder ? { borderRight: linkedRightBorder } : {}),
+        ...linkedBorderVars,
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}

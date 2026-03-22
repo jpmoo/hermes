@@ -21,7 +21,22 @@
   border-left-color: var(--border);
 }
 
-/* Connected-note right edge: colors/width come from inline `borderRight` on <article> (see NoteCard.jsx). */
+/*
+ * Connected notes: force right stripe — the card uses `border: 1px solid` which otherwise wins
+ * over partial longhands; !important + vars from NoteCard.jsx matches left threadline width/colors.
+ */
+.note-card.note-card--linked {
+  border-right-width: var(--hermes-link-rw, 3px) !important;
+  border-right-style: solid !important;
+  border-right-color: var(--hermes-link-rc, var(--accent-dim, #6d5610)) !important;
+}
+
+/* Insight-selected cards use box-shadow: none — restripe the right edge so it doesn’t disappear. */
+.stream-page:has(.note-card--insight-selected) .note-card.note-card--insight-selected.note-card--linked {
+  border-right-width: var(--hermes-link-rw, 3px) !important;
+  border-right-style: solid !important;
+  border-right-color: var(--hermes-link-rc, var(--accent-dim, #6d5610)) !important;
+}
 
 /* Stream insight: no focus ring on the selected card */
 .note-card.note-card--insight-selected:focus,
