@@ -21,26 +21,7 @@
   border-left-color: var(--border);
 }
 
-/* Connected notes: right stripe matches left threadline (width via inline borderRightWidth on <article>). */
-.note-card.note-card--linked.note-card--leaf {
-  border-right-color: var(--border);
-}
-
-.note-card.note-card--linked.note-card--depth-0 {
-  border-right-color: var(--accent-dim, #6d5610);
-}
-
-.note-card.note-card--linked.note-card--depth-1 {
-  border-right-color: #5a4a2a;
-}
-
-.note-card.note-card--linked.note-card--depth-2 {
-  border-right-color: #4a3a1a;
-}
-
-.note-card.note-card--linked.note-card--depth-3 {
-  border-right-color: #3a2a12;
-}
+/* Connected-note right edge: colors/width come from inline `borderRight` on <article> (see NoteCard.jsx). */
 
 /* Stream insight: no focus ring on the selected card */
 .note-card.note-card--insight-selected:focus,

@@ -83,20 +83,20 @@
   color: var(--text-muted);
 }
 
+/* Flex + gap avoids margin collapse between sections (margins on titles had little visible effect). */
 .hover-insight-tag-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-top: 0.2rem;
 }
 
 .hover-insight-tag-section {
-  margin-top: 0.55rem;
-}
-
-.hover-insight-tag-section:first-child {
   margin-top: 0;
 }
 
 .hover-insight-tag-section-title {
-  margin: 3px 0 0.3rem;
+  margin: 0 0 0.3rem;
   font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
