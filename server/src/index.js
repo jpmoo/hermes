@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import notesRoutes from './routes/notes.js';
 import tagsRoutes from './routes/tags.js';
-import queueRoutes from './routes/queue.js';
 import noteFilesRoutes from './routes/noteFiles.js';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
@@ -33,7 +32,6 @@ app.use((_req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/tags', tagsRoutes);
-app.use('/api/queue', queueRoutes);
 app.use('/api/note-files', noteFilesRoutes);
 
 // Health for systemd and load balancers

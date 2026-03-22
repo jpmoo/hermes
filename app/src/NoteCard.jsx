@@ -13,6 +13,7 @@ import {
 } from './api';
 import LinkifiedText from './LinkifiedText';
 import NoteAttachments from './NoteAttachments';
+import { useHoverInsight } from './HoverInsightContext';
 import './NoteCard.css';
 
 export default function NoteCard({
@@ -25,7 +26,10 @@ export default function NoteCard({
   hasReplies,
   /** When set, parent’s tags for inherit (stream). Omit to load parent tags via API when note has parent_id. */
   parentTagsForInherit,
+  /** Stream: enable hover tag/similar-note panels for depth ≥ 1 */
+  hoverInsightEnabled = false,
 }) {
+  const hoverInsight = useHoverInsight();
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [addingTag, setAddingTag] = useState(false);
@@ -210,10 +214,22 @@ export default function NoteCard({
     }
   };
 
+  const handleInsightEnter = (e) => {
+    if (!hoverInsightEnabled || editing) return;
+    hoverInsight?.startHover(note, e.currentTarget, depth);
+  };
+
+  const handleInsightLeave = () => {
+    if (!hoverInsightEnabled || editing) return;
+    hoverInsight?.endHover();
+  };
+
   return (
     <article
       className={cardClass}
       style={{ borderLeftWidth: borderWidth }}
+      onMouseEnter={handleInsightEnter}
+      onMouseLeave={handleInsightLeave}
       onClick={editing ? undefined : (ev) => onOpenThread?.(ev)}
       role={editing ? undefined : 'button'}
       tabIndex={editing ? undefined : 0}

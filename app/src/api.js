@@ -100,14 +100,42 @@ export async function getTags(opts = {}) {
   return r.json();
 }
 
-export async function resubmitTaglessNotes(limit = 150) {
-  const r = await fetch(`${API}/notes/resubmit-tagless`, {
+export async function createNoteConnection(anchorNoteId, linkedNoteId) {
+  const r = await fetch(`${API}/notes/${anchorNoteId}/connections`, {
     method: 'POST',
     headers: { ...headers(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ limit }),
+    body: JSON.stringify({ linkedNoteId }),
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'Failed to queue tag suggestions');
+  if (!r.ok) throw new Error(data.error || 'Failed to create connection');
+  return data;
+}
+
+export async function deleteNoteConnection(anchorNoteId, linkedNoteId) {
+  const r = await fetch(`${API}/notes/${anchorNoteId}/connections/${linkedNoteId}`, {
+    method: 'DELETE',
+    headers: headers(),
+  });
+  if (r.ok) return;
+  const data = await r.json().catch(() => ({}));
+  throw new Error(data.error || 'Failed to remove connection');
+}
+
+export async function getNoteConnections(noteId) {
+  const r = await fetch(`${API}/notes/${noteId}/connections`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load connections');
+  return data;
+}
+
+export async function fetchHoverInsight(noteId) {
+  const r = await fetch(`${API}/notes/hover-insight`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ noteId }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load suggestions');
   return data;
 }
 
@@ -158,30 +186,6 @@ export async function addNoteTag(noteId, { tag_id, name }) {
 export async function removeNoteTag(noteId, tagId) {
   const r = await fetch(`${API}/notes/${noteId}/tags/${tagId}`, { method: 'DELETE', headers: headers() });
   if (!r.ok) throw new Error('Failed to remove tag');
-}
-
-export async function getQueue(minConfidence = 0) {
-  const r = await fetch(`${API}/queue?minConfidence=${minConfidence}`, { headers: headers() });
-  if (!r.ok) throw new Error('Failed to load queue');
-  return r.json();
-}
-
-export async function getQueueCount(minConfidence = 0) {
-  const r = await fetch(`${API}/queue/count?minConfidence=${minConfidence}`, { headers: headers() });
-  if (!r.ok) throw new Error('Failed to load count');
-  return r.json();
-}
-
-export async function approveProposal(id) {
-  const r = await fetch(`${API}/queue/${id}/approve`, { method: 'POST', headers: headers() });
-  if (!r.ok) throw new Error('Failed to approve');
-  return r.json();
-}
-
-export async function rejectProposal(id) {
-  const r = await fetch(`${API}/queue/${id}/reject`, { method: 'POST', headers: headers() });
-  if (!r.ok) throw new Error('Failed to reject');
-  return r.json();
 }
 
 export async function uploadNoteFiles(noteId, files) {

@@ -60,7 +60,6 @@ export default function SearchView() {
       viewLinks={[
         { to: '/', label: 'Stream' },
         { to: '/outline', label: 'Outline' },
-        { to: '/queue', label: 'Queue', tooltip: 'Autotagging approval' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
       ]}

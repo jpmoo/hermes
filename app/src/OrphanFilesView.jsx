@@ -66,7 +66,6 @@ export default function OrphanFilesView() {
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },
-        { to: '/queue', label: 'Queue', tooltip: 'Autotagging approval' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
       ]}

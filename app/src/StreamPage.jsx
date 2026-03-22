@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
+import { HoverInsightProvider } from './HoverInsightContext';
 import './StreamPage.css';
 
 function buildTree(flat) {
@@ -172,6 +173,7 @@ function StreamList({
               note={n}
               depth={depth}
               hasReplies={(n.children?.length ?? 0) > 0}
+              hoverInsightEnabled
               parentTagsForInherit={parentTagsForInherit}
               onOpenThread={(ev) => onFocusNote(n.id, ev)}
               onStarredChange={onStarredChange}
@@ -723,7 +725,6 @@ export default function StreamPage() {
     ...(threadRootId
       ? [{ to: `/outline/${threadRootId}`, label: 'Outline' }]
       : [{ to: '/outline', label: 'Outline' }]),
-    { to: '/queue', label: 'Queue', tooltip: 'Autotagging approval' },
     { to: '/tags', label: 'Tags' },
     { to: '/search', label: 'Search' },
   ];
@@ -737,6 +738,7 @@ export default function StreamPage() {
       onLogout={logout}
       viewLinks={navLinks}
     >
+      <HoverInsightProvider onNoteUpdated={refreshAll}>
       <div className="stream-page">
         {floatOpen && (
           <div
@@ -913,6 +915,7 @@ export default function StreamPage() {
           )}
         </div>
       </div>
+      </HoverInsightProvider>
     </Layout>
   );
 }

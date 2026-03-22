@@ -4,8 +4,8 @@ A note-taking system built around conversation and tree structure. Specification
 
 ## Structure
 
-- **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth, embedding + AI tag pipeline, queue, semantic search. Serves the built web app and REST + WebSocket.
-- **`app/`** — React (Vite) web app: **Stream** (thread list + in-thread view on one page, `?thread=`), Outline, Tag view, queue, search, etc.
+- **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth, embeddings, hover tag/similar-note insight (Ollama + vectors), semantic search. Serves the built web app and REST + WebSocket.
+- **`app/`** — React (Vite) web app: **Stream** (thread list + in-thread view on one page, `?thread=`), Outline, Tag view, search, etc.
 - **`client/`** — Electron desktop app that loads the web app from the server (or dev Vite server).
 - **`mcp/`** — Optional stdio MCP for Claude Desktop. The main server also exposes **Streamable HTTP MCP** at **`/mcp`** (same tools).
 - **`telegram/`** — Telegram bot (capture messages as notes; `/thread`, `/reply`, `/star`, `/tags`).
@@ -18,12 +18,10 @@ A note-taking system built around conversation and tree structure. Specification
 | Notes CRUD, threading, root feed | Done |
 | Starred notes, All/Starred toggle | Done |
 | Embedding pipeline (Ollama → pgvector) | Done |
-| AI tag proposals on save (Ollama) | Done |
-| Approval queue (API + UI: slider, approve/reject, context) | Done |
-| Inherit parent tags from note UI; complements on approve | Done |
+| Hover replies: tag suggestions (Ollama + similar-note tags) & similar notes (Stream) | Done |
+| Inherit parent tags from note UI | Done |
 | Tag relationships (exclusion, complement) API | Done |
 | Flat / Tag view (filter by tags, AND/OR) | Done |
-| Queue: resubmit tagless notes for AI suggestions | Done |
 | Semantic search API | Done |
 | Edit / delete notes (delete with confirm, cascade) | Done |
 | MCP server for Claude | Done |
@@ -142,7 +140,10 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/tags` (all tags for typeahead), `GET /api/tags?in_use=1` (tags with ≥1 approved use on your notes — Tags page), `POST /api/tags`, relationships endpoints
 - `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (hybrid text + semantic; 503 only if Ollama fails and nothing matches the substring)
 - `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
-- `GET /api/queue?minConfidence=`, `GET /api/queue/count`, `POST /api/queue/:id/approve`, `POST /api/queue/:id/reject`
+- `POST /api/notes/hover-insight` — `{ noteId }` → tag suggestions (Ollama + tags from top similar notes), similar notes, and **persisted** `linked` notes for Stream hover UI (requires Ollama + embeddings)
+- `GET /api/notes/:id/connections` — `{ outgoing, incoming }` (saved links to/from other notes)
+- `POST /api/notes/:id/connections` — `{ linkedNoteId }` — create directed link **anchor** (`:id`) → **linked** note (idempotent)
+- `DELETE /api/notes/:id/connections/:linkedNoteId` — remove that link
 - `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphans**)
 
 ## MCP (Claude)
@@ -216,7 +217,7 @@ Optional string on create/update note: **stable reference outside Hermes** (e.g.
 
 ## Telegram bot
 
-`cd telegram && npm install`. Set `TELEGRAM_BOT_TOKEN` and `HERMES_API_URL`, `HERMES_MCP_TOKEN` (or token from login). Run `node bot.js`. Send a message to create a root note; `/thread Title` to start a thread; `/tags` to see pending queue.
+`cd telegram && npm install`. Set `TELEGRAM_BOT_TOKEN` and `HERMES_API_URL`, `HERMES_MCP_TOKEN` (or token from login). Run `node bot.js`. Send a message to create a root note; `/thread Title` to start a thread; `/tags` for a hint about Stream hover tag suggestions.
 
 ## License
 

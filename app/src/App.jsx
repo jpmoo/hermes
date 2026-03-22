@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './AuthContext';
 import Login from './Login';
 import StreamPage from './StreamPage';
 import OutlineView from './OutlineView';
-import QueueView from './QueueView';
 import TagView from './TagView';
 import SearchView from './SearchView';
 import OrphanFilesView from './OrphanFilesView';
@@ -46,14 +45,6 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <OutlineView />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/queue"
-        element={
-          <PrivateRoute>
-            <QueueView />
           </PrivateRoute>
         }
       />

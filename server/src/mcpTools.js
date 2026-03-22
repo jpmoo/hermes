@@ -102,8 +102,6 @@ export const TOOL_DEFS = [
     inputSchema: { type: 'object', properties: { q: { type: 'string' }, limit: { type: 'number' } }, required: ['q'] },
   },
   { name: 'hermes_search_tags', description: 'Query notes by tag(s).', inputSchema: { type: 'object', properties: { tag_ids: { type: 'array', items: { type: 'string' } }, mode: { type: 'string', enum: ['and', 'or'] } } } },
-  { name: 'hermes_get_queue', description: 'Get pending tag proposals.', inputSchema: { type: 'object', properties: { min_confidence: { type: 'number' } } } },
-  { name: 'hermes_approve_tag', description: 'Approve or reject a pending tag.', inputSchema: { type: 'object', properties: { proposal_id: { type: 'string' }, approve: { type: 'boolean' } }, required: ['proposal_id'] } },
   { name: 'hermes_star_note', description: 'Star or unstar a note.', inputSchema: { type: 'object', properties: { note_id: { type: 'string' }, starred: { type: 'boolean' } }, required: ['note_id'] } },
   { name: 'hermes_get_starred', description: 'Get starred roots.' },
   {
@@ -254,17 +252,6 @@ export async function callTool(ctx, req) {
         const ids = Array.isArray(tag_ids) ? tag_ids : (tag_ids || '').toString().split(',').filter(Boolean);
         const body = await api(`/notes/search-by-tags?tagIds=${ids.join(',')}&mode=${mode || 'and'}`);
         return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
-      }
-      case 'hermes_get_queue': {
-        const { min_confidence } = args || {};
-        const body = await api(`/queue?minConfidence=${min_confidence ?? 0}`);
-        return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
-      }
-      case 'hermes_approve_tag': {
-        const { proposal_id, approve } = args || {};
-        if (approve) await api(`/queue/${proposal_id}/approve`, { method: 'POST' });
-        else await api(`/queue/${proposal_id}/reject`, { method: 'POST' });
-        return { content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] };
       }
       case 'hermes_star_note': {
         const { note_id, starred } = args || {};

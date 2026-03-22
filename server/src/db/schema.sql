@@ -92,6 +92,21 @@ CREATE INDEX IF NOT EXISTS idx_note_tags_note ON note_tags(note_id);
 CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_note_tags_status ON note_tags(status) WHERE status = 'pending';
 
+-- User-drawn links between notes (e.g. Stream hover “similar note” → anchor)
+CREATE TABLE IF NOT EXISTS note_connections (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  anchor_note_id   UUID NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+  linked_note_id   UUID NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+  created_at       TIMESTAMPTZ DEFAULT now(),
+  CHECK (anchor_note_id <> linked_note_id),
+  UNIQUE (user_id, anchor_note_id, linked_note_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_note_connections_anchor ON note_connections(anchor_note_id);
+CREATE INDEX IF NOT EXISTS idx_note_connections_linked ON note_connections(linked_note_id);
+CREATE INDEX IF NOT EXISTS idx_note_connections_user ON note_connections(user_id);
+
 -- Trigger: bump updated_at only on real edits (not when ancestors get last_activity_at from replies)
 CREATE OR REPLACE FUNCTION notes_updated()
 RETURNS TRIGGER AS $$

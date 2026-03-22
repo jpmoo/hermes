@@ -3,7 +3,7 @@ import multer from 'multer';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { embedNote } from '../services/embedding.js';
-import { proposeTagsForNote } from '../services/aiTags.js';
+import { getHoverInsight } from '../services/hoverInsight.js';
 import { attachBlobListToNotes, MAX_BYTES } from '../services/noteFileBlobs.js';
 
 const router = Router();
@@ -432,52 +432,112 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
   }
 });
 
-/** Queue AI tag proposals for notes with no approved tags (non-empty body). Processes up to `limit` per call in the background. */
-router.post('/resubmit-tagless', async (req, res) => {
+/** Hover insight: Ollama tags + embedding-similar tags + similar notes (for Stream hover UI). */
+router.post('/hover-insight', async (req, res) => {
   try {
+    const noteId = req.body?.noteId;
+    if (!noteId) return res.status(400).json({ error: 'noteId required' });
+    const data = await getHoverInsight(noteId, req.userId);
+    if (!data) return res.status(404).json({ error: 'Note not found' });
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to build hover insight' });
+  }
+});
+
+/** List connections where this note is anchor (outgoing) or linked (incoming). */
+router.get('/:id/connections', async (req, res) => {
+  try {
+    const noteId = req.params.id;
     const userId = req.userId;
-    const limit = Math.min(300, Math.max(1, parseInt(req.body?.limit ?? req.query?.limit ?? '150', 10) || 150));
-    const countR = await pool.query(
-      `SELECT COUNT(*)::int AS c FROM notes n
-       WHERE n.user_id = $1
-       AND TRIM(COALESCE(n.content, '')) <> ''
-       AND NOT EXISTS (
-         SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.status = 'approved'
-       )`,
-      [userId]
+    const own = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+    if (own.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    const out = await pool.query(
+      `SELECT nc.id, nc.linked_note_id AS other_id, nb.content, nc.created_at
+       FROM note_connections nc
+       JOIN notes nb ON nb.id = nc.linked_note_id AND nb.user_id = $1
+       WHERE nc.user_id = $1 AND nc.anchor_note_id = $2
+       ORDER BY nc.created_at DESC`,
+      [userId, noteId]
     );
-    const totalTagless = countR.rows[0].c;
-    const r = await pool.query(
-      `SELECT n.id, n.content FROM notes n
-       WHERE n.user_id = $1
-       AND TRIM(COALESCE(n.content, '')) <> ''
-       AND NOT EXISTS (
-         SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.status = 'approved'
-       )
-       ORDER BY n.last_activity_at DESC
-       LIMIT $2`,
-      [userId, limit]
+    const inc = await pool.query(
+      `SELECT nc.id, nc.anchor_note_id AS other_id, na.content, nc.created_at
+       FROM note_connections nc
+       JOIN notes na ON na.id = nc.anchor_note_id AND na.user_id = $1
+       WHERE nc.user_id = $1 AND nc.linked_note_id = $2
+       ORDER BY nc.created_at DESC`,
+      [userId, noteId]
     );
-    const rows = r.rows;
     res.json({
-      queued: rows.length,
-      totalTagless,
-      hasMore: totalTagless > rows.length,
-    });
-    setImmediate(() => {
-      (async () => {
-        for (const row of rows) {
-          try {
-            await proposeTagsForNote(row.id, row.content, userId);
-          } catch (e) {
-            console.error('resubmit-tagless', row.id, e);
-          }
-        }
-      })();
+      outgoing: out.rows.map((r) => ({
+        connectionId: r.id,
+        noteId: r.other_id,
+        content: r.content,
+        created_at: r.created_at,
+      })),
+      incoming: inc.rows.map((r) => ({
+        connectionId: r.id,
+        noteId: r.other_id,
+        content: r.content,
+        created_at: r.created_at,
+      })),
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to queue tag suggestions' });
+    res.status(500).json({ error: 'Failed to list connections' });
+  }
+});
+
+/** Create directed link anchor → linked (idempotent). */
+router.post('/:id/connections', async (req, res) => {
+  try {
+    const anchorId = req.params.id;
+    const linkedNoteId = req.body?.linkedNoteId;
+    const userId = req.userId;
+    if (!linkedNoteId) return res.status(400).json({ error: 'linkedNoteId required' });
+    if (anchorId === linkedNoteId) return res.status(400).json({ error: 'Cannot connect a note to itself' });
+    const [a, b] = await Promise.all([
+      pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [anchorId, userId]),
+      pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [linkedNoteId, userId]),
+    ]);
+    if (a.rows.length === 0 || b.rows.length === 0) {
+      return res.status(404).json({ error: 'One or both notes not found' });
+    }
+    const ins = await pool.query(
+      `INSERT INTO note_connections (user_id, anchor_note_id, linked_note_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, anchor_note_id, linked_note_id) DO NOTHING
+       RETURNING id, anchor_note_id, linked_note_id, created_at`,
+      [userId, anchorId, linkedNoteId]
+    );
+    if (ins.rows.length > 0) return res.status(201).json(ins.rows[0]);
+    const ex = await pool.query(
+      `SELECT id, anchor_note_id, linked_note_id, created_at FROM note_connections
+       WHERE user_id = $1 AND anchor_note_id = $2 AND linked_note_id = $3`,
+      [userId, anchorId, linkedNoteId]
+    );
+    res.status(200).json(ex.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create connection' });
+  }
+});
+
+/** Remove link anchor → linkedNoteId. */
+router.delete('/:id/connections/:linkedNoteId', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `DELETE FROM note_connections
+       WHERE user_id = $1 AND anchor_note_id = $2 AND linked_note_id = $3
+       RETURNING id`,
+      [req.userId, req.params.id, req.params.linkedNoteId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Connection not found' });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete connection' });
   }
 });
 
@@ -519,7 +579,6 @@ router.post('/', async (req, res) => {
     );
     const note = r.rows[0];
     embedNote(note.id, note.content).catch(() => {});
-    proposeTagsForNote(note.id, note.content, userId).catch(() => {});
     res.status(201).json(note);
   } catch (err) {
     console.error(err);
@@ -549,7 +608,6 @@ router.patch('/:id', async (req, res) => {
     const note = r.rows[0];
     if (content !== undefined) {
       embedNote(note.id, note.content).catch(() => {});
-      proposeTagsForNote(note.id, note.content, req.userId).catch(() => {});
     }
     res.json(note);
   } catch (err) {

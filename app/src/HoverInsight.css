@@ -1,0 +1,251 @@
+/* Side gutters so panels sit in margins; pointer events only on panels */
+.hover-insight-margin {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 250;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 5.5rem;
+}
+
+.hover-insight-margin--left {
+  left: 0;
+  width: min(220px, 28vw);
+  justify-content: flex-start;
+  padding-left: 0.35rem;
+}
+
+.hover-insight-margin--right {
+  right: 0;
+  width: min(260px, 32vw);
+  justify-content: flex-end;
+  padding-right: 0.35rem;
+}
+
+.hover-insight-panel {
+  pointer-events: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 0.5rem;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  box-shadow: 4px 4px 4px -4px rgba(28, 27, 24, 0.12);
+  animation: hover-insight-slide-in 0.28s ease-out both;
+}
+
+.hover-insight-panel--left {
+  transform-origin: left center;
+}
+
+.hover-insight-panel--right {
+  transform-origin: right center;
+  animation-name: hover-insight-slide-in-right;
+}
+
+@keyframes hover-insight-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes hover-insight-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.hover-insight-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.hover-insight-muted {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.hover-insight-tag-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+
+.hover-insight-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.8125rem;
+}
+
+.hover-insight-tag-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.hover-insight-icon-btn {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hover-insight-icon-btn:hover {
+  color: var(--status-danger-text);
+  background: var(--status-danger-bg);
+}
+
+.hover-insight-icon-btn--add:hover {
+  color: var(--accent);
+  background: rgba(201, 162, 39, 0.12);
+}
+
+.hover-insight-persisted-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.hover-insight-persisted-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.hover-insight-persisted-snippet {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.35rem;
+  text-align: left;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--text);
+  background: rgba(138, 109, 10, 0.08);
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hover-insight-persisted-snippet:hover {
+  filter: brightness(1.02);
+}
+
+.hover-insight-unlink {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.hover-insight-similar-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+
+.hover-insight-similar-btn {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  margin-bottom: 0.35rem;
+  padding: 0.4rem 0.35rem;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text);
+  animation: hover-insight-slide-in-right 0.32s ease-out both;
+}
+
+.hover-insight-similar-btn:hover {
+  border-color: var(--accent-dim);
+}
+
+.hover-insight-similar-snippet {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.hover-insight-sim-pct {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Connection card: sits flush to hovered note’s right edge */
+.hover-insight-connection {
+  position: fixed;
+  z-index: 260;
+  width: min(240px, 36vw);
+  animation: hover-insight-connect 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes hover-insight-connect {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.hover-insight-connection-inner {
+  background: var(--bg-card);
+  border: 1px solid var(--accent-dim);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.hover-insight-connection-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+.hover-insight-connection-text {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+}

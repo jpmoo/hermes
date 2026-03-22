@@ -65,9 +65,10 @@ bot.on('message', async (msg) => {
     }
     if (cmd === '/tags') {
       try {
-        const queue = await api('/queue');
-        const count = await api('/queue/count');
-        bot.sendMessage(chatId, `Pending tag proposals: ${count.count}. Open the web Queue to approve.`);
+        bot.sendMessage(
+          chatId,
+          'Tag suggestions: open the Hermes web app, open a thread, and hover any reply — suggestions appear in the side margins.'
+        );
       } catch (e) {
         bot.sendMessage(chatId, `Error: ${e.message}`);
       }
