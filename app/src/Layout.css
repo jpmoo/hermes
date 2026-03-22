@@ -180,4 +180,7 @@
   background: var(--bg);
   color: var(--text);
   color-scheme: light;
+  /* Stream thread nav (sticky) sits below sticky header — tune if header height changes */
+  --stream-nav-sticky-top: 3.5rem;
+  --stream-nav-sticky-top-mobile: 6.85rem;
 }

@@ -309,11 +309,11 @@
   font-family: var(--font-mono);
 }
 
-/* Stacked linked notes — immediately right of hovered card */
+/* Stacked linked notes — flush beside selected card (position + width from inline style) */
 .hover-insight-connection-stack {
   position: fixed;
-  z-index: 260;
-  width: min(280px, 38vw);
+  z-index: 270;
+  box-sizing: border-box;
   overflow-y: auto;
   pointer-events: auto;
   display: flex;

@@ -502,11 +502,33 @@ function HoverInsightPanels() {
     [tags]
   );
   const similar = insight?.similarNotes || [];
+  /** Linked peers: highest similarity first; unknown similarity last. */
   const persisted = [...(insight?.persistedLinks || [])].sort((a, b) => {
     const sa = a.similarity != null ? a.similarity : -1;
     const sb = b.similarity != null ? b.similarity : -1;
-    return sb - sa;
+    if (sb !== sa) return sb - sa;
+    return (a.content || '').localeCompare(b.content || '');
   });
+
+  /** Flush to selected card’s right edge; flip left if it would leave the viewport. */
+  const connectionStackStyle =
+    rect && persisted.length > 0
+      ? (() => {
+          const gap = 2;
+          const stackW = Math.min(280, window.innerWidth * 0.38);
+          let left = rect.right + gap;
+          if (left + stackW > window.innerWidth - 8) {
+            left = Math.max(8, rect.left - stackW - gap);
+          }
+          const roomBelow = window.innerHeight - rect.top - 8;
+          return {
+            top: Math.max(0, rect.top),
+            left,
+            width: stackW,
+            maxHeight: `${Math.max(100, Math.min(roomBelow, window.innerHeight * 0.72))}px`,
+          };
+        })()
+      : null;
 
   const note = hover?.note;
 
@@ -565,47 +587,6 @@ function HoverInsightPanels() {
           >
             <div className={`hover-insight-panel hover-insight-panel--right ${loading ? 'hover-insight-panel--loading' : ''}`}>
               <p className="hover-insight-title">Similar notes</p>
-              {!loading && persisted.length > 0 && (
-                <>
-                  <p className="hover-insight-section-title">Linked</p>
-                  <ul className="hover-insight-persisted-list" data-insight-ui>
-                    {persisted.map((pn) => (
-                      <li key={pn.id} className="hover-insight-persisted-row">
-                        <button
-                          type="button"
-                          className="hover-insight-persisted-snippet"
-                          onMouseEnter={() => setConnectionTagSourceId(pn.id)}
-                          onClick={() => setConnectionModal({ linked: pn, anchorNoteId: note.id })}
-                          title="Open linked note"
-                        >
-                          <span className="hover-insight-linked-snippet-text">
-                            {(pn.content || '—').slice(0, 120)}
-                            {(pn.content?.length || 0) > 120 ? '…' : ''}
-                          </span>
-                          {pn.similarity != null && (
-                            <span className="hover-insight-linked-sim">
-                              {Math.round(pn.similarity * 100)}%
-                            </span>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          className="hover-insight-icon-btn hover-insight-unlink"
-                          aria-label="Disconnect linked note"
-                          title="Disconnect link (confirm)"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!window.confirm(CONFIRM_UNLINK)) return;
-                            unlinkPersisted(note.id, pn.id);
-                          }}
-                        >
-                          ×
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
               <div
                 className="hover-insight-similar-slider-wrap"
                 data-insight-ui
@@ -645,7 +626,7 @@ function HoverInsightPanels() {
                       className="hover-insight-similar-btn"
                       onMouseEnter={() => setConnectionTagSourceId(sn.id)}
                       onClick={() => linkSimilar(sn)}
-                      title="Save link — shows under Linked in this panel"
+                      title="Save link — appears stacked beside the selected note"
                     >
                       <span className="hover-insight-similar-snippet">
                         {(sn.content || '—').slice(0, 100)}
@@ -661,6 +642,53 @@ function HoverInsightPanels() {
             </div>
           </div>
         </>
+      )}
+
+      {hover && rect && persisted.length > 0 && connectionStackStyle && note && (
+        <div
+          className="hover-insight-connection-stack"
+          data-insight-ui
+          style={connectionStackStyle}
+        >
+          {persisted.map((pn) => (
+            <div
+              key={pn.id}
+              className="hover-insight-connection-card"
+              onMouseEnter={() => setConnectionTagSourceId(pn.id)}
+            >
+              <button
+                type="button"
+                className="hover-insight-connection-card-main"
+                onClick={() => setConnectionModal({ linked: pn, anchorNoteId: note.id })}
+                title="Open linked note"
+              >
+                <span className="hover-insight-connection-card-label">Linked</span>
+                {pn.similarity != null && (
+                  <span className="hover-insight-connection-card-sim">
+                    {Math.round(pn.similarity * 100)}%
+                  </span>
+                )}
+                <p className="hover-insight-connection-card-snippet">
+                  {(pn.content || '—').slice(0, 160)}
+                  {(pn.content?.length || 0) > 160 ? '…' : ''}
+                </p>
+              </button>
+              <button
+                type="button"
+                className="hover-insight-icon-btn hover-insight-connection-unlink"
+                aria-label="Disconnect linked note"
+                title="Disconnect link (confirm)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!window.confirm(CONFIRM_UNLINK)) return;
+                  unlinkPersisted(note.id, pn.id);
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
       )}
 
       {connectionModal && (

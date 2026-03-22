@@ -39,6 +39,19 @@
   gap: 0.5rem 0.75rem;
   margin-bottom: 1rem;
   transition: opacity 0.2s ease;
+  /* Stay visible while scrolling (below sticky layout header) */
+  position: sticky;
+  top: var(--stream-nav-sticky-top, 3.5rem);
+  z-index: 9;
+  background: var(--bg);
+  padding-top: 0.35rem;
+  padding-bottom: 0.5rem;
+  margin-top: -0.15rem;
+  margin-left: -0.25rem;
+  margin-right: -0.25rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  box-shadow: 0 6px 8px -6px rgba(28, 27, 24, 0.12);
 }
 
 .stream-page-nav-row--exit {
@@ -199,26 +212,12 @@
   }
 }
 
-.stream-page-focus-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.75rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.875rem;
+@media (max-width: 720px) {
+  .stream-page-nav-row {
+    /* Taller header when nav wraps under logo (see Layout.css) */
+    top: var(--stream-nav-sticky-top-mobile, 6.85rem);
+  }
 }
-
-.stream-page-focus-label {
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 
 .stream-page-compose-wrap {
   position: sticky;

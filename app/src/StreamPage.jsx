@@ -801,14 +801,6 @@ export default function StreamPage() {
                   key={threadRootId}
                   ref={threadAnchorRef}
                 >
-                  {focusId && focusId !== actualRootId && (
-                    <div className="stream-page-focus-bar">
-                      <span className="stream-page-focus-label">
-                        Branch: {focusSnippet}
-                        {focusedNode?.content?.length > 50 ? '…' : ''}
-                      </span>
-                    </div>
-                  )}
                   <ul className="stream-page-list" ref={threadListRef}>
                     <StreamList
                       nodes={displayTree}
