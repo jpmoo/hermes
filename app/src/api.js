@@ -100,6 +100,7 @@ export async function getTags(opts = {}) {
   return r.json();
 }
 
+/** Connect two notes (server stores one row; link is bidirectional in the UI). */
 export async function createNoteConnection(anchorNoteId, linkedNoteId) {
   const r = await fetch(`${API}/notes/${anchorNoteId}/connections`, {
     method: 'POST',
@@ -111,6 +112,7 @@ export async function createNoteConnection(anchorNoteId, linkedNoteId) {
   return data;
 }
 
+/** Remove connection between two notes (either stored anchor/linked direction). */
 export async function deleteNoteConnection(anchorNoteId, linkedNoteId) {
   const r = await fetch(`${API}/notes/${anchorNoteId}/connections/${linkedNoteId}`, {
     method: 'DELETE',
@@ -126,6 +128,14 @@ export async function getNoteConnections(noteId) {
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Failed to load connections');
   return data;
+}
+
+/** Walk parent chain to thread root id (for Stream navigation). */
+export async function getNoteThreadRoot(noteId) {
+  const r = await fetch(`${API}/notes/${noteId}/thread-root`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Could not resolve thread');
+  return data.thread_root_id;
 }
 
 export async function fetchHoverInsight(noteId) {

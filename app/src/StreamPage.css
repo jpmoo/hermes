@@ -12,6 +12,29 @@
   padding-top: 0.5rem;
 }
 
+/* Stream insight mode: one note selected for tag/connection panels — dim the rest */
+.stream-page:has(.note-card--insight-selected) .note-card.note-card--insight-dimmed {
+  opacity: 0.38;
+  filter: brightness(0.88);
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
+}
+
+.stream-page:has(.note-card--insight-selected) .note-card.note-card--insight-selected {
+  opacity: 1;
+  filter: none;
+  position: relative;
+  z-index: 3;
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease,
+    box-shadow 0.2s ease;
+  box-shadow:
+    0 0 0 2px var(--accent-dim, rgba(201, 162, 39, 0.55)),
+    4px 4px 4px -4px rgba(28, 27, 24, 0.14);
+}
+
 .stream-page-nav-row {
   display: flex;
   flex-wrap: wrap;

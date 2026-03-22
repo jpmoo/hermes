@@ -18,7 +18,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Notes CRUD, threading, root feed | Done |
 | Starred notes, All/Starred toggle | Done |
 | Embedding pipeline (Ollama → pgvector) | Done |
-| Hover replies: tag suggestions (Ollama + similar-note tags) & similar notes (Stream) | Done |
+| Stream insight: click a note for tag/connection panels (others dim); double-click opens thread | Done |
 | Inherit parent tags from note UI | Done |
 | Tag relationships (exclusion, complement) API | Done |
 | Flat / Tag view (filter by tags, AND/OR) | Done |
@@ -140,10 +140,11 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/tags` (all tags for typeahead), `GET /api/tags?in_use=1` (tags with ≥1 approved use on your notes — Tags page), `POST /api/tags`, relationships endpoints
 - `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (hybrid text + semantic; 503 only if Ollama fails and nothing matches the substring)
 - `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
-- `POST /api/notes/hover-insight` — `{ noteId }` → tag suggestions (Ollama + tags from top similar notes), similar notes, and **persisted** `linked` notes for Stream hover UI (requires Ollama + embeddings)
-- `GET /api/notes/:id/connections` — `{ outgoing, incoming }` (saved links to/from other notes)
-- `POST /api/notes/:id/connections` — `{ linkedNoteId }` — create directed link **anchor** (`:id`) → **linked** note (idempotent)
-- `DELETE /api/notes/:id/connections/:linkedNoteId` — remove that link
+- `POST /api/notes/hover-insight` — `{ noteId }` → `tagSuggestions[]` (each: `key`, `name`, `source` `ollama`|`similar`, optional `tagId`, and for Ollama `fromVocab` — UI groups into **neighbor** (thread context + vocab), **similar** (tags from embedding-similar notes), **new** (model-proposed tags)); plus similar notes and **bidirectional** persisted links (other note whether you created anchor→peer or peer→anchor; `tags[]`, `threadRootId`, …) (requires Ollama + embeddings)
+- `GET /api/notes/:id/thread-root` — resolves thread root id for any note (used when opening a linked note from hover)
+- `GET /api/notes/:id/connections` — `{ outgoing, incoming }` (same undirected link appears in both notes’ API; row is stored once with an anchor/linked orientation)
+- `POST /api/notes/:id/connections` — `{ linkedNoteId }` — connect two notes (one DB row; idempotent — if a link already exists in either direction, returns it)
+- `DELETE /api/notes/:id/connections/:linkedNoteId` — remove the link between the two notes (either stored orientation)
 - `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphans**)
 
 ## MCP (Claude)
@@ -217,7 +218,7 @@ Optional string on create/update note: **stable reference outside Hermes** (e.g.
 
 ## Telegram bot
 
-`cd telegram && npm install`. Set `TELEGRAM_BOT_TOKEN` and `HERMES_API_URL`, `HERMES_MCP_TOKEN` (or token from login). Run `node bot.js`. Send a message to create a root note; `/thread Title` to start a thread; `/tags` for a hint about Stream hover tag suggestions.
+`cd telegram && npm install`. Set `TELEGRAM_BOT_TOKEN` and `HERMES_API_URL`, `HERMES_MCP_TOKEN` (or token from login). Run `node bot.js`. Send a message to create a root note; `/thread Title` to start a thread; `/tags` for a hint about Stream tag suggestions (click a note on Stream).
 
 ## License
 

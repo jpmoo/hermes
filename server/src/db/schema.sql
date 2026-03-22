@@ -92,7 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_note_tags_note ON note_tags(note_id);
 CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_note_tags_status ON note_tags(status) WHERE status = 'pending';
 
--- User-drawn links between notes (e.g. Stream hover “similar note” → anchor)
+-- Links between notes (stored as one directed row; API treats as undirected — each note sees the other)
 CREATE TABLE IF NOT EXISTS note_connections (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

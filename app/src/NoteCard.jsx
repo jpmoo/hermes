@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   starNote,
   unstarNote,
@@ -26,10 +26,11 @@ export default function NoteCard({
   hasReplies,
   /** When set, parent’s tags for inherit (stream). Omit to load parent tags via API when note has parent_id. */
   parentTagsForInherit,
-  /** Stream: enable hover tag/similar-note panels for depth ≥ 1 */
+  /** Stream: single-click tag/connection panels; double-click opens thread (any depth) */
   hoverInsightEnabled = false,
 }) {
   const hoverInsight = useHoverInsight();
+  const insightClickTimerRef = useRef(null);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [addingTag, setAddingTag] = useState(false);
@@ -47,6 +48,17 @@ export default function NoteCard({
   useEffect(() => {
     setDropdownParentTags([]);
   }, [note.id]);
+
+  useEffect(
+    () => () => {
+      if (insightClickTimerRef.current) clearTimeout(insightClickTimerRef.current);
+    },
+    []
+  );
+
+  const insightSelectedId = hoverInsightEnabled ? hoverInsight?.hover?.note?.id : null;
+  const insightActive = Boolean(insightSelectedId);
+  const isInsightSelected = insightActive && insightSelectedId === note.id;
 
   const handleStar = async (e) => {
     e.preventDefault();
@@ -214,32 +226,75 @@ export default function NoteCard({
     }
   };
 
-  const handleInsightEnter = (e) => {
-    if (!hoverInsightEnabled || editing) return;
-    hoverInsight?.startHover(note, e.currentTarget, depth);
+  const handleCardClick = (ev) => {
+    if (editing) return;
+    if (!hoverInsightEnabled) {
+      onOpenThread?.(ev);
+      return;
+    }
+    const anchorEl = ev.currentTarget;
+    if (insightClickTimerRef.current) clearTimeout(insightClickTimerRef.current);
+    insightClickTimerRef.current = setTimeout(() => {
+      insightClickTimerRef.current = null;
+      hoverInsight?.selectInsightNote?.(note, anchorEl, depth);
+    }, 280);
   };
 
-  const handleInsightLeave = () => {
-    if (!hoverInsightEnabled || editing) return;
-    hoverInsight?.endHover();
+  const handleCardDoubleClick = (ev) => {
+    if (editing) return;
+    if (insightClickTimerRef.current) {
+      clearTimeout(insightClickTimerRef.current);
+      insightClickTimerRef.current = null;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (hoverInsightEnabled) {
+      hoverInsight?.clearInsightSelection?.();
+    }
+    onOpenThread?.(ev);
   };
+
+  const cardClassNames = [
+    cardClass,
+    hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
+    hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <article
-      className={cardClass}
+      className={cardClassNames}
       style={{ borderLeftWidth: borderWidth }}
-      onMouseEnter={handleInsightEnter}
-      onMouseLeave={handleInsightLeave}
-      onClick={editing ? undefined : (ev) => onOpenThread?.(ev)}
+      onClick={editing ? undefined : handleCardClick}
+      onDoubleClick={editing ? undefined : handleCardDoubleClick}
       role={editing ? undefined : 'button'}
       tabIndex={editing ? undefined : 0}
+      aria-pressed={hoverInsightEnabled && isInsightSelected ? true : undefined}
+      title={
+        hoverInsightEnabled && !editing
+          ? 'Click: tag & connection suggestions · Double-click: open thread'
+          : undefined
+      }
       onKeyDown={
         editing
           ? undefined
           : (e) => {
+              if (!hoverInsightEnabled) {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onOpenThread?.(e);
+                }
+                return;
+              }
               if (e.key === 'Enter') {
                 e.preventDefault();
+                hoverInsight?.clearInsightSelection?.();
                 onOpenThread?.(e);
+              }
+              if (e.key === ' ') {
+                e.preventDefault();
+                hoverInsight?.selectInsightNote?.(note, e.currentTarget, depth);
               }
             }
       }

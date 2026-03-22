@@ -9,8 +9,10 @@ function normalizeTagName(s) {
 }
 
 /**
- * Tag suggestions + similar notes for hover UI (non-root notes).
+ * Tag suggestions + similar notes + persisted links for Stream hover (any note, including thread roots).
  * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (>0.65) not on note.
+ * Root notes: no parent block; siblings = other root-level notes; children = direct replies only (no deeper thread).
+ * Tag harvest from vector-similar notes skips grandchildren+ of the hovered note (immediate children may still appear if similar).
  */
 export async function getHoverInsight(noteId, userId) {
   const noteR = await pool.query(
@@ -31,8 +33,9 @@ export async function getHoverInsight(noteId, userId) {
     if (pc) parentBlock = pc;
   }
 
+  /** Direct replies only (one level); not grandchildren or deeper. */
   const kidsR = await pool.query(
-    `SELECT content FROM notes WHERE parent_id = $1 AND user_id = $2 ORDER BY created_at ASC`,
+    `SELECT content FROM notes WHERE parent_id = $1 AND user_id = $2 ORDER BY created_at ASC LIMIT 40`,
     [noteId, userId]
   );
   const childrenBlock = kidsR.rows
@@ -81,13 +84,15 @@ export async function getHoverInsight(noteId, userId) {
     content?.trim() ? `--- hovered note ---\n${content.trim()}` : '',
     parentBlock ? `--- parent note ---\n${parentBlock}` : '',
     siblingsBlock ? `--- sibling notes (same level in thread) ---\n${siblingsBlock}` : '',
-    childrenBlock ? `--- child notes (replies under hovered note) ---\n${childrenBlock}` : '',
+    childrenBlock
+      ? `--- direct replies only (immediate children of hovered note, one level — not nested deeper) ---\n${childrenBlock}`
+      : '',
   ].filter(Boolean);
   const body = contextParts.join('\n\n');
 
   const ollamaParsed = [];
   if (body.trim()) {
-    const prompt = `You tag notes in Hermes. The HOVERED NOTE is the focus; parent, sibling, and child sections give thread context. Suggest tags for the hovered note (and context). Use ACTIVE TAGS when they fit; otherwise at most 6 NEW tags (lowercase, hyphenated).
+    const prompt = `You tag notes in Hermes. The HOVERED NOTE is the focus; parent, sibling, and child sections give thread context. Child notes are ONLY immediate replies (one level under the hovered note), not grandchildren or deeper thread. Suggest tags for the hovered note (and context). Use ACTIVE TAGS when they fit; otherwise at most 6 NEW tags (lowercase, hyphenated).
 
 Return ONLY a JSON array: [{"tag":"name","from_vocab":true|false}, ...] with 1–12 items. from_vocab is true only if the tag appears in ACTIVE TAGS.
 
@@ -132,6 +137,7 @@ JSON array only, no markdown:`;
       name: t.name,
       tagId: known?.id ?? null,
       source: 'ollama',
+      fromVocab: !!t.from_vocab,
     });
   }
 
@@ -150,14 +156,32 @@ JSON array only, no markdown:`;
   }
 
   const similarIds = similarRows.map((r) => r.id);
+  /** Grandchildren+ under hovered note: do not use their tags for “similar” tag harvest (only immediate children matter). */
+  const deepDescR = await pool.query(
+    `WITH RECURSIVE down AS (
+       SELECT n.id, 1 AS depth
+       FROM notes n
+       WHERE n.parent_id = $1::uuid AND n.user_id = $2
+       UNION ALL
+       SELECT n.id, d.depth + 1
+       FROM notes n
+       INNER JOIN down d ON n.parent_id = d.id
+       WHERE n.user_id = $2
+     )
+     SELECT id FROM down WHERE depth >= 2`,
+    [id, userId]
+  );
+  const deepDescendantIds = new Set(deepDescR.rows.map((r) => r.id));
+  const similarIdsForTagHarvest = similarIds.filter((sid) => !deepDescendantIds.has(sid));
+
   const embeddingTags = [];
-  if (similarIds.length) {
+  if (similarIdsForTagHarvest.length) {
     const tr = await pool.query(
       `SELECT DISTINCT t.id, t.name
        FROM note_tags nt
        JOIN tags t ON t.id = nt.tag_id
        WHERE nt.note_id = ANY($1) AND nt.status = 'approved'`,
-      [similarIds]
+      [similarIdsForTagHarvest]
     );
     for (const row of tr.rows) {
       const ln = row.name.toLowerCase();
@@ -176,7 +200,8 @@ JSON array only, no markdown:`;
   const similarNotes = similarRows
     .filter((r) => {
       const rp = r.parent_id ?? null;
-      return rp !== pid;
+      if (pid === null) return true; // top-level note: allow other roots as “similar”
+      return rp !== pid; // reply: skip siblings (same parent) as redundant
     })
     .map((r) => ({
       id: r.id,
@@ -188,12 +213,44 @@ JSON array only, no markdown:`;
   const tagSuggestions = [...ollamaTags, ...embeddingTags];
 
   const pl = await pool.query(
-    `SELECT nc.id AS connection_id, nb.id, nb.content, nb.parent_id
-     FROM note_connections nc
-     JOIN notes nb ON nb.id = nc.linked_note_id AND nb.user_id = $1
-     JOIN notes na ON na.id = nc.anchor_note_id AND na.user_id = $1
-     WHERE nc.user_id = $1 AND nc.anchor_note_id = $2
-     ORDER BY nc.created_at DESC`,
+    `WITH RECURSIVE thread_roots AS (
+       SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $1
+       UNION ALL
+       SELECT n.id, r.root_id FROM notes n JOIN thread_roots r ON n.parent_id = r.id WHERE n.user_id = $1
+     ),
+     anchor AS (SELECT embedding FROM notes WHERE id = $2 AND user_id = $1),
+     raw_links AS (
+       SELECT nc.id AS connection_id,
+              CASE
+                WHEN nc.anchor_note_id = $2::uuid THEN nc.linked_note_id
+                ELSE nc.anchor_note_id
+              END AS peer_id,
+              nc.created_at
+       FROM note_connections nc
+       WHERE nc.user_id = $1
+         AND (nc.anchor_note_id = $2::uuid OR nc.linked_note_id = $2::uuid)
+     ),
+     dedup AS (
+       SELECT DISTINCT ON (peer_id) connection_id, peer_id, created_at
+       FROM raw_links
+       ORDER BY peer_id, created_at DESC
+     )
+     SELECT d.connection_id,
+            nb.id,
+            nb.content,
+            nb.parent_id,
+            tr.root_id AS thread_root_id,
+            CASE
+              WHEN a.embedding IS NOT NULL AND nb.embedding IS NOT NULL
+              THEN 1 - (nb.embedding <=> a.embedding)
+              ELSE NULL
+            END AS similarity,
+            d.created_at
+     FROM dedup d
+     JOIN notes nb ON nb.id = d.peer_id AND nb.user_id = $1
+     JOIN thread_roots tr ON tr.id = nb.id
+     CROSS JOIN anchor a
+     ORDER BY similarity DESC NULLS LAST, d.created_at DESC`,
     [userId, id]
   );
   const persistedLinkIds = new Set(pl.rows.map((r) => r.id));
@@ -202,14 +259,44 @@ JSON array only, no markdown:`;
     id: r.id,
     content: r.content,
     parent_id: r.parent_id,
+    threadRootId: r.thread_root_id,
+    similarity: r.similarity != null ? Number(r.similarity) : null,
     persisted: true,
   }));
 
   const similarNotesFiltered = similarNotes.filter((s) => !persistedLinkIds.has(s.id));
 
+  const tagTargetIds = [
+    ...new Set([...similarNotesFiltered.map((s) => s.id), ...pl.rows.map((r) => r.id)]),
+  ];
+  const noteTagsMap = new Map();
+  if (tagTargetIds.length > 0) {
+    const tagR = await pool.query(
+      `SELECT nt.note_id, t.id AS tag_id, t.name
+       FROM note_tags nt
+       JOIN tags t ON t.id = nt.tag_id
+       WHERE nt.note_id = ANY($1::uuid[]) AND nt.status = 'approved'`,
+      [tagTargetIds]
+    );
+    for (const row of tagR.rows) {
+      if (!noteTagsMap.has(row.note_id)) noteTagsMap.set(row.note_id, []);
+      noteTagsMap.get(row.note_id).push({ id: row.tag_id, name: row.name });
+    }
+  }
+
+  const similarNotesWithTags = similarNotesFiltered.map((s) => ({
+    ...s,
+    tags: noteTagsMap.get(s.id) || [],
+  }));
+
+  const persistedLinksWithTags = persistedLinks.map((p) => ({
+    ...p,
+    tags: noteTagsMap.get(p.id) || [],
+  }));
+
   return {
     tagSuggestions,
-    similarNotes: similarNotesFiltered,
-    persistedLinks,
+    similarNotes: similarNotesWithTags,
+    persistedLinks: persistedLinksWithTags,
   };
 }

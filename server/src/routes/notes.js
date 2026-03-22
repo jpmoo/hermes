@@ -446,7 +446,7 @@ router.post('/hover-insight', async (req, res) => {
   }
 });
 
-/** List connections where this note is anchor (outgoing) or linked (incoming). */
+/** List connections by stored orientation (outgoing / incoming); same pair is one row in DB. */
 router.get('/:id/connections', async (req, res) => {
   try {
     const noteId = req.params.id;
@@ -489,7 +489,7 @@ router.get('/:id/connections', async (req, res) => {
   }
 });
 
-/** Create directed link anchor → linked (idempotent). */
+/** Create link between two notes (stored as one row; either orientation). Idempotent for the pair. */
 router.post('/:id/connections', async (req, res) => {
   try {
     const anchorId = req.params.id;
@@ -504,40 +504,72 @@ router.post('/:id/connections', async (req, res) => {
     if (a.rows.length === 0 || b.rows.length === 0) {
       return res.status(404).json({ error: 'One or both notes not found' });
     }
+    const existing = await pool.query(
+      `SELECT id, anchor_note_id, linked_note_id, created_at FROM note_connections
+       WHERE user_id = $1
+         AND (
+           (anchor_note_id = $2::uuid AND linked_note_id = $3::uuid)
+           OR (anchor_note_id = $3::uuid AND linked_note_id = $2::uuid)
+         )
+       LIMIT 1`,
+      [userId, anchorId, linkedNoteId]
+    );
+    if (existing.rows.length > 0) return res.status(200).json(existing.rows[0]);
     const ins = await pool.query(
       `INSERT INTO note_connections (user_id, anchor_note_id, linked_note_id)
        VALUES ($1, $2, $3)
-       ON CONFLICT (user_id, anchor_note_id, linked_note_id) DO NOTHING
        RETURNING id, anchor_note_id, linked_note_id, created_at`,
       [userId, anchorId, linkedNoteId]
     );
-    if (ins.rows.length > 0) return res.status(201).json(ins.rows[0]);
-    const ex = await pool.query(
-      `SELECT id, anchor_note_id, linked_note_id, created_at FROM note_connections
-       WHERE user_id = $1 AND anchor_note_id = $2 AND linked_note_id = $3`,
-      [userId, anchorId, linkedNoteId]
-    );
-    res.status(200).json(ex.rows[0]);
+    res.status(201).json(ins.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create connection' });
   }
 });
 
-/** Remove link anchor → linkedNoteId. */
+/** Remove undirected link between two notes (either stored orientation). */
 router.delete('/:id/connections/:linkedNoteId', async (req, res) => {
   try {
+    const a = req.params.id;
+    const b = req.params.linkedNoteId;
     const r = await pool.query(
       `DELETE FROM note_connections
-       WHERE user_id = $1 AND anchor_note_id = $2 AND linked_note_id = $3
+       WHERE user_id = $1
+         AND (
+           (anchor_note_id = $2::uuid AND linked_note_id = $3::uuid)
+           OR (anchor_note_id = $3::uuid AND linked_note_id = $2::uuid)
+         )
        RETURNING id`,
-      [req.userId, req.params.id, req.params.linkedNoteId]
+      [req.userId, a, b]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Connection not found' });
     res.status(204).send();
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to delete connection' });
+  }
+});
+
+// Resolve thread root id for any note (walk parent chain)
+router.get('/:id/thread-root', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+    const r = await pool.query(
+      `WITH RECURSIVE up AS (
+         SELECT id, parent_id FROM notes WHERE id = $1 AND user_id = $2
+         UNION ALL
+         SELECT n.id, n.parent_id FROM notes n JOIN up u ON n.id = u.parent_id WHERE n.user_id = $2
+       )
+       SELECT id AS thread_root_id FROM up WHERE parent_id IS NULL LIMIT 1`,
+      [id, userId]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    res.json({ thread_root_id: r.rows[0].thread_root_id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to resolve thread root' });
   }
 });
 

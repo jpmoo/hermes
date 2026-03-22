@@ -317,9 +317,14 @@ export default function StreamPage() {
   useEffect(() => {
     if (!threadRootId || !thread.length || loadingThread) return;
     requestAnimationFrame(() => {
+      const scrollEl = threadListRef.current?.closest('.stream-page-scroll');
+      if (focusParam && scrollEl) {
+        scrollEl.scrollTo({ top: 0, behavior: 'auto' });
+        return;
+      }
       threadAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  }, [threadRootId, thread[0]?.id, loadingThread]);
+  }, [threadRootId, thread[0]?.id, loadingThread, focusParam]);
 
   const openThreadDirect = useCallback(
     (rootId) => {
@@ -720,6 +725,13 @@ export default function StreamPage() {
     ? rootNote.content?.slice(0, 40) + (rootNote.content?.length > 40 ? '…' : '')
     : 'Stream';
 
+  const onHoverInsightGoToNote = useCallback(
+    ({ noteId, threadRootId: root }) => {
+      setSearchParams({ thread: root, focus: noteId });
+    },
+    [setSearchParams]
+  );
+
   const navLinks = [
     { to: '/', label: 'Stream' },
     ...(threadRootId
@@ -738,7 +750,7 @@ export default function StreamPage() {
       onLogout={logout}
       viewLinks={navLinks}
     >
-      <HoverInsightProvider onNoteUpdated={refreshAll}>
+      <HoverInsightProvider onNoteUpdated={refreshAll} onGoToNote={onHoverInsightGoToNote}>
       <div className="stream-page">
         {floatOpen && (
           <div
@@ -834,6 +846,7 @@ export default function StreamPage() {
                         note={n}
                         depth={0}
                         hasReplies={(n.reply_count ?? 0) > 0}
+                        hoverInsightEnabled
                         onOpenThread={(ev) => beginOpenThread(n.id, ev)}
                         onStarredChange={loadRoots}
                         onNoteUpdate={loadRoots}

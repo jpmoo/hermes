@@ -75,6 +75,28 @@
   color: var(--text-muted);
 }
 
+.hover-insight-tag-groups {
+  margin-top: 0.2rem;
+}
+
+.hover-insight-tag-section {
+  margin-top: 0.55rem;
+}
+
+.hover-insight-tag-section:first-child {
+  margin-top: 0;
+}
+
+.hover-insight-tag-section-title {
+  margin: 0 0 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  opacity: 0.92;
+}
+
 .hover-insight-muted {
   margin: 0;
   font-size: 0.78rem;
@@ -93,6 +115,21 @@
   gap: 0.25rem;
   margin-bottom: 0.35rem;
   font-size: 0.8125rem;
+  border-radius: 6px;
+  padding: 0.12rem 0.2rem;
+  margin-left: -0.2rem;
+  margin-right: -0.2rem;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hover-insight-tag-row--connection-highlight {
+  background: rgba(201, 162, 39, 0.16);
+  box-shadow: inset 0 0 0 1px var(--accent-dim, rgba(201, 162, 39, 0.45));
+}
+
+.hover-insight-tag-row--connection-highlight .hover-insight-tag-name {
+  font-weight: 600;
+  color: var(--accent, #8a6d0a);
 }
 
 .hover-insight-tag-name {
@@ -205,18 +242,24 @@
   font-family: var(--font-mono);
 }
 
-/* Connection card: sits flush to hovered note’s right edge */
-.hover-insight-connection {
+/* Stacked linked notes — immediately right of hovered card */
+.hover-insight-connection-stack {
   position: fixed;
   z-index: 260;
-  width: min(240px, 36vw);
-  animation: hover-insight-connect 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  width: min(280px, 38vw);
+  overflow-y: auto;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-right: 2px;
+  animation: hover-insight-connect 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes hover-insight-connect {
   from {
     opacity: 0;
-    transform: translateX(28px);
+    transform: translateX(20px);
   }
   to {
     opacity: 1;
@@ -224,28 +267,167 @@
   }
 }
 
-.hover-insight-connection-inner {
+.hover-insight-connection-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
   background: var(--bg-card);
   border: 1px solid var(--accent-dim);
   border-radius: 8px;
-  padding: 0.45rem 0.55rem;
+  padding: 0.35rem 0.4rem 0.35rem 0.45rem;
   box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.hover-insight-connection-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.hover-insight-connection-card-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.hover-insight-connection-card-main:hover .hover-insight-connection-card-snippet {
   color: var(--accent);
 }
 
-.hover-insight-connection-text {
-  margin: 0.2rem 0 0;
+.hover-insight-connection-card-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-right: 0.35rem;
+}
+
+.hover-insight-connection-card-sim {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.hover-insight-connection-card-snippet {
+  margin: 0.25rem 0 0;
   font-size: 0.78rem;
   line-height: 1.35;
   color: var(--text);
-  overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 6;
+  -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hover-insight-connection-unlink {
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+/* Full-note modal */
+.hover-insight-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: hover-insight-fade-in 0.2s ease-out both;
+}
+
+@keyframes hover-insight-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hover-insight-modal {
+  width: min(560px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.hover-insight-modal-title {
+  margin: 0;
+  padding: 0.85rem 1rem 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.hover-insight-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 1rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hover-insight-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.hover-insight-modal-actions-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.hover-insight-modal-btn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+
+.hover-insight-modal-btn--secondary {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+.hover-insight-modal-btn--primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.hover-insight-modal-btn--primary:hover {
+  filter: brightness(1.05);
+}
+
+.hover-insight-modal-btn--danger {
+  background: var(--status-danger-bg, rgba(180, 40, 40, 0.12));
+  color: var(--status-danger-text, #b91c1c);
+  border-color: var(--status-danger-text, #b91c1c);
+  font-weight: 600;
+}
+
+.hover-insight-modal-btn--danger:hover {
+  filter: brightness(0.97);
 }
