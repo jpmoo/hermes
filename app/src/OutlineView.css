@@ -58,11 +58,31 @@
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
   border-radius: 6px;
+}
+
+.outline-row:has(.outline-row-main) {
+  cursor: default;
+}
+
+.outline-row:not(:has(.outline-row-main)) {
   cursor: pointer;
 }
 
 .outline-row:hover {
   background: var(--bg-card);
+}
+
+/* Note text + star: opens Stream focused; chevron is separate (expand/collapse only). */
+.outline-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0.1rem 0.15rem;
+  margin: -0.1rem -0.15rem;
 }
 
 .outline-toggle {

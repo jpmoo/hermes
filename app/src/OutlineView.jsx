@@ -96,35 +96,33 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
     void runToggle();
   };
 
-  const handleRowClick = () => {
-    if (showToggle) {
-      void runToggle();
-      return;
-    }
+  const openInStream = () => {
     if (streamThreadRootId) {
       onGoToStream?.(streamThreadRootId, node.id);
     }
   };
 
+  const streamKeyDown = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    openInStream();
+  };
+
+  const rowPad = { paddingLeft: `${depth * 1.25 + 0.5}rem` };
+
+  const rowMain = (
+    <>
+      <span className={`outline-content ${node.starred ? 'outline-content--starred' : ''}`}>
+        {node.content || '—'}
+      </span>
+      {node.starred && <span className="outline-star">★</span>}
+    </>
+  );
+
   return (
     <div className="outline-node">
-      <div
-        className="outline-row"
-        style={{ paddingLeft: `${depth * 1.25 + 0.5}rem` }}
-        onClick={handleRowClick}
-        {...(!showToggle
-          ? {
-              role: 'button',
-              tabIndex: 0,
-              onKeyDown: (e) => {
-                if (e.key !== 'Enter' && e.key !== ' ') return;
-                e.preventDefault();
-                handleRowClick();
-              },
-            }
-          : {})}
-      >
-        {showToggle ? (
+      {showToggle ? (
+        <div className="outline-row" style={rowPad}>
           <button
             type="button"
             className="outline-toggle"
@@ -135,14 +133,33 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
           >
             {loading ? '…' : open ? '▼' : '▶'}
           </button>
-        ) : (
+          <div
+            className="outline-row-main"
+            role="button"
+            tabIndex={0}
+            aria-label="Open this note in Stream (focused)"
+            title="Open in Stream (focused on this note)"
+            onClick={openInStream}
+            onKeyDown={streamKeyDown}
+          >
+            {rowMain}
+          </div>
+        </div>
+      ) : (
+        <div
+          className="outline-row"
+          style={rowPad}
+          role="button"
+          tabIndex={0}
+          aria-label="Open this note in Stream (focused)"
+          title="Open in Stream (focused on this note)"
+          onClick={openInStream}
+          onKeyDown={streamKeyDown}
+        >
           <span className="outline-spacer" aria-hidden />
-        )}
-        <span className={`outline-content ${node.starred ? 'outline-content--starred' : ''}`}>
-          {node.content || '—'}
-        </span>
-        {node.starred && <span className="outline-star">★</span>}
-      </div>
+          {rowMain}
+        </div>
+      )}
       {hasSubtree && open && (
         <div className="outline-children">
           {node.children.map((c) => (
