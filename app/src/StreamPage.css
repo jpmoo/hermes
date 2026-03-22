@@ -14,14 +14,14 @@
 
 /* Quiet context above root / thread-root note lists */
 .stream-page-level-hint {
-  margin: 0 0 1rem;
+  margin: 0 0 0.85rem;
   padding: 0 0.15rem;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--text-muted);
-  opacity: 0.72;
+  opacity: 0.88;
   max-width: 34em;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
 }
 
 /* Stream insight mode: one note selected for tag/connection panels — dim the rest */

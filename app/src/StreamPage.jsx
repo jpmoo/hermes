@@ -791,7 +791,7 @@ export default function StreamPage() {
                   </button>
                 ) : null}
                 <button type="button" className="stream-page-nav-btn stream-page-nav-btn--root" onClick={closeThread}>
-                  All threads
+                  Root level
                 </button>
               </div>
               {!loadingThread &&
@@ -834,6 +834,9 @@ export default function StreamPage() {
             </>
           ) : (
             <>
+              <p className="stream-page-level-hint" role="note">
+                You are at the root.
+              </p>
               {loadError && (
                 <p className="stream-page-error" role="alert">
                   {loadError}
@@ -845,11 +848,7 @@ export default function StreamPage() {
                 <p className="stream-page-muted">
                   {starredOnly ? 'No starred threads yet.' : 'No threads yet. Start one below.'}
                 </p>
-              ) : (
-                <>
-                  <p className="stream-page-level-hint" role="note">
-                    You are at the root.
-                  </p>
+              ) : roots.length > 0 ? (
                 <ul className="stream-page-list">
                   {roots.map((n) => (
                     <li key={n.id} className="stream-page-root-item">
@@ -866,8 +865,7 @@ export default function StreamPage() {
                     </li>
                   ))}
                 </ul>
-                </>
-              )}
+              ) : null}
             </>
           )}
         </div>
