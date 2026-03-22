@@ -26,14 +26,14 @@
  * over partial longhands; !important + vars from NoteCard.jsx matches left threadline width/colors.
  */
 .note-card.note-card--linked {
-  border-right-width: var(--hermes-link-rw, 3px) !important;
+  border-right-width: var(--hermes-link-rw, 2px) !important;
   border-right-style: solid !important;
   border-right-color: var(--hermes-link-rc, var(--accent-dim, #6d5610)) !important;
 }
 
 /* Insight-selected cards use box-shadow: none — restripe the right edge so it doesn’t disappear. */
 .stream-page:has(.note-card--insight-selected) .note-card.note-card--insight-selected.note-card--linked {
-  border-right-width: var(--hermes-link-rw, 3px) !important;
+  border-right-width: var(--hermes-link-rw, 2px) !important;
   border-right-style: solid !important;
   border-right-color: var(--hermes-link-rc, var(--accent-dim, #6d5610)) !important;
 }

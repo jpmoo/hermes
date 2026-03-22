@@ -303,12 +303,12 @@ export default function NoteCard({
   /**
    * Right connection stripe: for leaf notes, left uses borderWidth 1px + var(--border) — if we reused
    * that for the right, the “stripe” is 1px and the same color as the frame (invisible). Use a
-   * minimum 3px and thread accent for leaf+linked; threaded notes keep width/color aligned with left.
+   * minimum 2px and thread accent for leaf+linked; threaded notes keep width/color aligned with left.
    */
   const linkStripeWidthPx = hasConnections
     ? showThreadline
       ? borderWidth
-      : Math.max(3, borderWidth)
+      : Math.max(2, borderWidth)
     : null;
   const linkedBorderVars =
     hasConnections
