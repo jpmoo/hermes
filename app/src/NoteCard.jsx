@@ -300,21 +300,17 @@ export default function NoteCard({
         }`
       : undefined;
 
-  const linkBarColor = !showThreadline
-    ? 'var(--border)'
-    : depth <= 0
-      ? 'var(--accent-dim, #6d5610)'
-      : depth === 1
-        ? '#5a4a2a'
-        : depth === 2
-          ? '#4a3a1a'
-          : '#3a2a12';
-
   return (
     <article
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
+        ...(hasConnections
+          ? {
+              borderRightWidth: borderWidth,
+              borderRightStyle: 'solid',
+            }
+          : {}),
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
@@ -467,16 +463,6 @@ export default function NoteCard({
           </div>
         </div>
       </div>
-      {hasConnections ? (
-        <span
-          className="note-card-link-bar"
-          aria-hidden
-          style={{
-            '--hermes-link-rw': `${borderWidth}px`,
-            '--hermes-link-rc': linkBarColor,
-          }}
-        />
-      ) : null}
     </article>
   );
 }

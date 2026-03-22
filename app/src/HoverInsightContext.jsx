@@ -58,19 +58,9 @@ function partitionTagSuggestions(list) {
   return { neighbor, connected, novel };
 }
 
-/** Whether a tag suggestion matches an approved tag on a linked note. */
-function tagSuggestionMatchesNoteTags(suggestion, noteTags) {
-  if (!noteTags?.length) return false;
-  if (suggestion.tagId && noteTags.some((t) => t.id === suggestion.tagId)) return true;
-  const name = (suggestion.name || '').trim().toLowerCase();
-  if (!name) return false;
-  return noteTags.some((t) => (t.name || '').trim().toLowerCase() === name);
-}
-
 const HoverInsightContext = createContext(null);
 
-function tagSuggestionTitle(t, highlightConnection) {
-  if (highlightConnection) return 'Also on the connection note you highlighted';
+function tagSuggestionTitle(t) {
   if (t.source === 'connected') return 'On a linked note; not on the selected note yet';
   if (t.fromVocab === true) return 'From thread context (parent, siblings, replies) using your tags';
   return 'New tag from model (may create tag when added)';
@@ -83,8 +73,6 @@ function HoverInsightTagSection({
   dismissTag,
   addTag,
   addingKey,
-  connectionTagSourceId,
-  connectionHighlightTags,
 }) {
   if (tags.length === 0) return null;
   return (
@@ -92,14 +80,8 @@ function HoverInsightTagSection({
       <p className="hover-insight-tag-section-title">{title}</p>
       <ul className="hover-insight-tag-list">
         {tags.map((t) => {
-          const highlightConnection =
-            !!connectionTagSourceId && tagSuggestionMatchesNoteTags(t, connectionHighlightTags);
           return (
-            <li
-              key={t.key}
-              className={`hover-insight-tag-row${highlightConnection ? ' hover-insight-tag-row--connection-highlight' : ''}`}
-              data-connection-highlight={highlightConnection ? 'true' : undefined}
-            >
+            <li key={t.key} className="hover-insight-tag-row">
               <button
                 type="button"
                 className="hover-insight-icon-btn"
@@ -108,7 +90,7 @@ function HoverInsightTagSection({
               >
                 ×
               </button>
-              <span className="hover-insight-tag-name" title={tagSuggestionTitle(t, highlightConnection)}>
+              <span className="hover-insight-tag-name" title={tagSuggestionTitle(t)}>
                 {t.name}
               </span>
               <button
@@ -146,7 +128,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     const fresh = insight?.persistedLinks?.find((x) => x.id === l.id);
     return fresh ? { ...l, threadPath: fresh.threadPath ?? l.threadPath } : l;
   }, [connectionModal, insight?.persistedLinks]);
-  const [connectionTagSourceId, setConnectionTagSourceId] = useState(null);
   const fetchTimer = useRef(null);
   const reqId = useRef(0);
   const activeHoverId = useRef(null);
@@ -164,7 +145,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     setDismissedKeys(new Set());
     setAddingKey(null);
     setConnectionModal(null);
-    setConnectionTagSourceId(null);
   }, []);
 
   /** Full reset (e.g. after navigating away). */
@@ -188,7 +168,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       activeHoverId.current = note.id;
       setDismissedKeys(new Set());
       setConnectionModal(null);
-      setConnectionTagSourceId(null);
       if (fetchTimer.current) clearTimeout(fetchTimer.current);
       const id = ++reqId.current;
       setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
@@ -295,7 +274,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
           const linkedId = cur?.linked?.id ?? cur?.id;
           return linkedId === linkedNoteId ? null : cur;
         });
-        setConnectionTagSourceId((cur) => (cur === linkedNoteId ? null : cur));
         onNoteUpdated?.();
 
         const rid = ++reqId.current;
@@ -346,8 +324,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       connectionModal,
       setConnectionModal,
       navigateToConnection,
-      connectionTagSourceId,
-      setConnectionTagSourceId,
     }),
     [
       selectInsightNote,
@@ -363,8 +339,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       connectionModal,
       setConnectionModal,
       navigateToConnection,
-      connectionTagSourceId,
-      setConnectionTagSourceId,
     ]
   );
 
@@ -392,8 +366,6 @@ function HoverInsightPanels() {
     connectionModal,
     setConnectionModal,
     navigateToConnection,
-    connectionTagSourceId,
-    setConnectionTagSourceId,
     insightAnchorRef,
   } = ctx;
 
@@ -415,12 +387,6 @@ function HoverInsightPanels() {
   }, [hover?.note?.id, insightAnchorRef]);
   void layoutRev;
   const rect = insightAnchorRef.current?.getBoundingClientRect?.();
-
-  const connectionHighlightTags = useMemo(() => {
-    if (!connectionTagSourceId || !insight) return [];
-    const fromLinked = insight.persistedLinks?.find((x) => x.id === connectionTagSourceId);
-    return fromLinked?.tags || [];
-  }, [connectionTagSourceId, insight]);
 
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
   const { neighbor: neighborTags, connected: connectedTags, novel: novelTags } = useMemo(
@@ -461,9 +427,9 @@ function HoverInsightPanels() {
               maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
             },
             stackTopPx,
-            /* Vertical spine centered on the stack; starts at stack top so it hangs below the anchor note only. */
             spineX: left + stackW / 2,
-            spineYStart: stackTopPx,
+            anchorBottom: rect.bottom,
+            anchorRight: rect.right,
           };
         })()
       : null;
@@ -477,7 +443,16 @@ function HoverInsightPanels() {
     }
     const el = connectionStackRef.current;
     if (!el) return undefined;
-    const measure = () => setConnectionStackHeight(el.offsetHeight);
+    const measure = () => {
+      const kids = el.children;
+      if (kids.length === 0) {
+        setConnectionStackHeight(0);
+        return;
+      }
+      const stackRect = el.getBoundingClientRect();
+      const lastRect = kids[kids.length - 1].getBoundingClientRect();
+      setConnectionStackHeight(Math.max(0, lastRect.bottom - stackRect.top));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -493,11 +468,12 @@ function HoverInsightPanels() {
 
   const connectionSpinePath = useMemo(() => {
     if (!connectionLayout || persisted.length === 0) return null;
-    const { stackTopPx, spineX, spineYStart } = connectionLayout;
+    const { stackTopPx, spineX, anchorBottom, anchorRight } = connectionLayout;
     const estH = persisted.length * 92 + Math.max(0, persisted.length - 1) * 7 + 8;
-    const h = Math.max(connectionStackHeight, estH, 40);
-    const yEnd = stackTopPx + h;
-    return `M ${spineX} ${spineYStart} L ${spineX} ${yEnd}`;
+    const contentH = connectionStackHeight > 0 ? connectionStackHeight : estH;
+    const yEnd = stackTopPx + contentH;
+    /* From anchor’s bottom-right, across to stack center, then down to last linked card’s bottom. */
+    return `M ${anchorRight} ${anchorBottom} L ${spineX} ${anchorBottom} L ${spineX} ${yEnd}`;
   }, [connectionLayout, connectionStackHeight, persisted.length]);
 
   return (
@@ -521,8 +497,6 @@ function HoverInsightPanels() {
                     dismissTag={dismissTag}
                     addTag={addTag}
                     addingKey={addingKey}
-                    connectionTagSourceId={connectionTagSourceId}
-                    connectionHighlightTags={connectionHighlightTags}
                   />
                   <HoverInsightTagSection
                     title="Based on connected notes"
@@ -531,8 +505,6 @@ function HoverInsightPanels() {
                     dismissTag={dismissTag}
                     addTag={addTag}
                     addingKey={addingKey}
-                    connectionTagSourceId={connectionTagSourceId}
-                    connectionHighlightTags={connectionHighlightTags}
                   />
                   <HoverInsightTagSection
                     title="New tag suggestions"
@@ -541,8 +513,6 @@ function HoverInsightPanels() {
                     dismissTag={dismissTag}
                     addTag={addTag}
                     addingKey={addingKey}
-                    connectionTagSourceId={connectionTagSourceId}
-                    connectionHighlightTags={connectionHighlightTags}
                   />
                 </div>
               )}
@@ -565,11 +535,7 @@ function HoverInsightPanels() {
           style={connectionLayout.stackStyle}
         >
           {persisted.map((pn) => (
-            <div
-              key={pn.id}
-              className="hover-insight-connection-card"
-              onMouseEnter={() => setConnectionTagSourceId(pn.id)}
-            >
+            <div key={pn.id} className="hover-insight-connection-card">
               <button
                 type="button"
                 className="hover-insight-connection-card-main"

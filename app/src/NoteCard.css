@@ -21,26 +21,30 @@
   border-left-color: var(--border);
 }
 
-/* Linked notes: visible right threadline (border + DOM bar — some themes clip one or the other). */
+/* Linked notes: thick right edge (longhands override shorthand; color matches left threadline). */
 .note-card.note-card--linked {
   position: relative;
   box-sizing: border-box;
 }
 
-/* Absolutely positioned bar on top of the right edge so it always reads as “thick” like the left accent. */
-.note-card.note-card--linked .note-card-link-bar {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: var(--hermes-link-rw, 3px);
-  min-width: var(--hermes-link-rw, 3px);
-  background-color: var(--hermes-link-rc, var(--accent-dim));
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
-  pointer-events: none;
-  z-index: 6;
-  box-sizing: border-box;
+.note-card.note-card--linked.note-card--leaf {
+  border-right-color: var(--border) !important;
+}
+
+.note-card.note-card--linked.note-card--depth-0 {
+  border-right-color: var(--accent-dim, #6d5610) !important;
+}
+
+.note-card.note-card--linked.note-card--depth-1 {
+  border-right-color: #5a4a2a !important;
+}
+
+.note-card.note-card--linked.note-card--depth-2 {
+  border-right-color: #4a3a1a !important;
+}
+
+.note-card.note-card--linked.note-card--depth-3 {
+  border-right-color: #3a2a12 !important;
 }
 
 /* Stream insight: no focus ring on the selected card */
