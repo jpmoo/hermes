@@ -88,15 +88,7 @@ function tagSuggestionTitle(t) {
   return 'New tag from model (may create tag when added)';
 }
 
-function HoverInsightTagSection({
-  title,
-  tags,
-  note,
-  dismissTag,
-  addTag,
-  addingKey,
-  showDismiss = true,
-}) {
+function HoverInsightTagSection({ title, tags, note, addTag, addingKey }) {
   if (tags.length === 0) return null;
   return (
     <div className="hover-insight-tag-section">
@@ -104,20 +96,7 @@ function HoverInsightTagSection({
       <ul className="hover-insight-tag-list">
         {tags.map((t) => {
           return (
-            <li
-              key={t.key}
-              className={`hover-insight-tag-row${showDismiss ? '' : ' hover-insight-tag-row--no-dismiss'}`}
-            >
-              {showDismiss ? (
-                <button
-                  type="button"
-                  className="hover-insight-icon-btn"
-                  aria-label={`Dismiss ${t.name}`}
-                  onClick={() => dismissTag(t.key)}
-                >
-                  ×
-                </button>
-              ) : null}
+            <li key={t.key} className="hover-insight-tag-row hover-insight-tag-row--no-dismiss">
               <span className="hover-insight-tag-name" title={tagSuggestionTitle(t)}>
                 {t.name}
               </span>
@@ -360,8 +339,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       insight,
       loading,
       unlinkPersisted,
-      dismissedKeys,
-      dismissTag,
       addTag,
       addingKey,
       connectionModal,
@@ -376,8 +353,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       insight,
       loading,
       unlinkPersisted,
-      dismissedKeys,
-      dismissTag,
       addTag,
       addingKey,
       connectionModal,
@@ -404,8 +379,6 @@ function HoverInsightPanels() {
     insight,
     loading,
     unlinkPersisted,
-    dismissedKeys,
-    dismissTag,
     addTag,
     addingKey,
     connectionModal,
@@ -563,7 +536,6 @@ function HoverInsightPanels() {
                     title="Based on neighbor notes"
                     tags={neighborTags}
                     note={note}
-                    dismissTag={dismissTag}
                     addTag={addTag}
                     addingKey={addingKey}
                   />
@@ -571,7 +543,6 @@ function HoverInsightPanels() {
                     title="Based on connected notes"
                     tags={connectedTags}
                     note={note}
-                    dismissTag={dismissTag}
                     addTag={addTag}
                     addingKey={addingKey}
                   />
@@ -579,10 +550,8 @@ function HoverInsightPanels() {
                     title="New tag suggestions"
                     tags={novelTags}
                     note={note}
-                    dismissTag={dismissTag}
                     addTag={addTag}
                     addingKey={addingKey}
-                    showDismiss={false}
                   />
                 </div>
               )}
@@ -629,31 +598,46 @@ function HoverInsightPanels() {
                     <p className="hover-insight-muted">No notes at or above this threshold.</p>
                   ) : (
                     <ul className="hover-insight-similar-list">
-                      {filteredSimilarNotes.map((sn) => (
-                        <li key={sn.id}>
-                          <button
-                            type="button"
-                            className="hover-insight-similar-btn"
-                            title="Add as connected note to the selected card"
-                            onClick={() => connectSimilarNote(sn.id)}
-                          >
-                            <span className="hover-insight-similar-btn-main">
-                              {sn.threadPath ? (
-                                <span className="hover-insight-similar-path" title={sn.threadPath}>
-                                  {sn.threadPath}
-                                </span>
-                              ) : (
-                                <span className="hover-insight-similar-path hover-insight-muted">
-                                  (Thread root)
-                                </span>
+                      {filteredSimilarNotes.map((sn) => {
+                        const raw = sn.content != null ? String(sn.content).trim().replace(/\s+/g, ' ') : '';
+                        const path = sn.threadPath || sn.thread_path || '';
+                        const snippet =
+                          raw.length > 160 ? `${raw.slice(0, 160)}…` : raw || '—';
+                        return (
+                          <li key={sn.id}>
+                            <button
+                              type="button"
+                              className="hover-insight-similar-btn"
+                              title="Add as connected note to the selected card"
+                              onClick={() => connectSimilarNote(sn.id)}
+                            >
+                              <span className="hover-insight-similar-btn-main">
+                                {path ? (
+                                  <p
+                                    className="hover-insight-thread-path hover-insight-thread-path--card hover-insight-similar-thread-path"
+                                    title={path}
+                                  >
+                                    {path}
+                                  </p>
+                                ) : (
+                                  <p className="hover-insight-thread-path hover-insight-thread-path--card hover-insight-similar-thread-path hover-insight-muted">
+                                    (Thread root)
+                                  </p>
+                                )}
+                                <p
+                                  className="hover-insight-connection-card-snippet hover-insight-similar-note-snippet"
+                                  title={raw || undefined}
+                                >
+                                  {snippet}
+                                </p>
+                              </span>
+                              {sn.similarity != null && (
+                                <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
                               )}
-                            </span>
-                            {sn.similarity != null && (
-                              <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
-                            )}
-                          </button>
-                        </li>
-                      ))}
+                            </button>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </>

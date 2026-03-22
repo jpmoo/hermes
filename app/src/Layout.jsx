@@ -79,7 +79,10 @@ export default function Layout({
             <button
               type="button"
               className="layout-logout"
-              onClick={onLogout}
+              onClick={() => {
+                if (!window.confirm('Sign out of Hermes?')) return;
+                onLogout?.();
+              }}
               aria-label="Sign out"
               title="Sign out"
             >

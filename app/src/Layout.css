@@ -13,8 +13,10 @@
 }
 
 .layout-header-inner {
-  max-width: 960px;
-  margin: 0 auto;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
@@ -45,8 +47,10 @@
 .layout-nav {
   display: flex;
   flex-wrap: wrap;
+  flex: 1 1 auto;
   gap: 0.35rem 0.5rem;
   align-items: center;
+  justify-content: center;
   min-width: 0;
 }
 

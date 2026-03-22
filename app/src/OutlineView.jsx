@@ -26,7 +26,7 @@ function buildTree(flat) {
   return roots;
 }
 
-function OutlineNode({ node, depth, onSelect, onLoadThread, isMultiRoot }) {
+function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThread, isMultiRoot }) {
   const { expandAllTick, collapseAllTick } = useContext(OutlineExpandContext);
   const rc = node.reply_count ?? 0;
   const cc = node.children?.length ?? 0;
@@ -57,8 +57,8 @@ function OutlineNode({ node, depth, onSelect, onLoadThread, isMultiRoot }) {
     }
   }, [collapseAllTick]);
 
-  const handleToggle = async (e) => {
-    e.stopPropagation();
+  /** Same behavior as the ▼/▶ control: load root thread and/or flip expand state. */
+  const runToggle = async () => {
     if (loading) return;
     if (!hasSubtree && replyCount > 0 && onLoadThread && depth === 0) {
       setLoading(true);
@@ -73,18 +73,44 @@ function OutlineNode({ node, depth, onSelect, onLoadThread, isMultiRoot }) {
     setOpen((o) => !o);
   };
 
+  const handleToggleClick = (e) => {
+    e.stopPropagation();
+    void runToggle();
+  };
+
+  const handleRowClick = () => {
+    if (showToggle) {
+      void runToggle();
+      return;
+    }
+    if (streamThreadRootId) {
+      onGoToStream?.(streamThreadRootId);
+    }
+  };
+
   return (
     <div className="outline-node">
       <div
         className="outline-row"
         style={{ paddingLeft: `${depth * 1.25 + 0.5}rem` }}
-        onClick={() => onSelect?.(node.id)}
+        onClick={handleRowClick}
+        {...(!showToggle
+          ? {
+              role: 'button',
+              tabIndex: 0,
+              onKeyDown: (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                handleRowClick();
+              },
+            }
+          : {})}
       >
         {showToggle ? (
           <button
             type="button"
             className="outline-toggle"
-            onClick={handleToggle}
+            onClick={handleToggleClick}
             aria-expanded={open && (hasSubtree || loading)}
             disabled={loading}
             title={open ? 'Collapse replies' : 'Expand replies'}
@@ -106,7 +132,8 @@ function OutlineNode({ node, depth, onSelect, onLoadThread, isMultiRoot }) {
               key={c.id}
               node={c}
               depth={depth + 1}
-              onSelect={onSelect}
+              streamThreadRootId={streamThreadRootId}
+              onGoToStream={onGoToStream}
               onLoadThread={null}
               isMultiRoot={isMultiRoot}
             />
@@ -240,19 +267,10 @@ export default function OutlineView() {
                   node={node}
                   depth={0}
                   isMultiRoot={!isThread}
+                  streamThreadRootId={isThread ? rootId : node.id}
                   onLoadThread={!isThread ? loadThreadForRoot : null}
-                  onSelect={(id) => {
-                    if (isThread) {
-                      navigate({
-                        pathname: '/',
-                        search:
-                          id === rootId
-                            ? `?thread=${rootId}`
-                            : `?thread=${rootId}&focus=${id}`,
-                      });
-                    } else {
-                      navigate(`/outline/${id}`);
-                    }
+                  onGoToStream={(threadRoot) => {
+                    navigate({ pathname: '/', search: `?thread=${threadRoot}` });
                   }}
                 />
               ))}
