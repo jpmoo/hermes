@@ -21,6 +21,12 @@
   border-left-color: var(--border);
 }
 
+/* Stream insight: no focus ring on the selected card */
+.note-card.note-card--insight-selected:focus,
+.note-card.note-card--insight-selected:focus-visible {
+  outline: none;
+}
+
 .note-card-body {
   display: flex;
   flex-direction: column;

@@ -28,11 +28,8 @@
   z-index: 3;
   transition:
     opacity 0.2s ease,
-    filter 0.2s ease,
-    box-shadow 0.2s ease;
-  box-shadow:
-    0 0 0 2px var(--accent-dim, rgba(201, 162, 39, 0.55)),
-    4px 4px 4px -4px rgba(28, 27, 24, 0.14);
+    filter 0.2s ease;
+  box-shadow: none;
 }
 
 .stream-page-nav-row {

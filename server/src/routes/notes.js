@@ -366,6 +366,20 @@ router.get('/search-semantic', async (req, res) => {
   }
 });
 
+/** Hover insight: static path before /:id/* to avoid any param shadowing. */
+router.post('/hover-insight', async (req, res) => {
+  try {
+    const noteId = req.body?.noteId;
+    if (!noteId) return res.status(400).json({ error: 'noteId required' });
+    const data = await getHoverInsight(noteId, req.userId, { minSimilarity: req.body?.minSimilarity });
+    if (!data) return res.status(404).json({ error: 'Note not found' });
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to build hover insight' });
+  }
+});
+
 // Get tags for a note (approved only)
 router.get('/:id/tags', async (req, res) => {
   try {
@@ -429,20 +443,6 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to remove tag from note' });
-  }
-});
-
-/** Hover insight: Ollama tags + embedding-similar tags + similar notes (for Stream UI). Optional body.minSimilarity 0.1–0.9 (0.05 steps). */
-router.post('/hover-insight', async (req, res) => {
-  try {
-    const noteId = req.body?.noteId;
-    if (!noteId) return res.status(400).json({ error: 'noteId required' });
-    const data = await getHoverInsight(noteId, req.userId, { minSimilarity: req.body?.minSimilarity });
-    if (!data) return res.status(404).json({ error: 'Note not found' });
-    res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to build hover insight' });
   }
 });
 

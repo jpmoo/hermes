@@ -1,7 +1,8 @@
 import pool from '../db/pool.js';
 import { generate } from './ollama.js';
 
-const VECTOR_CANDIDATES = 30;
+/** Nearest neighbors to consider before applying minSimilarity (increase if library is large). */
+const VECTOR_CANDIDATES = 120;
 const SIM_MIN_BOUND = 0.1;
 const SIM_MAX_BOUND = 0.9;
 const SIM_MIN_STEP = 0.05;
@@ -23,17 +24,17 @@ function normalizeTagName(s) {
  * Tag suggestions + similar notes + persisted links for Stream hover (any note, including thread roots).
  * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (cosine similarity > minSimilarity) not on note.
  * Root notes: no parent block; siblings = other root-level notes; children = direct replies only (no deeper thread).
+ * Similar notes: all nearest neighbors above minSimilarity (siblings are not excluded — they were hiding the whole list for replies).
  * Tag harvest from vector-similar notes skips grandchildren+ of the hovered note (immediate children may still appear if similar).
  */
 export async function getHoverInsight(noteId, userId, opts = {}) {
   const minSimilarity = normalizeMinSimilarity(opts.minSimilarity ?? SIM_MIN_DEFAULT);
   const noteR = await pool.query(
-    `SELECT id, parent_id, content, embedding::text AS emb_text
-     FROM notes WHERE id = $1 AND user_id = $2`,
+    `SELECT id, parent_id, content FROM notes WHERE id = $1 AND user_id = $2`,
     [noteId, userId]
   );
   if (noteR.rows.length === 0) return null;
-  const { id, parent_id: parentId, content, emb_text: embText } = noteR.rows[0];
+  const { id, parent_id: parentId, content } = noteR.rows[0];
 
   let parentBlock = '';
   if (parentId) {
@@ -153,19 +154,24 @@ JSON array only, no markdown:`;
     });
   }
 
+  /* Use the hovered row’s embedding in-SQL (avoid vector::text round-trip through node-pg). */
   let similarRows = [];
-  if (embText) {
-    const simR = await pool.query(
-      `SELECT n.id, n.parent_id, n.content,
-              1 - (n.embedding <=> $1::vector) AS similarity
-       FROM notes n
-       WHERE n.user_id = $2 AND n.id <> $3::uuid AND n.embedding IS NOT NULL
-       ORDER BY n.embedding <=> $1::vector
-       LIMIT $4`,
-      [embText, userId, id, VECTOR_CANDIDATES]
-    );
-    similarRows = simR.rows.filter((r) => Number(r.similarity) > minSimilarity).slice(0, 10);
-  }
+  const simR = await pool.query(
+    `WITH hovered AS (
+       SELECT embedding FROM notes WHERE id = $1 AND user_id = $2 AND embedding IS NOT NULL
+     )
+     SELECT n.id, n.parent_id, n.content,
+            1 - (n.embedding <=> hovered.embedding) AS similarity
+     FROM notes n
+     CROSS JOIN hovered
+     WHERE n.user_id = $2 AND n.id <> $1::uuid AND n.embedding IS NOT NULL
+     ORDER BY n.embedding <=> hovered.embedding
+     LIMIT $3`,
+    [id, userId, VECTOR_CANDIDATES]
+  );
+  similarRows = simR.rows
+    .filter((r) => Number(r.similarity) >= minSimilarity)
+    .slice(0, 10);
 
   const similarIds = similarRows.map((r) => r.id);
   /** Grandchildren+ under hovered note: do not use their tags for “similar” tag harvest (only immediate children matter). */
@@ -208,19 +214,12 @@ JSON array only, no markdown:`;
     }
   }
 
-  const pid = parentId ?? null;
-  const similarNotes = similarRows
-    .filter((r) => {
-      const rp = r.parent_id ?? null;
-      if (pid === null) return true; // top-level note: allow other roots as “similar”
-      return rp !== pid; // reply: skip siblings (same parent) as redundant
-    })
-    .map((r) => ({
-      id: r.id,
-      content: r.content,
-      similarity: Number(r.similarity),
-      parent_id: r.parent_id,
-    }));
+  const similarNotes = similarRows.map((r) => ({
+    id: r.id,
+    content: r.content,
+    similarity: Number(r.similarity),
+    parent_id: r.parent_id,
+  }));
 
   const tagSuggestions = [...ollamaTags, ...embeddingTags];
 

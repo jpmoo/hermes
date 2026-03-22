@@ -67,6 +67,14 @@
   }
 }
 
+.hover-insight-section-title {
+  margin: 0.35rem 0 0.35rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent, #c9a227);
+}
+
 .hover-insight-title {
   margin: 0 0 0.4rem;
   font-size: 0.7rem;
@@ -181,6 +189,10 @@
 .hover-insight-persisted-snippet {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
   padding: 0.4rem 0.35rem;
   text-align: left;
   font-size: 0.75rem;
@@ -190,6 +202,19 @@
   border: 1px solid var(--accent-dim);
   border-radius: 6px;
   cursor: pointer;
+}
+
+.hover-insight-linked-snippet-text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.hover-insight-linked-sim {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 .hover-insight-persisted-snippet:hover {
