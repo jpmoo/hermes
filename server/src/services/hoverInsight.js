@@ -20,6 +20,117 @@ function normalizeTagName(s) {
   return (s || '').toString().trim().toLowerCase().replace(/\s+/g, '-');
 }
 
+const THREAD_PATH_SEGMENT_MAX = 36;
+
+/**
+ * Breadcrumb from thread root → note: truncated note snippets joined by " > ".
+ */
+export async function getNoteThreadPathDisplay(noteId, userId) {
+  const segments = [];
+  let cur = noteId;
+  const seen = new Set();
+  for (let depth = 0; depth < 64 && cur && !seen.has(cur); depth++) {
+    seen.add(cur);
+    const r = await pool.query(
+      `SELECT parent_id, content FROM notes WHERE id = $1 AND user_id = $2`,
+      [cur, userId]
+    );
+    if (!r.rows.length) break;
+    const { parent_id: p, content } = r.rows[0];
+    const text = (content || '').trim().replace(/\s+/g, ' ');
+    const piece =
+      text.length > THREAD_PATH_SEGMENT_MAX ? `${text.slice(0, THREAD_PATH_SEGMENT_MAX)}…` : text || '—';
+    segments.unshift(piece);
+    cur = p;
+  }
+  return segments.join(' > ');
+}
+
+/**
+ * Linked peers for a note (connections + snippet, cosine sim when embeddings exist, threadPath).
+ * Does not attach tags — caller merges from a combined tag query when needed.
+ */
+export async function loadPersistedLinksMetadata(anchorNoteId, userId) {
+  let pl = { rows: [] };
+  try {
+    pl = await pool.query(
+      `WITH raw_links AS (
+         SELECT nc.id AS connection_id,
+                CASE
+                  WHEN nc.anchor_note_id = $2::uuid THEN nc.linked_note_id
+                  ELSE nc.anchor_note_id
+                END AS peer_id,
+                nc.created_at
+         FROM note_connections nc
+         WHERE nc.user_id = $1
+           AND (nc.anchor_note_id = $2::uuid OR nc.linked_note_id = $2::uuid)
+       ),
+       dedup AS (
+         SELECT DISTINCT ON (peer_id) connection_id, peer_id, created_at
+         FROM raw_links
+         ORDER BY peer_id, created_at DESC
+       )
+       SELECT d.connection_id,
+              nb.id,
+              nb.content,
+              nb.parent_id,
+              NULL::uuid AS thread_root_id,
+              CASE
+                WHEN an.embedding IS NOT NULL AND nb.embedding IS NOT NULL
+                THEN 1 - (nb.embedding <=> an.embedding)
+                ELSE NULL
+              END AS similarity,
+              d.created_at
+       FROM dedup d
+       INNER JOIN notes nb ON nb.id = d.peer_id AND nb.user_id = $1
+       LEFT JOIN notes an ON an.id = $2::uuid AND an.user_id = $1
+       ORDER BY similarity DESC NULLS LAST, d.created_at DESC`,
+      [userId, anchorNoteId]
+    );
+  } catch (err) {
+    console.error('persisted links query:', err.message || err);
+  }
+  const persistedLinkIds = new Set(pl.rows.map((r) => r.id));
+  const persistedLinks = await Promise.all(
+    pl.rows.map(async (r) => ({
+      connectionId: r.connection_id,
+      id: r.id,
+      content: r.content,
+      parent_id: r.parent_id,
+      threadRootId: r.thread_root_id,
+      similarity: r.similarity != null ? Number(r.similarity) : null,
+      persisted: true,
+      threadPath: await getNoteThreadPathDisplay(r.id, userId),
+    }))
+  );
+  return { persistedLinks, persistedLinkIds };
+}
+
+/** Linked notes with approved tags (for quick-load API). */
+export async function getLinkedNotesWithTags(anchorNoteId, userId) {
+  const { persistedLinks } = await loadPersistedLinksMetadata(anchorNoteId, userId);
+  const ids = persistedLinks.map((p) => p.id);
+  const noteTagsMap = new Map();
+  if (ids.length > 0) {
+    const tagR = await pool.query(
+      `SELECT nt.note_id, t.id AS tag_id, t.name
+       FROM note_tags nt
+       JOIN tags t ON t.id = nt.tag_id
+       WHERE nt.note_id = ANY($1::uuid[]) AND nt.status = 'approved'`,
+      [ids]
+    );
+    for (const row of tagR.rows) {
+      if (!noteTagsMap.has(row.note_id)) noteTagsMap.set(row.note_id, []);
+      noteTagsMap.get(row.note_id).push({ id: row.tag_id, name: row.name });
+    }
+  }
+  const withTags = persistedLinks.map((p) => ({
+    ...p,
+    tags: noteTagsMap.get(p.id) || [],
+  }));
+  return { persistedLinks: withTags };
+}
+
 /**
  * Tag suggestions + similar notes + persisted links for Stream hover (any note, including thread roots).
  * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (cosine similarity > minSimilarity) not on note.
@@ -223,6 +334,37 @@ JSON array only, no markdown:`;
     }
   }
 
+  /* Approved tags on explicitly linked notes, not already on the hovered note (de-duped vs Ollama + similar). */
+  let connectedTagRows = { rows: [] };
+  try {
+    connectedTagRows = await pool.query(
+      `SELECT DISTINCT t.id, t.name
+       FROM note_connections nc
+       INNER JOIN notes peer ON peer.user_id = nc.user_id AND (
+         (nc.anchor_note_id = $2::uuid AND peer.id = nc.linked_note_id)
+         OR (nc.linked_note_id = $2::uuid AND peer.id = nc.anchor_note_id)
+       )
+       INNER JOIN note_tags nt ON nt.note_id = peer.id AND nt.status = 'approved'
+       INNER JOIN tags t ON t.id = nt.tag_id
+       WHERE nc.user_id = $1`,
+      [userId, id]
+    );
+  } catch (err) {
+    console.error('connected-note tags query:', err.message || err);
+  }
+  const connectedTags = [];
+  for (const row of connectedTagRows.rows) {
+    const ln = row.name.toLowerCase();
+    if (onNoteIds.has(row.id) || seenNames.has(ln)) continue;
+    seenNames.add(ln);
+    connectedTags.push({
+      key: `c-${row.id}`,
+      name: row.name,
+      tagId: row.id,
+      source: 'connected',
+    });
+  }
+
   const similarNotes = similarRows.map((r) => ({
     id: r.id,
     content: r.content,
@@ -230,63 +372,14 @@ JSON array only, no markdown:`;
     parent_id: r.parent_id,
   }));
 
-  const tagSuggestions = [...ollamaTags, ...embeddingTags];
+  const tagSuggestions = [...ollamaTags, ...embeddingTags, ...connectedTags];
 
-  /* Linked peers: keep SQL simple (no LATERAL/recursion). Thread root for “go to” is resolved client-side via getNoteThreadRoot when null. */
-  let pl = { rows: [] };
-  try {
-    pl = await pool.query(
-      `WITH raw_links AS (
-         SELECT nc.id AS connection_id,
-                CASE
-                  WHEN nc.anchor_note_id = $2::uuid THEN nc.linked_note_id
-                  ELSE nc.anchor_note_id
-                END AS peer_id,
-                nc.created_at
-         FROM note_connections nc
-         WHERE nc.user_id = $1
-           AND (nc.anchor_note_id = $2::uuid OR nc.linked_note_id = $2::uuid)
-       ),
-       dedup AS (
-         SELECT DISTINCT ON (peer_id) connection_id, peer_id, created_at
-         FROM raw_links
-         ORDER BY peer_id, created_at DESC
-       )
-       SELECT d.connection_id,
-              nb.id,
-              nb.content,
-              nb.parent_id,
-              NULL::uuid AS thread_root_id,
-              CASE
-                WHEN an.embedding IS NOT NULL AND nb.embedding IS NOT NULL
-                THEN 1 - (nb.embedding <=> an.embedding)
-                ELSE NULL
-              END AS similarity,
-              d.created_at
-       FROM dedup d
-       INNER JOIN notes nb ON nb.id = d.peer_id AND nb.user_id = $1
-       LEFT JOIN notes an ON an.id = $2::uuid AND an.user_id = $1
-       ORDER BY similarity DESC NULLS LAST, d.created_at DESC`,
-      [userId, id]
-    );
-  } catch (err) {
-    console.error('hover-insight persisted links query:', err.message || err);
-  }
-  const persistedLinkIds = new Set(pl.rows.map((r) => r.id));
-  const persistedLinks = pl.rows.map((r) => ({
-    connectionId: r.connection_id,
-    id: r.id,
-    content: r.content,
-    parent_id: r.parent_id,
-    threadRootId: r.thread_root_id,
-    similarity: r.similarity != null ? Number(r.similarity) : null,
-    persisted: true,
-  }));
+  const { persistedLinks, persistedLinkIds } = await loadPersistedLinksMetadata(id, userId);
 
   const similarNotesFiltered = similarNotes.filter((s) => !persistedLinkIds.has(s.id));
 
   const tagTargetIds = [
-    ...new Set([...similarNotesFiltered.map((s) => s.id), ...pl.rows.map((r) => r.id)]),
+    ...new Set([...similarNotesFiltered.map((s) => s.id), ...persistedLinks.map((p) => p.id)]),
   ];
   const noteTagsMap = new Map();
   if (tagTargetIds.length > 0) {

@@ -138,6 +138,22 @@ export async function getNoteThreadRoot(noteId) {
   return data.thread_root_id;
 }
 
+/** Root → note breadcrumb (truncated snippets, " > " separators). */
+export async function getNoteThreadPath(noteId) {
+  const r = await fetch(`${API}/notes/${noteId}/thread-path`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Could not load thread path');
+  return data.threadPath || '';
+}
+
+/** Linked notes for Stream insight (immediate paint; no tag/similar work). */
+export async function fetchLinkedNotesQuick(noteId) {
+  const r = await fetch(`${API}/notes/${noteId}/linked-notes`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load linked notes');
+  return data;
+}
+
 export async function fetchHoverInsight(noteId, minSimilarity = 0.5) {
   const r = await fetch(`${API}/notes/hover-insight`, {
     method: 'POST',

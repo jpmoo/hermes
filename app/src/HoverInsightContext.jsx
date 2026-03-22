@@ -9,9 +9,11 @@ import React, {
 } from 'react';
 import {
   fetchHoverInsight,
+  fetchLinkedNotesQuick,
   addNoteTag,
   createNoteConnection,
   deleteNoteConnection,
+  getNoteThreadPath,
   getNoteThreadRoot,
 } from './api';
 import './HoverInsight.css';
@@ -65,13 +67,16 @@ function normalizeHoverInsightPayload(data) {
   };
 }
 
-/** Split flat tag list into neighbor / similar / new (ollama) groups. */
+/** Split flat tag list into neighbor / connected / similar / new (ollama) groups. */
 function partitionTagSuggestions(list) {
   const neighbor = [];
+  const connected = [];
   const similar = [];
   const novel = [];
   for (const t of list) {
-    if (t.source === 'similar') {
+    if (t.source === 'connected') {
+      connected.push(t);
+    } else if (t.source === 'similar') {
       similar.push(t);
     } else if (t.source === 'ollama') {
       if (t.fromVocab === true) neighbor.push(t);
@@ -80,7 +85,7 @@ function partitionTagSuggestions(list) {
       else novel.push(t);
     }
   }
-  return { neighbor, similar, novel };
+  return { neighbor, connected, similar, novel };
 }
 
 /** Whether a tag suggestion matches an approved tag on a connection (similar / linked) note. */
@@ -96,6 +101,7 @@ const HoverInsightContext = createContext(null);
 
 function tagSuggestionTitle(t, highlightConnection) {
   if (highlightConnection) return 'Also on the connection note you highlighted';
+  if (t.source === 'connected') return 'From a note you linked to this one';
   if (t.source === 'similar') return 'From similar notes in your library';
   if (t.fromVocab === true) return 'From thread context (parent, siblings, replies) using your tags';
   return 'New tag from model (may create tag when added)';
@@ -164,6 +170,13 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const [dismissedKeys, setDismissedKeys] = useState(() => new Set());
   const [addingKey, setAddingKey] = useState(null);
   const [connectionModal, setConnectionModal] = useState(null);
+  /** Merge latest `threadPath` from insight after optimistic link + async fetch. */
+  const connectionModalLinked = useMemo(() => {
+    if (!connectionModal?.linked) return null;
+    const l = connectionModal.linked;
+    const fresh = insight?.persistedLinks?.find((x) => x.id === l.id);
+    return fresh ? { ...l, threadPath: fresh.threadPath ?? l.threadPath } : l;
+  }, [connectionModal, insight?.persistedLinks]);
   const [connectionTagSourceId, setConnectionTagSourceId] = useState(null);
   const [similarityMin, setSimilarityMin] = useState(() => readStoredSimilarityMin());
   const fetchTimer = useRef(null);
@@ -255,11 +268,31 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setConnectionModal(null);
       setConnectionTagSourceId(null);
       if (fetchTimer.current) clearTimeout(fetchTimer.current);
-      setInsight(null);
+      const id = ++reqId.current;
+      setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
       setLoading(true);
       const minSim = similarityMin;
+
+      fetchLinkedNotesQuick(note.id)
+        .then((data) => {
+          if (reqId.current !== id) return;
+          const persistedLinks = Array.isArray(data?.persistedLinks)
+            ? data.persistedLinks
+            : Array.isArray(data?.persisted_links)
+              ? data.persisted_links
+              : [];
+          setInsight((prev) => ({
+            tagSuggestions: prev?.tagSuggestions ?? [],
+            similarNotes: prev?.similarNotes ?? [],
+            persistedLinks,
+          }));
+        })
+        .catch((err) => {
+          if (reqId.current !== id) return;
+          console.error(err);
+        });
+
       fetchTimer.current = setTimeout(() => {
-        const id = ++reqId.current;
         fetchHoverInsight(note.id, minSim)
           .then((data) => {
             if (reqId.current !== id) return;
@@ -267,7 +300,11 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
           })
           .catch(() => {
             if (reqId.current !== id) return;
-            setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
+            setInsight((prev) => ({
+              tagSuggestions: [],
+              similarNotes: [],
+              persistedLinks: prev?.persistedLinks ?? [],
+            }));
           })
           .finally(() => {
             if (reqId.current === id) setLoading(false);
@@ -352,31 +389,60 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         };
       });
       onNoteUpdated?.();
+      getNoteThreadPath(sn.id)
+        .then((threadPath) => {
+          setInsight((prev) => {
+            if (!prev?.persistedLinks) return prev;
+            return {
+              ...prev,
+              persistedLinks: prev.persistedLinks.map((x) =>
+                x.id === sn.id ? { ...x, threadPath } : x
+              ),
+            };
+          });
+        })
+        .catch(() => {});
     } catch (e) {
       console.error(e);
     }
   }, [onNoteUpdated]);
 
-  const unlinkPersisted = useCallback(async (anchorNoteId, linkedNoteId) => {
-    try {
-      await deleteNoteConnection(anchorNoteId, linkedNoteId);
-      setInsight((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          persistedLinks: (prev.persistedLinks || []).filter((x) => x.id !== linkedNoteId),
-        };
-      });
-      setConnectionModal((cur) => {
-        const linkedId = cur?.linked?.id ?? cur?.id;
-        return linkedId === linkedNoteId ? null : cur;
-      });
-      setConnectionTagSourceId((cur) => (cur === linkedNoteId ? null : cur));
-      onNoteUpdated?.();
-    } catch (e) {
-      console.error(e);
-    }
-  }, [onNoteUpdated]);
+  const unlinkPersisted = useCallback(
+    async (anchorNoteId, linkedNoteId) => {
+      try {
+        await deleteNoteConnection(anchorNoteId, linkedNoteId);
+        setInsight((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            persistedLinks: (prev.persistedLinks || []).filter((x) => x.id !== linkedNoteId),
+          };
+        });
+        setConnectionModal((cur) => {
+          const linkedId = cur?.linked?.id ?? cur?.id;
+          return linkedId === linkedNoteId ? null : cur;
+        });
+        setConnectionTagSourceId((cur) => (cur === linkedNoteId ? null : cur));
+        onNoteUpdated?.();
+
+        /* Re-fetch insight so the unlinked note can appear in similar notes again (server filters linked ids). */
+        const rid = ++reqId.current;
+        const minSim = similarityMin;
+        fetchHoverInsight(anchorNoteId, minSim)
+          .then((data) => {
+            if (reqId.current !== rid) return;
+            setInsight(normalizeHoverInsightPayload(data));
+          })
+          .catch((err) => {
+            if (reqId.current !== rid) return;
+            console.error(err);
+          });
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [onNoteUpdated, similarityMin]
+  );
 
   const navigateToConnection = useCallback(
     async (n) => {
@@ -497,7 +563,7 @@ function HoverInsightPanels() {
   }, [connectionTagSourceId, insight]);
 
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
-  const { neighbor: neighborTags, similar: similarTags, novel: novelTags } = useMemo(
+  const { neighbor: neighborTags, connected: connectedTags, similar: similarTags, novel: novelTags } = useMemo(
     () => partitionTagSuggestions(tags),
     [tags]
   );
@@ -510,25 +576,31 @@ function HoverInsightPanels() {
     return (a.content || '').localeCompare(b.content || '');
   });
 
-  /** Below the selected card, width capped, right edge aligned with the card (viewport-clamped). */
-  const connectionStackStyle =
+  /** Below the card, shifted ~40px past its right edge; L-connector path in viewport coords. */
+  const LINK_STACK_OUTSET = 40;
+  const connectionLayout =
     rect && persisted.length > 0
       ? (() => {
           const gap = 6;
           const margin = 8;
+          const elbowY = rect.bottom + 5;
           const stackW = Math.min(280, Math.max(200, rect.width), window.innerWidth - 2 * margin);
-          let left = rect.right - stackW;
-          if (left < margin) left = margin;
+          let left = rect.right + LINK_STACK_OUTSET;
           if (left + stackW > window.innerWidth - margin) {
             left = Math.max(margin, window.innerWidth - margin - stackW);
           }
+          if (left < margin) left = margin;
           const top = rect.bottom + gap;
           const roomBelow = window.innerHeight - top - margin;
+          const connectorPath = `M ${rect.right} ${elbowY} L ${left} ${elbowY} L ${left} ${top}`;
           return {
-            top,
-            left,
-            width: stackW,
-            maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
+            stackStyle: {
+              top,
+              left,
+              width: stackW,
+              maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
+            },
+            connectorPath,
           };
         })()
       : null;
@@ -552,6 +624,16 @@ function HoverInsightPanels() {
                   <HoverInsightTagSection
                     title="Based on neighbor notes"
                     tags={neighborTags}
+                    note={note}
+                    dismissTag={dismissTag}
+                    addTag={addTag}
+                    addingKey={addingKey}
+                    connectionTagSourceId={connectionTagSourceId}
+                    connectionHighlightTags={connectionHighlightTags}
+                  />
+                  <HoverInsightTagSection
+                    title="Based on connected notes"
+                    tags={connectedTags}
                     note={note}
                     dismissTag={dismissTag}
                     addTag={addTag}
@@ -629,7 +711,7 @@ function HoverInsightPanels() {
                       className="hover-insight-similar-btn"
                       onMouseEnter={() => setConnectionTagSourceId(sn.id)}
                       onClick={() => linkSimilar(sn)}
-                      title="Save link — appears in a stack below the selected note (right-aligned)"
+                      title="Save link — appears in the linked stack below the note (past its right edge)"
                     >
                       <span className="hover-insight-similar-snippet">
                         {(sn.content || '—').slice(0, 100)}
@@ -647,11 +729,22 @@ function HoverInsightPanels() {
         </>
       )}
 
-      {hover && rect && persisted.length > 0 && connectionStackStyle && note && (
+      {hover && rect && persisted.length > 0 && connectionLayout && note && (
+        <>
+          <svg
+            className="hover-insight-link-connector"
+            aria-hidden
+            data-insight-ui
+          >
+            <path
+              d={connectionLayout.connectorPath}
+              className="hover-insight-link-connector-path"
+            />
+          </svg>
         <div
           className="hover-insight-connection-stack"
           data-insight-ui
-          style={connectionStackStyle}
+          style={connectionLayout.stackStyle}
         >
           {persisted.map((pn) => (
             <div
@@ -671,6 +764,11 @@ function HoverInsightPanels() {
                     {Math.round(pn.similarity * 100)}%
                   </span>
                 )}
+                {pn.threadPath ? (
+                  <p className="hover-insight-thread-path hover-insight-thread-path--card" title={pn.threadPath}>
+                    {pn.threadPath}
+                  </p>
+                ) : null}
                 <p className="hover-insight-connection-card-snippet">
                   {(pn.content || '—').slice(0, 160)}
                   {(pn.content?.length || 0) > 160 ? '…' : ''}
@@ -692,6 +790,7 @@ function HoverInsightPanels() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {connectionModal && (
@@ -714,7 +813,14 @@ function HoverInsightPanels() {
               Linked note
             </h2>
             <div className="hover-insight-modal-body">
-              {connectionModal.linked.content || '—'}
+              {connectionModalLinked?.threadPath ? (
+                <p className="hover-insight-thread-path hover-insight-thread-path--modal" title={connectionModalLinked.threadPath}>
+                  {connectionModalLinked.threadPath}
+                </p>
+              ) : null}
+              <div className="hover-insight-modal-note-text">
+                {connectionModalLinked?.content || '—'}
+              </div>
             </div>
             <div className="hover-insight-modal-actions">
               <button

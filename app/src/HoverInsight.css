@@ -309,7 +309,26 @@
   font-family: var(--font-mono);
 }
 
-/* Stacked linked notes — below selected card, right-aligned (position + width from inline style) */
+/* Orthogonal “L” from note’s bottom-right to linked stack (viewport coords) */
+.hover-insight-link-connector {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 268;
+  overflow: visible;
+}
+
+.hover-insight-link-connector-path {
+  fill: none;
+  stroke: var(--accent-dim, #6d5610);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Stacked linked notes — below selected card, outset past right edge (position + width from inline style) */
 .hover-insight-connection-stack {
   position: fixed;
   z-index: 270;
@@ -376,6 +395,23 @@
   font-family: var(--font-mono);
 }
 
+.hover-insight-thread-path {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.hover-insight-thread-path--card {
+  margin-top: 0.2rem;
+  font-size: 0.62rem;
+}
+
+.hover-insight-thread-path--modal {
+  margin-bottom: 0.5rem;
+  font-size: 0.7rem;
+}
+
 .hover-insight-connection-card-snippet {
   margin: 0.25rem 0 0;
   font-size: 0.78rem;
@@ -440,6 +476,9 @@
   flex: 1;
   overflow-y: auto;
   padding: 0 1rem 1rem;
+}
+
+.hover-insight-modal-note-text {
   font-size: 0.9rem;
   line-height: 1.5;
   color: var(--text);

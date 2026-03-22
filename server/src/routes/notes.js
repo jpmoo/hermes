@@ -3,7 +3,11 @@ import multer from 'multer';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { embedNote } from '../services/embedding.js';
-import { getHoverInsight } from '../services/hoverInsight.js';
+import {
+  getHoverInsight,
+  getLinkedNotesWithTags,
+  getNoteThreadPathDisplay,
+} from '../services/hoverInsight.js';
 import { attachBlobListToNotes, MAX_BYTES } from '../services/noteFileBlobs.js';
 
 const router = Router();
@@ -586,6 +590,36 @@ router.get('/:id/thread-root', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to resolve thread root' });
+  }
+});
+
+/** Breadcrumb path from thread root to note (snippet segments joined by " > "). */
+router.get('/:id/thread-path', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+    const own = await pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
+    if (own.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    const threadPath = await getNoteThreadPathDisplay(id, userId);
+    res.json({ threadPath });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to resolve thread path' });
+  }
+});
+
+/** Linked notes only (fast; no embeddings / Ollama). Same shape as hover-insight `persistedLinks`. */
+router.get('/:id/linked-notes', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+    const own = await pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
+    if (own.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    const { persistedLinks } = await getLinkedNotesWithTags(id, userId);
+    res.json({ persistedLinks });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load linked notes' });
   }
 });
 
