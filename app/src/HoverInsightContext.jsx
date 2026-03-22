@@ -40,19 +40,18 @@ function normalizeHoverInsightPayload(data) {
   };
 }
 
-/** Split flat tag list into neighbor / connected / new (ollama) groups. */
+/** Split flat tag list: neighbor (thread SQL), connected (links SQL), novel (Ollama only). */
 function partitionTagSuggestions(list) {
   const neighbor = [];
   const connected = [];
   const novel = [];
   for (const t of list) {
-    if (t.source === 'connected') {
+    if (t.source === 'neighbor') {
+      neighbor.push(t);
+    } else if (t.source === 'connected') {
       connected.push(t);
-    } else if (t.source === 'ollama') {
-      if (t.fromVocab === true) neighbor.push(t);
-      else if (t.fromVocab === false) novel.push(t);
-      else if (t.tagId) neighbor.push(t);
-      else novel.push(t);
+    } else if (t.source === 'ollama' && t.fromVocab !== true) {
+      novel.push(t);
     }
   }
   return { neighbor, connected, novel };
@@ -61,8 +60,10 @@ function partitionTagSuggestions(list) {
 const HoverInsightContext = createContext(null);
 
 function tagSuggestionTitle(t) {
+  if (t.source === 'neighbor') {
+    return 'On parent, sibling, or direct reply; not on this note yet';
+  }
   if (t.source === 'connected') return 'On a linked note; not on the selected note yet';
-  if (t.fromVocab === true) return 'From thread context (parent, siblings, replies) using your tags';
   return 'New tag from model (may create tag when added)';
 }
 
@@ -389,6 +390,7 @@ function HoverInsightPanels() {
   const rect = insightAnchorRef.current?.getBoundingClientRect?.();
 
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
+  const similarNotes = insight?.similarNotes || [];
   const { neighbor: neighborTags, connected: connectedTags, novel: novelTags } = useMemo(
     () => partitionTagSuggestions(tags),
     [tags]
@@ -428,8 +430,6 @@ function HoverInsightPanels() {
             },
             stackTopPx,
             spineX: left + stackW / 2,
-            anchorBottom: rect.bottom,
-            anchorRight: rect.right,
           };
         })()
       : null;
@@ -468,12 +468,12 @@ function HoverInsightPanels() {
 
   const connectionSpinePath = useMemo(() => {
     if (!connectionLayout || persisted.length === 0) return null;
-    const { stackTopPx, spineX, anchorBottom, anchorRight } = connectionLayout;
+    const { stackTopPx, spineX } = connectionLayout;
     const estH = persisted.length * 92 + Math.max(0, persisted.length - 1) * 7 + 8;
     const contentH = connectionStackHeight > 0 ? connectionStackHeight : estH;
     const yEnd = stackTopPx + contentH;
-    /* From anchor’s bottom-right, across to stack center, then down to last linked card’s bottom. */
-    return `M ${anchorRight} ${anchorBottom} L ${spineX} ${anchorBottom} L ${spineX} ${yEnd}`;
+    /* Single vertical at stack center (no horizontal segment along anchor bottom). */
+    return `M ${spineX} ${stackTopPx} L ${spineX} ${yEnd}`;
   }, [connectionLayout, connectionStackHeight, persisted.length]);
 
   return (
@@ -515,6 +515,41 @@ function HoverInsightPanels() {
                     addingKey={addingKey}
                   />
                 </div>
+              )}
+            </div>
+          </div>
+          <div
+            className="hover-insight-margin hover-insight-margin--right"
+            data-insight-ui
+          >
+            <div className={`hover-insight-panel hover-insight-panel--right ${loading ? 'hover-insight-panel--loading' : ''}`}>
+              <p className="hover-insight-title">Similar notes</p>
+              {loading && <p className="hover-insight-muted">Thinking…</p>}
+              {!loading && similarNotes.length === 0 && (
+                <p className="hover-insight-muted">
+                  No similar notes (needs embeddings, or nothing close enough yet).
+                </p>
+              )}
+              {!loading && similarNotes.length > 0 && (
+                <ul className="hover-insight-similar-list">
+                  {similarNotes.map((sn) => (
+                    <li key={sn.id}>
+                      <button
+                        type="button"
+                        className="hover-insight-similar-btn"
+                        onClick={() => navigateToConnection(sn)}
+                      >
+                        <span className="hover-insight-similar-snippet">
+                          {(sn.content || '—').trim().replace(/\s+/g, ' ').slice(0, 120)}
+                          {(sn.content?.length || 0) > 120 ? '…' : ''}
+                        </span>
+                        {sn.similarity != null && (
+                          <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>

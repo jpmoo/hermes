@@ -300,6 +300,17 @@ export default function NoteCard({
         }`
       : undefined;
 
+  /** Right threadline color (custom props drive ::after — survives float box-shadow / border quirks). */
+  const linkBarColor = !showThreadline
+    ? 'var(--border)'
+    : depth <= 0
+      ? 'var(--accent-dim, #6d5610)'
+      : depth === 1
+        ? '#5a4a2a'
+        : depth === 2
+          ? '#4a3a1a'
+          : '#3a2a12';
+
   return (
     <article
       className={cardClassNames}
@@ -307,8 +318,8 @@ export default function NoteCard({
         borderLeftWidth: borderWidth,
         ...(hasConnections
           ? {
-              borderRightWidth: borderWidth,
-              borderRightStyle: 'solid',
+              '--hermes-link-rw': `${borderWidth}px`,
+              '--hermes-link-rc': linkBarColor,
             }
           : {}),
       }}

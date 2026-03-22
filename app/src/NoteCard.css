@@ -21,30 +21,25 @@
   border-left-color: var(--border);
 }
 
-/* Linked notes: thick right edge (longhands override shorthand; color matches left threadline). */
+/* Linked notes: thick right strip (::after paints above card bg; works with stream float box-shadow). */
 .note-card.note-card--linked {
   position: relative;
   box-sizing: border-box;
+  isolation: isolate;
 }
 
-.note-card.note-card--linked.note-card--leaf {
-  border-right-color: var(--border) !important;
-}
-
-.note-card.note-card--linked.note-card--depth-0 {
-  border-right-color: var(--accent-dim, #6d5610) !important;
-}
-
-.note-card.note-card--linked.note-card--depth-1 {
-  border-right-color: #5a4a2a !important;
-}
-
-.note-card.note-card--linked.note-card--depth-2 {
-  border-right-color: #4a3a1a !important;
-}
-
-.note-card.note-card--linked.note-card--depth-3 {
-  border-right-color: #3a2a12 !important;
+.note-card.note-card--linked::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--hermes-link-rw, 3px);
+  min-width: var(--hermes-link-rw, 3px);
+  background-color: var(--hermes-link-rc, var(--accent-dim));
+  border-radius: 0 10px 10px 0;
+  pointer-events: none;
+  z-index: 4;
 }
 
 /* Stream insight: no focus ring on the selected card */

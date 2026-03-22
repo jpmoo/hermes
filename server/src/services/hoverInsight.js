@@ -122,10 +122,10 @@ export async function getLinkedNotesWithTags(anchorNoteId, userId) {
 }
 
 /**
- * Tag suggestions + persisted links for Stream hover (any note, including thread roots).
- * Order: Ollama (neighbor-context vocab + up to 6 new), then tags from **linked** peers not on the hovered note.
- * Root notes: no parent block; siblings = other root-level notes; children = direct replies only (no deeper thread).
- * Vector “similar notes” and embedding tag harvest are disabled — connections only.
+ * Tag suggestions + persisted links + vector similar notes for Stream hover.
+ * Tags: (1) neighbor — approved tags on parent/siblings/immediate children not on hovered note;
+ * (2) Ollama — up to 6 new hyphenated tags; (3) connected — approved tags on linked peers not on hovered note.
+ * Similar notes: cosine nearest neighbors (embeddings), excluding self and explicit connection peers.
  */
 export async function getHoverInsight(noteId, userId, _opts = {}) {
   const noteR = await pool.query(
@@ -195,21 +195,28 @@ export async function getHoverInsight(noteId, userId, _opts = {}) {
       [parentId, ...siblingsR.rows.map((r) => r.id), ...kidsR.rows.map((r) => r.id)].filter(Boolean)
     ),
   ];
-  const neighborTagIds = new Set();
-  const neighborTagNames = new Set();
+  /** Approved tags on parent / siblings / immediate children that the hovered note does not have yet. */
+  let neighborSuggestionRows = { rows: [] };
   if (neighborNoteIds.length > 0) {
-    const ntr = await pool.query(
+    neighborSuggestionRows = await pool.query(
       `SELECT DISTINCT t.id, t.name
        FROM note_tags nt
        JOIN tags t ON t.id = nt.tag_id
-       WHERE nt.note_id = ANY($1::uuid[]) AND nt.status = 'approved'`,
-      [neighborNoteIds]
+       WHERE nt.note_id = ANY($1::uuid[]) AND nt.status = 'approved'
+         AND NOT EXISTS (
+           SELECT 1 FROM note_tags nt2
+           WHERE nt2.note_id = $2 AND nt2.tag_id = t.id AND nt2.status = 'approved'
+         )
+       ORDER BY t.name`,
+      [neighborNoteIds, id]
     );
-    for (const row of ntr.rows) {
-      neighborTagIds.add(row.id);
-      neighborTagNames.add(row.name.toLowerCase());
-    }
   }
+  const neighborSuggestions = neighborSuggestionRows.rows.map((row) => ({
+    key: `n-${row.id}`,
+    name: row.name,
+    tagId: row.id,
+    source: 'neighbor',
+  }));
 
   const tagList =
     activeTagRows.rows.map((t) => t.name).join(', ') || '(no tags in use yet — you may suggest up to 6 new hyphenated tags)';
@@ -227,13 +234,13 @@ export async function getHoverInsight(noteId, userId, _opts = {}) {
   const ollamaParsed = [];
   const prompt = `You tag notes in Hermes. The HOVERED NOTE is the focus; parent, sibling, and child sections (when present) are thread neighbors only.
 
-Your output must combine:
-1) **Neighbor vocabulary**: from_vocab **true** only for names in ACTIVE TAGS that fit **parent, siblings, or immediate children** context (not tags that only appear on unrelated notes).
-2) **New tags**: up to **6** items with from_vocab **false** — lowercase, hyphenated, helpful for the hovered note (even if the note text is short or empty).
+Neighbor tags from the thread are listed separately in the app from the database. Your job here is **only**:
+
+**New tags**: up to **6** items with from_vocab **false** — lowercase, hyphenated, helpful for the hovered note (even if the note text is short or empty). Do not use from_vocab true.
 
 Child notes in context are ONLY immediate replies (one level), not deeper thread.
 
-Return ONLY a JSON array: [{"tag":"name","from_vocab":true|false}, ...] with 1–12 items total.
+Return ONLY a JSON array: [{"tag":"name","from_vocab":false}, ...] with 1–6 items.
 
 ACTIVE TAGS: ${tagList}
 
@@ -251,12 +258,10 @@ JSON array only, no markdown:`;
         for (const it of items) {
           const name = normalizeTagName(it.tag || it.name);
           if (!name) continue;
-          const fromVocab = !!it.from_vocab;
-          if (!fromVocab) {
-            newCount += 1;
-            if (newCount > 6) continue;
-          }
-          ollamaParsed.push({ name, from_vocab: fromVocab });
+          if (it.from_vocab) continue;
+          newCount += 1;
+          if (newCount > 6) continue;
+          ollamaParsed.push({ name, from_vocab: false });
         }
       }
     } catch {
@@ -265,26 +270,23 @@ JSON array only, no markdown:`;
   }
 
   const seenNames = new Set(onNoteNames);
+  for (const row of neighborSuggestions) {
+    seenNames.add(row.name.toLowerCase());
+  }
+
+  /** Novel tags from the model only (neighbor + connected lists come from SQL). */
   const ollamaTags = [];
   for (const t of ollamaParsed) {
     if (seenNames.has(t.name)) continue;
     const known = activeByName.get(t.name);
     const tid = known?.id ?? null;
-    if (t.from_vocab) {
-      const inNeighborContext =
-        neighborTagNames.has(t.name) || (tid != null && neighborTagIds.has(tid));
-      if (!inNeighborContext) {
-        /* Tag exists in library (e.g. only on linked notes) — skip here; “connected” list handles it. */
-        continue;
-      }
-    }
     seenNames.add(t.name);
     ollamaTags.push({
       key: `o-${t.name}`,
       name: t.name,
       tagId: tid,
       source: 'ollama',
-      fromVocab: !!t.from_vocab,
+      fromVocab: false,
     });
   }
 
@@ -320,9 +322,49 @@ JSON array only, no markdown:`;
     });
   }
 
-  const tagSuggestions = [...ollamaTags, ...connectedTags];
+  const tagSuggestions = [...neighborSuggestions, ...ollamaTags, ...connectedTags];
 
   const { persistedLinks } = await loadPersistedLinksMetadata(id, userId);
+
+  /** Vector similar notes (exclude self and explicit connection peers). */
+  let similarNotes = [];
+  try {
+    const peerIds = persistedLinks.map((p) => p.id);
+    const similarSql = (excludePeers) => `WITH RECURSIVE roots AS (
+         SELECT n.id, n.id AS root_id
+         FROM notes n
+         WHERE n.parent_id IS NULL AND n.user_id = $2
+         UNION ALL
+         SELECT c.id, r.root_id
+         FROM notes c
+         JOIN roots r ON r.id = c.parent_id
+       )
+       SELECT n.id, n.content, 1 - (n.embedding <=> an.embedding) AS similarity, rt.root_id AS thread_root_id
+       FROM notes an
+       CROSS JOIN notes n
+       JOIN roots rt ON rt.id = n.id
+       WHERE an.id = $1::uuid
+         AND an.user_id = $2
+         AND an.embedding IS NOT NULL
+         AND n.user_id = $2
+         AND n.embedding IS NOT NULL
+         AND n.id <> $1::uuid
+         ${excludePeers ? 'AND NOT (n.id = ANY($3::uuid[]))' : ''}
+       ORDER BY n.embedding <=> an.embedding
+       LIMIT 12`;
+    const simR = peerIds.length
+      ? await pool.query(similarSql(true), [id, userId, peerIds])
+      : await pool.query(similarSql(false), [id, userId]);
+    similarNotes = simR.rows.map((row) => ({
+      id: row.id,
+      content: row.content,
+      similarity: row.similarity != null ? Number(row.similarity) : null,
+      threadRootId: row.thread_root_id,
+    }));
+  } catch (err) {
+    console.error('hover similar notes:', err.message || err);
+    similarNotes = [];
+  }
 
   const tagTargetIds = [...new Set(persistedLinks.map((p) => p.id))];
   const noteTagsMap = new Map();
@@ -347,7 +389,7 @@ JSON array only, no markdown:`;
 
   return {
     tagSuggestions,
-    similarNotes: [],
+    similarNotes,
     persistedLinks: persistedLinksWithTags,
   };
 }
