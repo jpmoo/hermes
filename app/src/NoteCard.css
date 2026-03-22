@@ -21,25 +21,32 @@
   border-left-color: var(--border);
 }
 
-/* Linked notes: thick right strip (::after paints above card bg; works with stream float box-shadow). */
+/* Linked notes: dedicated grid column (always visible; ::after was painted under body content). */
 .note-card.note-card--linked {
   position: relative;
   box-sizing: border-box;
-  isolation: isolate;
 }
 
-.note-card.note-card--linked::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: var(--hermes-link-rw, 3px);
-  min-width: var(--hermes-link-rw, 3px);
-  background-color: var(--hermes-link-rc, var(--accent-dim));
-  border-radius: 0 10px 10px 0;
+.note-card-body.note-card-body--linked {
+  display: grid;
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) var(--hermes-link-rw, 3px);
+  column-gap: 0;
+}
+
+.note-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.note-card-link-rail {
+  align-self: stretch;
+  min-height: 2rem;
+  border-radius: 0 9px 9px 0;
   pointer-events: none;
-  z-index: 4;
+  flex-shrink: 0;
 }
 
 /* Stream insight: no focus ring on the selected card */
@@ -52,6 +59,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+/* .note-card-main wraps inner content when linked; when not linked, body acts as main (see JSX). */
+.note-card-body:not(.note-card-body--linked) > .note-card-main {
+  display: contents;
 }
 
 .note-card-content {

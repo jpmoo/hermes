@@ -470,6 +470,19 @@
   padding: 0 1rem 1rem;
 }
 
+.hover-insight-modal-section-label {
+  margin: 0.65rem 0 0.35rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.hover-insight-modal-section-label:first-of-type {
+  margin-top: 0;
+}
+
 .hover-insight-modal-note-text {
   font-size: 0.9rem;
   line-height: 1.5;

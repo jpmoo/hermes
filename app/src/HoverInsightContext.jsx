@@ -13,12 +13,27 @@ import {
   fetchLinkedNotesQuick,
   addNoteTag,
   deleteNoteConnection,
+  getNote,
+  getNoteThreadPath,
   getNoteThreadRoot,
 } from './api';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
   'Remove the link between these two notes? The notes are not deleted—only the connection is removed.';
+
+const SIMILAR_MIN_LS_KEY = 'hermes.insightSimilarMinPct';
+
+function readStoredSimilarMinPct() {
+  try {
+    const raw = localStorage.getItem(SIMILAR_MIN_LS_KEY);
+    const n = raw != null ? parseInt(raw, 10) : 25;
+    if (!Number.isFinite(n)) return 25;
+    return Math.min(95, Math.max(5, n));
+  } catch {
+    return 25;
+  }
+}
 
 /** Ensure arrays exist (API / parse edge cases). Accept camelCase or snake_case keys. */
 function normalizeHoverInsightPayload(data) {
@@ -122,13 +137,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const [dismissedKeys, setDismissedKeys] = useState(() => new Set());
   const [addingKey, setAddingKey] = useState(null);
   const [connectionModal, setConnectionModal] = useState(null);
-  /** Merge latest `threadPath` from insight after optimistic link + async fetch. */
-  const connectionModalLinked = useMemo(() => {
-    if (!connectionModal?.linked) return null;
-    const l = connectionModal.linked;
-    const fresh = insight?.persistedLinks?.find((x) => x.id === l.id);
-    return fresh ? { ...l, threadPath: fresh.threadPath ?? l.threadPath } : l;
-  }, [connectionModal, insight?.persistedLinks]);
   const fetchTimer = useRef(null);
   const reqId = useRef(0);
   const activeHoverId = useRef(null);
@@ -370,7 +378,69 @@ function HoverInsightPanels() {
     insightAnchorRef,
   } = ctx;
 
+  /** Peer shown in the modal: merge stack row with latest insight row (ids, threadPath updates). */
+  const connectionModalLinked = useMemo(() => {
+    if (!connectionModal?.linked) return null;
+    const l = connectionModal.linked;
+    const fresh = insight?.persistedLinks?.find((x) => x.id === l.id);
+    return fresh ? { ...l, ...fresh, threadPath: fresh.threadPath ?? l.threadPath, content: fresh.content ?? l.content } : l;
+  }, [connectionModal, insight?.persistedLinks]);
+
+  /** Full breadcrumb (includes this note) + authoritative body from API — stack payload can be stale/minimal. */
+  const [connectionModalFetched, setConnectionModalFetched] = useState({
+    threadPath: '',
+    content: '',
+    loading: false,
+  });
+
+  useEffect(() => {
+    const linked = connectionModal?.linked;
+    if (!linked?.id) {
+      setConnectionModalFetched({ threadPath: '', content: '', loading: false });
+      return undefined;
+    }
+    let cancelled = false;
+    setConnectionModalFetched({
+      threadPath: linked.threadPath || '',
+      content: linked.content != null ? String(linked.content) : '',
+      loading: true,
+    });
+    Promise.all([
+      getNoteThreadPath(linked.id, { excludeLeaf: false }),
+      getNote(linked.id).then((n) => (n?.content != null ? String(n.content) : '')),
+    ])
+      .then(([path, content]) => {
+        if (cancelled) return;
+        setConnectionModalFetched({
+          threadPath: path || '',
+          content: content,
+          loading: false,
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setConnectionModalFetched({
+          threadPath: linked.threadPath || '',
+          content: linked.content != null ? String(linked.content) : '',
+          loading: false,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionModal?.linked?.id]);
+
   const [layoutRev, setLayoutRev] = useState(0);
+  const [similarMinPct, setSimilarMinPct] = useState(readStoredSimilarMinPct);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIMILAR_MIN_LS_KEY, String(similarMinPct));
+    } catch {
+      /* ignore */
+    }
+  }, [similarMinPct]);
+
   useEffect(() => {
     if (!hover?.note) return undefined;
     const bump = () => setLayoutRev((n) => n + 1);
@@ -391,6 +461,12 @@ function HoverInsightPanels() {
 
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
   const similarNotes = insight?.similarNotes || [];
+  const similarMin = similarMinPct / 100;
+  const filteredSimilarNotes = useMemo(
+    () =>
+      similarNotes.filter((sn) => sn.similarity == null || Number(sn.similarity) >= similarMin),
+    [similarNotes, similarMin]
+  );
   const { neighbor: neighborTags, connected: connectedTags, novel: novelTags } = useMemo(
     () => partitionTagSuggestions(tags),
     [tags]
@@ -531,25 +607,54 @@ function HoverInsightPanels() {
                 </p>
               )}
               {!loading && similarNotes.length > 0 && (
-                <ul className="hover-insight-similar-list">
-                  {similarNotes.map((sn) => (
-                    <li key={sn.id}>
-                      <button
-                        type="button"
-                        className="hover-insight-similar-btn"
-                        onClick={() => navigateToConnection(sn)}
-                      >
-                        <span className="hover-insight-similar-snippet">
-                          {(sn.content || '—').trim().replace(/\s+/g, ' ').slice(0, 120)}
-                          {(sn.content?.length || 0) > 120 ? '…' : ''}
-                        </span>
-                        {sn.similarity != null && (
-                          <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <div className="hover-insight-similar-slider-wrap">
+                    <div className="hover-insight-similar-slider-label">
+                      <span>Min. similarity</span>
+                      <span className="hover-insight-similar-slider-value">{similarMinPct}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      className="hover-insight-similar-slider"
+                      min={5}
+                      max={95}
+                      step={5}
+                      value={similarMinPct}
+                      onChange={(e) => setSimilarMinPct(Number(e.target.value))}
+                      aria-label="Minimum similarity for similar notes"
+                    />
+                    <div className="hover-insight-similar-slider-ticks" aria-hidden>
+                      <span>5%</span>
+                      <span>25%</span>
+                      <span>50%</span>
+                      <span>75%</span>
+                      <span>95%</span>
+                    </div>
+                  </div>
+                  {filteredSimilarNotes.length === 0 ? (
+                    <p className="hover-insight-muted">No notes at or above this threshold.</p>
+                  ) : (
+                    <ul className="hover-insight-similar-list">
+                      {filteredSimilarNotes.map((sn) => (
+                        <li key={sn.id}>
+                          <button
+                            type="button"
+                            className="hover-insight-similar-btn"
+                            onClick={() => navigateToConnection(sn)}
+                          >
+                            <span className="hover-insight-similar-snippet">
+                              {(sn.content || '—').trim().replace(/\s+/g, ' ').slice(0, 120)}
+                              {(sn.content?.length || 0) > 120 ? '…' : ''}
+                            </span>
+                            {sn.similarity != null && (
+                              <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -629,17 +734,34 @@ function HoverInsightPanels() {
             aria-labelledby="hover-insight-modal-title"
           >
             <h2 id="hover-insight-modal-title" className="hover-insight-modal-title">
-              Linked note
+              Connected note
             </h2>
             <div className="hover-insight-modal-body">
-              {connectionModalLinked?.threadPath ? (
-                <p className="hover-insight-thread-path hover-insight-thread-path--modal" title={connectionModalLinked.threadPath}>
-                  {connectionModalLinked.threadPath}
+              <p className="hover-insight-modal-section-label">Thread path</p>
+              {connectionModalFetched.loading && !connectionModalFetched.threadPath ? (
+                <p className="hover-insight-muted">Loading path…</p>
+              ) : connectionModalFetched.threadPath ? (
+                <p
+                  className="hover-insight-thread-path hover-insight-thread-path--modal"
+                  title={connectionModalFetched.threadPath}
+                >
+                  {connectionModalFetched.threadPath}
                 </p>
-              ) : null}
-              <div className="hover-insight-modal-note-text">
-                {connectionModalLinked?.content || '—'}
-              </div>
+              ) : (
+                <p className="hover-insight-muted">No path</p>
+              )}
+              <p className="hover-insight-modal-section-label">Note</p>
+              {connectionModalFetched.loading && !connectionModalFetched.content ? (
+                <p className="hover-insight-muted">Loading note…</p>
+              ) : (
+                <div className="hover-insight-modal-note-text">
+                  {connectionModalFetched.content?.trim()
+                    ? connectionModalFetched.content
+                    : connectionModalLinked?.content?.trim()
+                      ? connectionModalLinked.content
+                      : '—'}
+                </div>
+              )}
             </div>
             <div className="hover-insight-modal-actions">
               <button

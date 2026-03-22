@@ -316,12 +316,6 @@ export default function NoteCard({
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
-        ...(hasConnections
-          ? {
-              '--hermes-link-rw': `${borderWidth}px`,
-              '--hermes-link-rc': linkBarColor,
-            }
-          : {}),
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
@@ -352,7 +346,11 @@ export default function NoteCard({
             }
       }
     >
-      <div className="note-card-body">
+      <div
+        className={`note-card-body${hasConnections ? ' note-card-body--linked' : ''}`}
+        style={hasConnections ? { '--hermes-link-rw': `${borderWidth}px` } : undefined}
+      >
+        <div className="note-card-main">
         {editing ? (
           <form className="note-card-edit" onSubmit={handleSaveEdit} onClick={(e) => e.stopPropagation()}>
             <textarea
@@ -473,6 +471,10 @@ export default function NoteCard({
             </button>
           </div>
         </div>
+        </div>
+        {hasConnections ? (
+          <div className="note-card-link-rail" style={{ backgroundColor: linkBarColor }} aria-hidden />
+        ) : null}
       </div>
     </article>
   );
