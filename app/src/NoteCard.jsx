@@ -300,13 +300,22 @@ export default function NoteCard({
         }`
       : undefined;
 
-  /** Custom props + CSS !important on border-right longhands (inline `borderRight` still lost to cascade in some cases). */
+  /**
+   * Right connection stripe: for leaf notes, left uses borderWidth 1px + var(--border) — if we reused
+   * that for the right, the “stripe” is 1px and the same color as the frame (invisible). Use a
+   * minimum 3px and thread accent for leaf+linked; threaded notes keep width/color aligned with left.
+   */
+  const linkStripeWidthPx = hasConnections
+    ? showThreadline
+      ? borderWidth
+      : Math.max(3, borderWidth)
+    : null;
   const linkedBorderVars =
     hasConnections
       ? {
-          '--hermes-link-rw': `${borderWidth}px`,
+          '--hermes-link-rw': `${linkStripeWidthPx}px`,
           '--hermes-link-rc': !showThreadline
-            ? 'var(--border)'
+            ? 'var(--accent-dim, #6d5610)'
             : depth <= 0
               ? 'var(--accent-dim, #6d5610)'
               : depth === 1

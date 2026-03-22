@@ -226,7 +226,6 @@
   padding-top: 1rem;
   padding-bottom: 0.5rem;
   background: linear-gradient(to top, var(--bg) 85%, transparent);
-  border-top: 1px solid var(--border);
   margin-left: -0.25rem;
   margin-right: -0.25rem;
   padding-left: 0.25rem;
