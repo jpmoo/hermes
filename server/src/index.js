@@ -19,6 +19,14 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+// Built app uses Vite base `/hermes/` → fetches `/hermes/api/...`; normalize to `/api/...` for routing
+app.use((req, _res, next) => {
+  if (req.url.startsWith('/hermes/api')) {
+    req.url = req.url.slice('/hermes'.length);
+  }
+  next();
+});
+
 // Allow Vite/React app to load (inline styles and scripts); override strict CSP from proxies
 app.use((_req, res, next) => {
   res.setHeader(

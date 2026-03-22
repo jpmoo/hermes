@@ -44,6 +44,24 @@ function readStoredSimilarityMin() {
   return SIM_SLIDER_DEFAULT;
 }
 
+/** Ensure arrays exist (API / parse edge cases). */
+function normalizeHoverInsightPayload(data) {
+  if (!data || typeof data !== 'object') {
+    return {
+      tagSuggestions: [],
+      similarNotes: [],
+      persistedLinks: [],
+      similarityMin: SIM_SLIDER_DEFAULT,
+    };
+  }
+  return {
+    ...data,
+    tagSuggestions: Array.isArray(data.tagSuggestions) ? data.tagSuggestions : [],
+    similarNotes: Array.isArray(data.similarNotes) ? data.similarNotes : [],
+    persistedLinks: Array.isArray(data.persistedLinks) ? data.persistedLinks : [],
+  };
+}
+
 /** Split flat tag list into neighbor / similar / new (ollama) groups. */
 function partitionTagSuggestions(list) {
   const neighbor = [];
@@ -198,7 +216,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         fetchHoverInsight(noteId, c)
           .then((data) => {
             if (reqId.current !== id) return;
-            setInsight(data);
+            setInsight(normalizeHoverInsightPayload(data));
           })
           .catch(() => {
             if (reqId.current !== id) return;
@@ -242,7 +260,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         fetchHoverInsight(note.id, minSim)
           .then((data) => {
             if (reqId.current !== id) return;
-            setInsight(data);
+            setInsight(normalizeHoverInsightPayload(data));
           })
           .catch(() => {
             if (reqId.current !== id) return;

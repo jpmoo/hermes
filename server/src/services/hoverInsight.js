@@ -319,6 +319,6 @@ JSON array only, no markdown:`;
     tagSuggestions,
     similarNotes: similarNotesWithTags,
     persistedLinks: persistedLinksWithTags,
-    similarityMin,
+    similarityMin: minSimilarity,
   };
 }
