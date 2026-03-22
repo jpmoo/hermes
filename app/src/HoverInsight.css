@@ -12,14 +12,14 @@
 
 .hover-insight-margin--left {
   left: 0;
-  width: 100px;
+  width: 250px;
   justify-content: flex-start;
   padding-left: 0;
 }
 
 .hover-insight-margin--right {
   right: 0;
-  width: 100px;
+  width: 250px;
   justify-content: flex-end;
   padding-right: 0;
 }
@@ -27,13 +27,13 @@
 .hover-insight-panel {
   pointer-events: auto;
   box-sizing: border-box;
-  width: 100px;
-  min-width: 100px;
-  max-width: 100px;
+  width: 250px;
+  min-width: 250px;
+  max-width: 250px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 0.5rem 0.35rem;
+  padding: 0.65rem 0.5rem;
   max-height: min(70vh, 520px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -48,31 +48,6 @@
 .hover-insight-panel--right {
   transform-origin: right center;
   animation-name: hover-insight-slide-in-right;
-}
-
-/* 100px-wide columns: wrap tag rows; smaller + control */
-.hover-insight-panel .hover-insight-tag-row {
-  flex-wrap: wrap;
-  row-gap: 0.2rem;
-}
-
-.hover-insight-panel .hover-insight-tag-name {
-  flex: 1 1 100%;
-  min-width: 0;
-  white-space: normal;
-  word-break: break-word;
-  overflow: visible;
-  text-overflow: unset;
-}
-
-.hover-insight-panel .hover-insight-icon-btn {
-  width: 1.1rem;
-  height: 1.1rem;
-  font-size: 0.72rem;
-}
-
-.hover-insight-panel .hover-insight-icon-btn--add {
-  margin-left: auto;
 }
 
 @keyframes hover-insight-slide-in {

@@ -61,6 +61,16 @@ function normalizeHoverInsightPayload(data) {
   };
 }
 
+/** Higher similarity first; null/unknown last; tie-break by content snippet. */
+function sortBySimilarityDesc(list) {
+  return [...list].sort((a, b) => {
+    const sa = a.similarity != null ? Number(a.similarity) : -1;
+    const sb = b.similarity != null ? Number(b.similarity) : -1;
+    if (sb !== sa) return sb - sa;
+    return (a.content || '').localeCompare(b.content || '');
+  });
+}
+
 /** Split flat tag list: neighbor (thread SQL), connected (links SQL), novel (Ollama only). */
 function partitionTagSuggestions(list) {
   const neighbor = [];
@@ -97,9 +107,6 @@ function HoverInsightTagSection({ title, tags, note, addTag, addingKey }) {
         {tags.map((t) => {
           return (
             <li key={t.key} className="hover-insight-tag-row hover-insight-tag-row--no-dismiss">
-              <span className="hover-insight-tag-name" title={tagSuggestionTitle(t)}>
-                {t.name}
-              </span>
               <button
                 type="button"
                 className="hover-insight-icon-btn hover-insight-icon-btn--add"
@@ -109,6 +116,9 @@ function HoverInsightTagSection({ title, tags, note, addTag, addingKey }) {
               >
                 +
               </button>
+              <span className="hover-insight-tag-name" title={tagSuggestionTitle(t)}>
+                {t.name}
+              </span>
             </li>
           );
         })}
@@ -308,13 +318,37 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [clearAll, onGoToNote]
   );
 
-  /** Connect a similar note to the current insight anchor; refresh panels (does not navigate). */
+  /** Connect a similar note: optimistic reorder (similar list + linked stack by similarity), then sync from API. */
   const connectSimilarNote = useCallback(
     async (similarNoteId) => {
       const anchorId = activeHoverId.current;
       if (!anchorId || !similarNoteId || String(anchorId) === String(similarNoteId)) return;
+
+      setInsight((prev) => {
+        if (!prev) return prev;
+        const similar = [...(prev.similarNotes || [])];
+        const hit = similar.find((x) => String(x.id) === String(similarNoteId));
+        if (!hit) return prev;
+        const without = similar.filter((x) => String(x.id) !== String(similarNoteId));
+        const similarSorted = sortBySimilarityDesc(without);
+        const pl = [...(prev.persistedLinks || [])];
+        if (pl.some((p) => String(p.id) === String(similarNoteId))) {
+          return { ...prev, similarNotes: similarSorted };
+        }
+        const link = {
+          id: hit.id,
+          content: hit.content,
+          similarity: hit.similarity != null ? Number(hit.similarity) : null,
+          threadRootId: hit.threadRootId ?? hit.thread_root_id,
+          threadPath: hit.threadPath ?? hit.thread_path ?? '',
+          tags: Array.isArray(hit.tags) ? hit.tags : [],
+          persisted: true,
+        };
+        const persistedSorted = sortBySimilarityDesc([...pl, link]);
+        return { ...prev, similarNotes: similarSorted, persistedLinks: persistedSorted };
+      });
+
       try {
-        setLoading(true);
         await createNoteConnection(anchorId, similarNoteId);
         onNoteUpdated?.();
         const data = await fetchHoverInsight(anchorId);
@@ -323,8 +357,14 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       } catch (e) {
         console.error(e);
         window.alert(e?.message || 'Could not connect note');
-      } finally {
-        setLoading(false);
+        try {
+          const data = await fetchHoverInsight(anchorId);
+          if (activeHoverId.current === anchorId) {
+            setInsight(normalizeHoverInsightPayload(data));
+          }
+        } catch (_) {
+          /* ignore */
+        }
       }
     },
     [onNoteUpdated]
@@ -475,22 +515,21 @@ function HoverInsightPanels() {
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
   const similarNotes = insight?.similarNotes || [];
   const similarMin = similarMinPct / 100;
-  const filteredSimilarNotes = useMemo(
-    () =>
-      similarNotes.filter((sn) => sn.similarity == null || Number(sn.similarity) >= similarMin),
-    [similarNotes, similarMin]
-  );
+  const filteredSimilarNotes = useMemo(() => {
+    const filtered = similarNotes.filter(
+      (sn) => sn.similarity == null || Number(sn.similarity) >= similarMin
+    );
+    return sortBySimilarityDesc(filtered);
+  }, [similarNotes, similarMin]);
   const { neighbor: neighborTags, connected: connectedTags, novel: novelTags } = useMemo(
     () => partitionTagSuggestions(tags),
     [tags]
   );
   /** Linked peers: highest similarity first; unknown similarity last. */
-  const persisted = [...(insight?.persistedLinks || [])].sort((a, b) => {
-    const sa = a.similarity != null ? a.similarity : -1;
-    const sb = b.similarity != null ? b.similarity : -1;
-    if (sb !== sa) return sb - sa;
-    return (a.content || '').localeCompare(b.content || '');
-  });
+  const persisted = useMemo(
+    () => sortBySimilarityDesc(insight?.persistedLinks || []),
+    [insight?.persistedLinks]
+  );
 
   const note = hover?.note;
 
