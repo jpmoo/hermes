@@ -794,6 +794,13 @@ export default function StreamPage() {
                   All threads
                 </button>
               </div>
+              {!loadingThread &&
+                thread.length > 0 &&
+                (!focusId || focusId === actualRootId) && (
+                  <p className="stream-page-level-hint" role="note">
+                    You are at the root.
+                  </p>
+                )}
               {loadingThread ? (
                 <p className="stream-page-muted">Loading thread…</p>
               ) : thread.length === 0 ? (
@@ -839,6 +846,10 @@ export default function StreamPage() {
                   {starredOnly ? 'No starred threads yet.' : 'No threads yet. Start one below.'}
                 </p>
               ) : (
+                <>
+                  <p className="stream-page-level-hint" role="note">
+                    You are at the root.
+                  </p>
                 <ul className="stream-page-list">
                   {roots.map((n) => (
                     <li key={n.id} className="stream-page-root-item">
@@ -855,6 +866,7 @@ export default function StreamPage() {
                     </li>
                   ))}
                 </ul>
+                </>
               )}
             </>
           )}

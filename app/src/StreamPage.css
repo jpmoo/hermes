@@ -12,6 +12,18 @@
   padding-top: 0.5rem;
 }
 
+/* Quiet context above root / thread-root note lists */
+.stream-page-level-hint {
+  margin: 0 0 1rem;
+  padding: 0 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  opacity: 0.72;
+  max-width: 34em;
+  letter-spacing: 0.01em;
+}
+
 /* Stream insight mode: one note selected for tag/connection panels — dim the rest */
 .stream-page:has(.note-card--insight-selected) .note-card.note-card--insight-dimmed {
   opacity: 0.38;
