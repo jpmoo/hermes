@@ -391,7 +391,7 @@ router.post('/hover-insight', async (req, res) => {
   try {
     const noteId = req.body?.noteId;
     if (!noteId) return res.status(400).json({ error: 'noteId required' });
-    const data = await getHoverInsight(noteId, req.userId, { minSimilarity: req.body?.minSimilarity });
+    const data = await getHoverInsight(noteId, req.userId);
     if (!data) return res.status(404).json({ error: 'Note not found' });
     res.json(data);
   } catch (err) {

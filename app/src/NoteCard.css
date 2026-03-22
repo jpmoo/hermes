@@ -21,7 +21,24 @@
   border-left-color: var(--border);
 }
 
-/* Linked notes: `note-card--linked` — right border is inline in NoteCard.jsx (matches left threadline). */
+/* Linked notes: thick right bar matches left threadline (width/color from --hermes-link-* on the article). */
+.note-card.note-card--linked {
+  position: relative;
+}
+
+.note-card.note-card--linked::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--hermes-link-rw, 3px);
+  background: var(--hermes-link-rc, var(--accent-dim));
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  pointer-events: none;
+  z-index: 2;
+}
 
 /* Stream insight: no focus ring on the selected card */
 .note-card.note-card--insight-selected:focus,

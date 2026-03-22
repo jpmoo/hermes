@@ -4,7 +4,7 @@ A note-taking system built around conversation and tree structure. Specification
 
 ## Structure
 
-- **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth, embeddings, hover tag/similar-note insight (Ollama + vectors), semantic search. Serves the built web app and REST + WebSocket.
+- **`server/`** — Node.js API (Express), PostgreSQL (pgvector), JWT auth, embeddings, Stream hover insight (Ollama tags + linked notes), semantic search. Serves the built web app and REST + WebSocket.
 - **`app/`** — React (Vite) web app: **Stream** (thread list + in-thread view on one page, `?thread=`), Outline, Tag view, search, etc.
 - **`client/`** — Electron desktop app that loads the web app from the server (or dev Vite server).
 - **`mcp/`** — Optional stdio MCP for Claude Desktop. The main server also exposes **Streamable HTTP MCP** at **`/mcp`** (same tools).
@@ -18,7 +18,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Notes CRUD, threading, root feed | Done |
 | Starred notes, All/Starred toggle | Done |
 | Embedding pipeline (Ollama → pgvector) | Done |
-| Stream insight: click a note for tag/connection panels (others dim); double-click opens thread; similar-note **min. similarity** slider (default 0.5, **saved in `localStorage`** after you change it); notes with **linked** peers show a **thicker right border** (API `connection_count`) | Done |
+| Stream insight: click a note for tag panels (others dim); double-click opens thread; tag suggestions from **neighbor thread** + **linked** peers only (no vector “similar” list); notes with **linked** peers show a **right threadline** matching the left (API `connection_count`) | Done |
 | Inherit parent tags from note UI | Done |
 | Tag relationships (exclusion, complement) API | Done |
 | Flat / Tag view (filter by tags, AND/OR) | Done |
@@ -140,10 +140,10 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/tags` (all tags for typeahead), `GET /api/tags?in_use=1` (tags with ≥1 approved use on your notes — Tags page), `POST /api/tags`, relationships endpoints
 - `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (hybrid text + semantic; 503 only if Ollama fails and nothing matches the substring)
 - `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
-- `POST /api/notes/hover-insight` — body `{ noteId, minSimilarity? }`. Optional **minSimilarity** in **0.1–0.9** (snapped to **0.05**), default **0.5**; similar-note list and embedding-derived tag suggestions use cosine similarity **≥** that value (hovered note must have an embedding; up to 120 nearest neighbors are considered). **Similar** list omits the **parent**, **immediate children**, and (for **replies**) **siblings** (same `parent_id`). Response: `tagSuggestions[]` (neighbor / **connected** / similar / new in UI; items include `source`: `ollama` \| `similar` \| `connected` — **neighbor** = model `from_vocab` suggestions **only** if that tag is approved on **parent, siblings, or immediate children** of the hovered note (not merely elsewhere, e.g. linked notes); **connected** = approved tags on **linked** peers that are **not** on the hovered note; de-duped across sections), `similarNotes`, `persistedLinks` (stack **below** the note, **right edge** at note’s right **+60px**, **vertical spine** centered on the stack **from the stack top downward** behind the cards; unlink refetches insight so that note can reappear under similar), `similarityMin` (echo). Stream: slider in Similar notes panel; the app stores the last slider value in **`localStorage`** key `hermes_insight_similarity_min` after the user changes it. Requires Ollama + embeddings.
+- `POST /api/notes/hover-insight` — body `{ noteId }`. Tag suggestions: **neighbor** (Ollama `from_vocab` only if tag is on **parent, siblings, or immediate children**), **connected** (approved tags on **linked** peers not on the hovered note), **new** (Ollama novel tags). No vector similar-note list or embedding tag harvest. Response: `tagSuggestions[]`, `similarNotes` (always `[]`), `persistedLinks` (linked stack **below** the note, right edge **+60px**, vertical spine behind cards). **Ollama** required for model tags; embeddings unused for this endpoint.
 - `GET /api/notes/:id/thread-root` — resolves thread root id for any note (used when opening a linked note from hover)
 - `GET /api/notes/:id/thread-path` — `{ threadPath }` (truncated snippets, ` > `). Query **`excludeLeaf=1`** (default for the app’s linked-note fetch): **ancestors only** (omit the note itself; the card already shows its text). Omit the query for root → that note including its snippet.
-- `GET /api/notes/:id/linked-notes` — `{ persistedLinks }` only (same objects as hover-insight linked stack: snippet, similarity when embeddings exist, `threadPath` = parent chain only, tags). Fast DB path; **no Ollama**. Stream uses this on card click so linked notes render before tag/similar suggestions load.
+- `GET /api/notes/:id/linked-notes` — `{ persistedLinks }` only (same objects as hover-insight linked stack: snippet, cosine similarity when both notes have embeddings, `threadPath` = parent chain only, tags). Fast DB path; **no Ollama**. Stream uses this on card click so linked notes render before tag suggestions load.
 - `GET /api/notes/:id/connections` — `{ outgoing, incoming }` (same undirected link appears in both notes’ API; row is stored once with an anchor/linked orientation)
 - `POST /api/notes/:id/connections` — `{ linkedNoteId }` — connect two notes (one DB row; idempotent — if a link already exists in either direction, returns it)
 - `DELETE /api/notes/:id/connections/:linkedNoteId` — remove the link between the two notes (either stored orientation)

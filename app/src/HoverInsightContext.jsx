@@ -12,40 +12,13 @@ import {
   fetchHoverInsight,
   fetchLinkedNotesQuick,
   addNoteTag,
-  createNoteConnection,
   deleteNoteConnection,
-  getNoteThreadPath,
   getNoteThreadRoot,
 } from './api';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
   'Remove the link between these two notes? The notes are not deleted—only the connection is removed.';
-
-/** Last “min. similarity” for Stream insight; persists across sessions after the user moves the slider. */
-const SIMILARITY_STORAGE_KEY = 'hermes_insight_similarity_min';
-const SIM_SLIDER_MIN = 0.1;
-const SIM_SLIDER_MAX = 0.9;
-const SIM_SLIDER_STEP = 0.05;
-const SIM_SLIDER_DEFAULT = 0.5;
-
-function clampSimilaritySlider(x) {
-  const n = Number(x);
-  if (!Number.isFinite(n)) return SIM_SLIDER_DEFAULT;
-  const s =
-    Math.round(Math.min(SIM_SLIDER_MAX, Math.max(SIM_SLIDER_MIN, n)) / SIM_SLIDER_STEP) * SIM_SLIDER_STEP;
-  return s;
-}
-
-function readStoredSimilarityMin() {
-  try {
-    const v = parseFloat(localStorage.getItem(SIMILARITY_STORAGE_KEY) ?? '', 10);
-    if (Number.isFinite(v)) return clampSimilaritySlider(v);
-  } catch (_) {
-    /* ignore */
-  }
-  return SIM_SLIDER_DEFAULT;
-}
 
 /** Ensure arrays exist (API / parse edge cases). Accept camelCase or snake_case keys. */
 function normalizeHoverInsightPayload(data) {
@@ -54,7 +27,6 @@ function normalizeHoverInsightPayload(data) {
       tagSuggestions: [],
       similarNotes: [],
       persistedLinks: [],
-      similarityMin: SIM_SLIDER_DEFAULT,
     };
   }
   const persisted = data.persistedLinks ?? data.persisted_links;
@@ -68,17 +40,14 @@ function normalizeHoverInsightPayload(data) {
   };
 }
 
-/** Split flat tag list into neighbor / connected / similar / new (ollama) groups. */
+/** Split flat tag list into neighbor / connected / new (ollama) groups. */
 function partitionTagSuggestions(list) {
   const neighbor = [];
   const connected = [];
-  const similar = [];
   const novel = [];
   for (const t of list) {
     if (t.source === 'connected') {
       connected.push(t);
-    } else if (t.source === 'similar') {
-      similar.push(t);
     } else if (t.source === 'ollama') {
       if (t.fromVocab === true) neighbor.push(t);
       else if (t.fromVocab === false) novel.push(t);
@@ -86,10 +55,10 @@ function partitionTagSuggestions(list) {
       else novel.push(t);
     }
   }
-  return { neighbor, connected, similar, novel };
+  return { neighbor, connected, novel };
 }
 
-/** Whether a tag suggestion matches an approved tag on a connection (similar / linked) note. */
+/** Whether a tag suggestion matches an approved tag on a linked note. */
 function tagSuggestionMatchesNoteTags(suggestion, noteTags) {
   if (!noteTags?.length) return false;
   if (suggestion.tagId && noteTags.some((t) => t.id === suggestion.tagId)) return true;
@@ -103,7 +72,6 @@ const HoverInsightContext = createContext(null);
 function tagSuggestionTitle(t, highlightConnection) {
   if (highlightConnection) return 'Also on the connection note you highlighted';
   if (t.source === 'connected') return 'On a linked note; not on the selected note yet';
-  if (t.source === 'similar') return 'From similar notes in your library';
   if (t.fromVocab === true) return 'From thread context (parent, siblings, replies) using your tags';
   return 'New tag from model (may create tag when added)';
 }
@@ -179,9 +147,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     return fresh ? { ...l, threadPath: fresh.threadPath ?? l.threadPath } : l;
   }, [connectionModal, insight?.persistedLinks]);
   const [connectionTagSourceId, setConnectionTagSourceId] = useState(null);
-  const [similarityMin, setSimilarityMin] = useState(() => readStoredSimilarityMin());
   const fetchTimer = useRef(null);
-  const sliderInsightTimerRef = useRef(null);
   const reqId = useRef(0);
   const activeHoverId = useRef(null);
   /** Selected card element for layout (connection stack / scroll sync). */
@@ -192,8 +158,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     activeHoverId.current = null;
     insightAnchorRef.current = null;
     if (fetchTimer.current) clearTimeout(fetchTimer.current);
-    if (sliderInsightTimerRef.current) clearTimeout(sliderInsightTimerRef.current);
-    sliderInsightTimerRef.current = null;
     setHover(null);
     setInsight(null);
     setLoading(false);
@@ -208,45 +172,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     clearInsightSelection();
   }, [clearInsightSelection]);
 
-  /** Update slider state and write to localStorage (survives reloads / new tabs on same origin). */
-  const persistSimilarityMin = useCallback((raw) => {
-    const c = clampSimilaritySlider(raw);
-    setSimilarityMin(c);
-    try {
-      localStorage.setItem(SIMILARITY_STORAGE_KEY, String(c));
-    } catch (_) {
-      /* private mode / quota */
-    }
-    return c;
-  }, []);
-
-  const onSimilaritySliderChange = useCallback(
-    (rawValue) => {
-      const c = persistSimilarityMin(rawValue);
-      const noteId = activeHoverId.current;
-      if (!noteId) return;
-      if (sliderInsightTimerRef.current) clearTimeout(sliderInsightTimerRef.current);
-      sliderInsightTimerRef.current = setTimeout(() => {
-        sliderInsightTimerRef.current = null;
-        const id = ++reqId.current;
-        setLoading(true);
-        fetchHoverInsight(noteId, c)
-          .then((data) => {
-            if (reqId.current !== id) return;
-            setInsight(normalizeHoverInsightPayload(data));
-          })
-          .catch(() => {
-            if (reqId.current !== id) return;
-            setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
-          })
-          .finally(() => {
-            if (reqId.current === id) setLoading(false);
-          });
-      }, 320);
-    },
-    [persistSimilarityMin]
-  );
-
   /**
    * Single-click: show tag / connection UI for this note. Click again on the same note to dismiss.
    * @param {number} depth Stream depth (≥ 0 for insight-enabled cards).
@@ -258,10 +183,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         clearInsightSelection();
         return;
       }
-      if (sliderInsightTimerRef.current) {
-        clearTimeout(sliderInsightTimerRef.current);
-        sliderInsightTimerRef.current = null;
-      }
       insightAnchorRef.current = anchorEl;
       setHover({ note });
       activeHoverId.current = note.id;
@@ -272,7 +193,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       const id = ++reqId.current;
       setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
       setLoading(true);
-      const minSim = similarityMin;
 
       fetchLinkedNotesQuick(note.id)
         .then((data) => {
@@ -294,7 +214,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         });
 
       fetchTimer.current = setTimeout(() => {
-        fetchHoverInsight(note.id, minSim)
+        fetchHoverInsight(note.id)
           .then((data) => {
             if (reqId.current !== id) return;
             setInsight(normalizeHoverInsightPayload(data));
@@ -312,7 +232,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
           });
       }, 220);
     },
-    [clearInsightSelection, similarityMin]
+    [clearInsightSelection]
   );
 
   /** Pointer / Escape: dismiss when clicking outside insight UI and the selected card. */
@@ -360,54 +280,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [dismissTag, onNoteUpdated]
   );
 
-  const linkSimilar = useCallback(async (sn) => {
-    const anchorId = activeHoverId.current;
-    if (!anchorId) return;
-    if (sn.persisted) return;
-    try {
-      const row = await createNoteConnection(anchorId, sn.id);
-      setInsight((prev) => {
-        const p = prev || { tagSuggestions: [], similarNotes: [], persistedLinks: [] };
-        if ((p.persistedLinks || []).some((x) => x.id === sn.id)) {
-          return { ...p, similarNotes: (p.similarNotes || []).filter((x) => x.id !== sn.id) };
-        }
-        return {
-          ...p,
-          persistedLinks: [
-            ...(p.persistedLinks || []),
-            {
-              connectionId: row.id,
-              id: sn.id,
-              content: sn.content,
-              parent_id: sn.parent_id,
-              threadRootId: null,
-              similarity: sn.similarity != null ? Number(sn.similarity) : null,
-              persisted: true,
-              tags: sn.tags || [],
-            },
-          ],
-          similarNotes: (p.similarNotes || []).filter((x) => x.id !== sn.id),
-        };
-      });
-      onNoteUpdated?.();
-      getNoteThreadPath(sn.id)
-        .then((threadPath) => {
-          setInsight((prev) => {
-            if (!prev?.persistedLinks) return prev;
-            return {
-              ...prev,
-              persistedLinks: prev.persistedLinks.map((x) =>
-                x.id === sn.id ? { ...x, threadPath } : x
-              ),
-            };
-          });
-        })
-        .catch(() => {});
-    } catch (e) {
-      console.error(e);
-    }
-  }, [onNoteUpdated]);
-
   const unlinkPersisted = useCallback(
     async (anchorNoteId, linkedNoteId) => {
       try {
@@ -426,10 +298,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         setConnectionTagSourceId((cur) => (cur === linkedNoteId ? null : cur));
         onNoteUpdated?.();
 
-        /* Re-fetch insight so the unlinked note can appear in similar notes again (server filters linked ids). */
         const rid = ++reqId.current;
-        const minSim = similarityMin;
-        fetchHoverInsight(anchorNoteId, minSim)
+        fetchHoverInsight(anchorNoteId)
           .then((data) => {
             if (reqId.current !== rid) return;
             setInsight(normalizeHoverInsightPayload(data));
@@ -442,7 +312,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         console.error(e);
       }
     },
-    [onNoteUpdated, similarityMin]
+    [onNoteUpdated]
   );
 
   const navigateToConnection = useCallback(
@@ -468,7 +338,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       hover,
       insight,
       loading,
-      linkSimilar,
       unlinkPersisted,
       dismissedKeys,
       dismissTag,
@@ -479,8 +348,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       navigateToConnection,
       connectionTagSourceId,
       setConnectionTagSourceId,
-      similarityMin,
-      onSimilaritySliderChange,
     }),
     [
       selectInsightNote,
@@ -488,7 +355,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       hover,
       insight,
       loading,
-      linkSimilar,
       unlinkPersisted,
       dismissedKeys,
       dismissTag,
@@ -499,8 +365,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       navigateToConnection,
       connectionTagSourceId,
       setConnectionTagSourceId,
-      similarityMin,
-      onSimilaritySliderChange,
     ]
   );
 
@@ -520,7 +384,6 @@ function HoverInsightPanels() {
     hover,
     insight,
     loading,
-    linkSimilar,
     unlinkPersisted,
     dismissedKeys,
     dismissTag,
@@ -532,8 +395,6 @@ function HoverInsightPanels() {
     connectionTagSourceId,
     setConnectionTagSourceId,
     insightAnchorRef,
-    similarityMin,
-    onSimilaritySliderChange,
   } = ctx;
 
   const [layoutRev, setLayoutRev] = useState(0);
@@ -557,18 +418,15 @@ function HoverInsightPanels() {
 
   const connectionHighlightTags = useMemo(() => {
     if (!connectionTagSourceId || !insight) return [];
-    const fromSimilar = insight.similarNotes?.find((x) => x.id === connectionTagSourceId);
-    if (fromSimilar?.tags?.length) return fromSimilar.tags;
     const fromLinked = insight.persistedLinks?.find((x) => x.id === connectionTagSourceId);
     return fromLinked?.tags || [];
   }, [connectionTagSourceId, insight]);
 
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
-  const { neighbor: neighborTags, connected: connectedTags, similar: similarTags, novel: novelTags } = useMemo(
+  const { neighbor: neighborTags, connected: connectedTags, novel: novelTags } = useMemo(
     () => partitionTagSuggestions(tags),
     [tags]
   );
-  const similar = insight?.similarNotes || [];
   /** Linked peers: highest similarity first; unknown similarity last. */
   const persisted = [...(insight?.persistedLinks || [])].sort((a, b) => {
     const sa = a.similarity != null ? a.similarity : -1;
@@ -677,16 +535,6 @@ function HoverInsightPanels() {
                     connectionHighlightTags={connectionHighlightTags}
                   />
                   <HoverInsightTagSection
-                    title="Based on similar notes"
-                    tags={similarTags}
-                    note={note}
-                    dismissTag={dismissTag}
-                    addTag={addTag}
-                    addingKey={addingKey}
-                    connectionTagSourceId={connectionTagSourceId}
-                    connectionHighlightTags={connectionHighlightTags}
-                  />
-                  <HoverInsightTagSection
                     title="New tag suggestions"
                     tags={novelTags}
                     note={note}
@@ -698,67 +546,6 @@ function HoverInsightPanels() {
                   />
                 </div>
               )}
-            </div>
-          </div>
-
-          <div
-            className="hover-insight-margin hover-insight-margin--right"
-            data-insight-ui
-          >
-            <div className={`hover-insight-panel hover-insight-panel--right ${loading ? 'hover-insight-panel--loading' : ''}`}>
-              <p className="hover-insight-title">Similar notes</p>
-              <div
-                className="hover-insight-similar-slider-wrap"
-                data-insight-ui
-                title="Default 50% until you change it; your choice is saved in this browser."
-              >
-                <label className="hover-insight-similar-slider-label" htmlFor="hover-insight-similarity-slider">
-                  Min. similarity{' '}
-                  <span className="hover-insight-similar-slider-value">
-                    {Math.round(similarityMin * 100)}%
-                  </span>
-                </label>
-                <input
-                  id="hover-insight-similarity-slider"
-                  type="range"
-                  className="hover-insight-similar-slider"
-                  min={SIM_SLIDER_MIN}
-                  max={SIM_SLIDER_MAX}
-                  step={SIM_SLIDER_STEP}
-                  value={similarityMin}
-                  onChange={(e) => onSimilaritySliderChange(parseFloat(e.target.value, 10))}
-                />
-                <div className="hover-insight-similar-slider-ticks" aria-hidden>
-                  <span>10%</span>
-                  <span>90%</span>
-                </div>
-              </div>
-              {!loading && similar.length === 0 && (
-                <p className="hover-insight-muted">
-                  None above {Math.round(similarityMin * 100)}% similarity
-                </p>
-              )}
-              <ul className="hover-insight-similar-list">
-                {similar.map((sn) => (
-                  <li key={sn.id}>
-                    <button
-                      type="button"
-                      className="hover-insight-similar-btn"
-                      onMouseEnter={() => setConnectionTagSourceId(sn.id)}
-                      onClick={() => linkSimilar(sn)}
-                      title="Save link — appears in the linked stack below the note (right-aligned, +60px)"
-                    >
-                      <span className="hover-insight-similar-snippet">
-                        {(sn.content || '—').slice(0, 100)}
-                        {(sn.content?.length || 0) > 100 ? '…' : ''}
-                      </span>
-                      <span className="hover-insight-sim-pct">
-                        {Math.round((sn.similarity || 0) * 100)}%
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
             </div>
           </div>
         </>

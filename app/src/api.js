@@ -155,13 +155,12 @@ export async function fetchLinkedNotesQuick(noteId) {
   return data;
 }
 
-export async function fetchHoverInsight(noteId, minSimilarity = 0.5) {
+export async function fetchHoverInsight(noteId) {
   const r = await fetch(`${API}/notes/hover-insight`, {
     method: 'POST',
     headers: { ...headers(), 'Content-Type': 'application/json' },
     body: JSON.stringify({
       noteId: noteId != null ? String(noteId) : noteId,
-      minSimilarity,
     }),
   });
   const data = await r.json().catch(() => ({}));

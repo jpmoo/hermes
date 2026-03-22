@@ -12,7 +12,7 @@
 
 .hover-insight-margin--left {
   left: 0;
-  width: min(220px, 28vw);
+  width: min(280px, 36vw);
   justify-content: flex-start;
   padding-left: 0.35rem;
 }

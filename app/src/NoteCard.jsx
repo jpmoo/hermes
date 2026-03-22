@@ -294,16 +294,20 @@ export default function NoteCard({
         }`
       : undefined;
 
-  /* Full `borderRight` shorthand so width matches left threadline (longhands + `border:` shorthand were dropping the right edge in some cases). */
-  const linkedRightBorder = hasConnections
-    ? (() => {
-        const w = `${borderWidth}px`;
-        if (!showThreadline) return `${w} solid var(--border)`;
-        if (depth <= 0) return `${w} solid var(--accent-dim, #6d5610)`;
-        if (depth === 1) return `${w} solid #5a4a2a`;
-        if (depth === 2) return `${w} solid #4a3a1a`;
-        return `${w} solid #3a2a12`;
-      })()
+  /* Right “threadline” via ::after + CSS vars — more reliable than border longhands next to `border:` shorthand. */
+  const linkBarVars = hasConnections
+    ? {
+        '--hermes-link-rw': `${borderWidth}px`,
+        '--hermes-link-rc': !showThreadline
+          ? 'var(--border)'
+          : depth <= 0
+            ? 'var(--accent-dim, #6d5610)'
+            : depth === 1
+              ? '#5a4a2a'
+              : depth === 2
+                ? '#4a3a1a'
+                : '#3a2a12',
+      }
     : null;
 
   return (
@@ -311,7 +315,7 @@ export default function NoteCard({
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
-        ...(linkedRightBorder ? { borderRight: linkedRightBorder } : {}),
+        ...(linkBarVars || {}),
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}

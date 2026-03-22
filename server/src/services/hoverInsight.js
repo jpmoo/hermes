@@ -1,21 +1,6 @@
 import pool from '../db/pool.js';
 import { generate } from './ollama.js';
 
-/** Nearest neighbors to consider before applying minSimilarity (increase if library is large). */
-const VECTOR_CANDIDATES = 120;
-const SIM_MIN_BOUND = 0.1;
-const SIM_MAX_BOUND = 0.9;
-const SIM_MIN_STEP = 0.05;
-const SIM_MIN_DEFAULT = 0.5;
-
-/** Clamp + snap client-provided minimum cosine similarity for “similar notes”. */
-export function normalizeMinSimilarity(raw) {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return SIM_MIN_DEFAULT;
-  const snapped = Math.round(n / SIM_MIN_STEP) * SIM_MIN_STEP;
-  return Math.min(SIM_MAX_BOUND, Math.max(SIM_MIN_BOUND, snapped));
-}
-
 function normalizeTagName(s) {
   return (s || '').toString().trim().toLowerCase().replace(/\s+/g, '-');
 }
@@ -137,14 +122,12 @@ export async function getLinkedNotesWithTags(anchorNoteId, userId) {
 }
 
 /**
- * Tag suggestions + similar notes + persisted links for Stream hover (any note, including thread roots).
- * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (cosine similarity > minSimilarity) not on note.
+ * Tag suggestions + persisted links for Stream hover (any note, including thread roots).
+ * Order: Ollama (neighbor-context vocab + up to 6 new), then tags from **linked** peers not on the hovered note.
  * Root notes: no parent block; siblings = other root-level notes; children = direct replies only (no deeper thread).
- * Similar notes: nearest neighbors above minSimilarity, excluding parent, immediate children, and (for replies) siblings.
- * Tag harvest from vector-similar notes skips grandchildren+ of the hovered note.
+ * Vector “similar notes” and embedding tag harvest are disabled — connections only.
  */
-export async function getHoverInsight(noteId, userId, opts = {}) {
-  const minSimilarity = normalizeMinSimilarity(opts.minSimilarity ?? SIM_MIN_DEFAULT);
+export async function getHoverInsight(noteId, userId, _opts = {}) {
   const noteR = await pool.query(
     `SELECT id, parent_id, content FROM notes WHERE id = $1 AND user_id = $2`,
     [noteId, userId]
@@ -287,7 +270,7 @@ JSON array only, no markdown:`;
       const inNeighborContext =
         neighborTagNames.has(t.name) || (tid != null && neighborTagIds.has(tid));
       if (!inNeighborContext) {
-        /* Tag exists in library (e.g. only on linked notes) — skip here; “connected” / similar lists handle it. */
+        /* Tag exists in library (e.g. only on linked notes) — skip here; “connected” list handles it. */
         continue;
       }
     }
@@ -301,76 +284,7 @@ JSON array only, no markdown:`;
     });
   }
 
-  /* Use the hovered row’s embedding in-SQL (avoid vector::text round-trip through node-pg). */
-  let similarRows = [];
-  const simR = await pool.query(
-    `WITH hovered AS (
-       SELECT embedding FROM notes WHERE id = $1 AND user_id = $2 AND embedding IS NOT NULL
-     )
-     SELECT n.id, n.parent_id, n.content,
-            1 - (n.embedding <=> hovered.embedding) AS similarity
-     FROM notes n
-     CROSS JOIN hovered
-     WHERE n.user_id = $2 AND n.id <> $1::uuid AND n.embedding IS NOT NULL
-     ORDER BY n.embedding <=> hovered.embedding
-     LIMIT $3`,
-    [id, userId, VECTOR_CANDIDATES]
-  );
-  const hoveredParentId = parentId ?? null;
-  const sameNote = (a, b) => a != null && b != null && String(a) === String(b);
-  similarRows = simR.rows
-    .filter((r) => Number(r.similarity) >= minSimilarity)
-    .filter((r) => {
-      const rp = r.parent_id ?? null;
-      if (parentId && sameNote(r.id, parentId)) return false; // parent
-      if (sameNote(rp, id)) return false; // immediate child of hovered
-      if (hoveredParentId !== null && sameNote(rp, hoveredParentId)) return false; // sibling (same parent)
-      return true;
-    })
-    .slice(0, 10);
-
-  const similarIds = similarRows.map((r) => r.id);
-  /** Grandchildren+ under hovered note: do not use their tags for “similar” tag harvest (only immediate children matter). */
-  const deepDescR = await pool.query(
-    `WITH RECURSIVE down AS (
-       SELECT n.id, 1 AS depth
-       FROM notes n
-       WHERE n.parent_id = $1::uuid AND n.user_id = $2
-       UNION ALL
-       SELECT n.id, d.depth + 1
-       FROM notes n
-       INNER JOIN down d ON n.parent_id = d.id
-       WHERE n.user_id = $2
-     )
-     SELECT id FROM down WHERE depth >= 2`,
-    [id, userId]
-  );
-  const deepDescendantIds = new Set(deepDescR.rows.map((r) => r.id));
-  const similarIdsForTagHarvest = similarIds.filter((sid) => !deepDescendantIds.has(sid));
-
-  const embeddingTags = [];
-  if (similarIdsForTagHarvest.length) {
-    const tr = await pool.query(
-      `SELECT DISTINCT t.id, t.name
-       FROM note_tags nt
-       JOIN tags t ON t.id = nt.tag_id
-       WHERE nt.note_id = ANY($1) AND nt.status = 'approved'`,
-      [similarIdsForTagHarvest]
-    );
-    for (const row of tr.rows) {
-      const ln = row.name.toLowerCase();
-      if (onNoteIds.has(row.id) || seenNames.has(ln)) continue;
-      seenNames.add(ln);
-      embeddingTags.push({
-        key: `s-${row.id}`,
-        name: row.name,
-        tagId: row.id,
-        source: 'similar',
-      });
-    }
-  }
-
-  /* Approved tags on explicitly linked notes, not already on the hovered note (de-duped vs Ollama + similar). */
+  /* Approved tags on explicitly linked notes, not already on the hovered note (de-duped vs Ollama). */
   let connectedTagRows = { rows: [] };
   try {
     connectedTagRows = await pool.query(
@@ -402,22 +316,11 @@ JSON array only, no markdown:`;
     });
   }
 
-  const similarNotes = similarRows.map((r) => ({
-    id: r.id,
-    content: r.content,
-    similarity: Number(r.similarity),
-    parent_id: r.parent_id,
-  }));
+  const tagSuggestions = [...ollamaTags, ...connectedTags];
 
-  const tagSuggestions = [...ollamaTags, ...embeddingTags, ...connectedTags];
+  const { persistedLinks } = await loadPersistedLinksMetadata(id, userId);
 
-  const { persistedLinks, persistedLinkIds } = await loadPersistedLinksMetadata(id, userId);
-
-  const similarNotesFiltered = similarNotes.filter((s) => !persistedLinkIds.has(s.id));
-
-  const tagTargetIds = [
-    ...new Set([...similarNotesFiltered.map((s) => s.id), ...persistedLinks.map((p) => p.id)]),
-  ];
+  const tagTargetIds = [...new Set(persistedLinks.map((p) => p.id))];
   const noteTagsMap = new Map();
   if (tagTargetIds.length > 0) {
     const tagR = await pool.query(
@@ -433,11 +336,6 @@ JSON array only, no markdown:`;
     }
   }
 
-  const similarNotesWithTags = similarNotesFiltered.map((s) => ({
-    ...s,
-    tags: noteTagsMap.get(s.id) || [],
-  }));
-
   const persistedLinksWithTags = persistedLinks.map((p) => ({
     ...p,
     tags: noteTagsMap.get(p.id) || [],
@@ -445,8 +343,7 @@ JSON array only, no markdown:`;
 
   return {
     tagSuggestions,
-    similarNotes: similarNotesWithTags,
+    similarNotes: [],
     persistedLinks: persistedLinksWithTags,
-    similarityMin: minSimilarity,
   };
 }
