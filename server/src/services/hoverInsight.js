@@ -10,7 +10,7 @@ function normalizeTagName(s) {
 
 /**
  * Tag suggestions + similar notes for hover UI (non-root notes).
- * Order: Ollama (vocab + up to 4 new), then tags from top similar notes (>0.65) not on note.
+ * Order: Ollama (vocab + up to 6 new), then tags from top similar notes (>0.65) not on note.
  */
 export async function getHoverInsight(noteId, userId) {
   const noteR = await pool.query(
@@ -21,11 +21,37 @@ export async function getHoverInsight(noteId, userId) {
   if (noteR.rows.length === 0) return null;
   const { id, parent_id: parentId, content, emb_text: embText } = noteR.rows[0];
 
+  let parentBlock = '';
+  if (parentId) {
+    const pr = await pool.query(
+      `SELECT content FROM notes WHERE id = $1 AND user_id = $2`,
+      [parentId, userId]
+    );
+    const pc = pr.rows[0]?.content?.trim();
+    if (pc) parentBlock = pc;
+  }
+
   const kidsR = await pool.query(
     `SELECT content FROM notes WHERE parent_id = $1 AND user_id = $2 ORDER BY created_at ASC`,
     [noteId, userId]
   );
   const childrenBlock = kidsR.rows
+    .map((r) => r.content?.trim())
+    .filter(Boolean)
+    .join('\n---\n');
+
+  const siblingsR = await pool.query(
+    `SELECT content FROM notes
+     WHERE user_id = $1 AND id <> $2
+       AND (
+         (parent_id = $3 AND $3 IS NOT NULL)
+         OR (parent_id IS NULL AND $3 IS NULL)
+       )
+     ORDER BY created_at ASC
+     LIMIT 40`,
+    [userId, noteId, parentId]
+  );
+  const siblingsBlock = siblingsR.rows
     .map((r) => r.content?.trim())
     .filter(Boolean)
     .join('\n---\n');
@@ -49,22 +75,26 @@ export async function getHoverInsight(noteId, userId) {
   const onNoteIds = new Set(onNoteR.rows.map((t) => t.id));
 
   const tagList =
-    activeTagRows.rows.map((t) => t.name).join(', ') || '(no tags in use yet — you may suggest up to 4 new hyphenated tags)';
+    activeTagRows.rows.map((t) => t.name).join(', ') || '(no tags in use yet — you may suggest up to 6 new hyphenated tags)';
 
-  const body = [content?.trim(), childrenBlock ? `--- direct replies ---\n${childrenBlock}` : '']
-    .filter(Boolean)
-    .join('\n\n');
+  const contextParts = [
+    content?.trim() ? `--- hovered note ---\n${content.trim()}` : '',
+    parentBlock ? `--- parent note ---\n${parentBlock}` : '',
+    siblingsBlock ? `--- sibling notes (same level in thread) ---\n${siblingsBlock}` : '',
+    childrenBlock ? `--- child notes (replies under hovered note) ---\n${childrenBlock}` : '',
+  ].filter(Boolean);
+  const body = contextParts.join('\n\n');
 
   const ollamaParsed = [];
   if (body.trim()) {
-    const prompt = `You tag notes in Hermes. Use ACTIVE TAGS when they fit; otherwise suggest at most 4 NEW tags (lowercase, hyphenated).
+    const prompt = `You tag notes in Hermes. The HOVERED NOTE is the focus; parent, sibling, and child sections give thread context. Suggest tags for the hovered note (and context). Use ACTIVE TAGS when they fit; otherwise at most 6 NEW tags (lowercase, hyphenated).
 
 Return ONLY a JSON array: [{"tag":"name","from_vocab":true|false}, ...] with 1–12 items. from_vocab is true only if the tag appears in ACTIVE TAGS.
 
 ACTIVE TAGS: ${tagList}
 
-NOTE (and direct replies section if present):
-${body.slice(0, 3500)}
+CONTEXT:
+${body.slice(0, 5500)}
 
 JSON array only, no markdown:`;
     const raw = await generate(prompt, { num_predict: 450, temperature: 0.25 });
@@ -80,7 +110,7 @@ JSON array only, no markdown:`;
             const fromVocab = !!it.from_vocab;
             if (!fromVocab) {
               newCount += 1;
-              if (newCount > 4) continue;
+              if (newCount > 6) continue;
             }
             ollamaParsed.push({ name, from_vocab: fromVocab });
           }
