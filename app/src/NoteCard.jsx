@@ -294,17 +294,24 @@ export default function NoteCard({
         }`
       : undefined;
 
+  /* Full `borderRight` shorthand so width matches left threadline (longhands + `border:` shorthand were dropping the right edge in some cases). */
+  const linkedRightBorder = hasConnections
+    ? (() => {
+        const w = `${borderWidth}px`;
+        if (!showThreadline) return `${w} solid var(--border)`;
+        if (depth <= 0) return `${w} solid var(--accent-dim, #6d5610)`;
+        if (depth === 1) return `${w} solid #5a4a2a`;
+        if (depth === 2) return `${w} solid #4a3a1a`;
+        return `${w} solid #3a2a12`;
+      })()
+    : null;
+
   return (
     <article
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
-        ...(hasConnections
-          ? {
-              borderRightWidth: borderWidth,
-              borderRightStyle: 'solid',
-            }
-          : {}),
+        ...(linkedRightBorder ? { borderRight: linkedRightBorder } : {}),
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}

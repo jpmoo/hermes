@@ -164,7 +164,7 @@ export async function getHoverInsight(noteId, userId, opts = {}) {
 
   /** Direct replies only (one level); not grandchildren or deeper. */
   const kidsR = await pool.query(
-    `SELECT content FROM notes WHERE parent_id = $1 AND user_id = $2 ORDER BY created_at ASC LIMIT 40`,
+    `SELECT id, content FROM notes WHERE parent_id = $1 AND user_id = $2 ORDER BY created_at ASC LIMIT 40`,
     [noteId, userId]
   );
   const childrenBlock = kidsR.rows
@@ -173,7 +173,7 @@ export async function getHoverInsight(noteId, userId, opts = {}) {
     .join('\n---\n');
 
   const siblingsR = await pool.query(
-    `SELECT content FROM notes
+    `SELECT id, content FROM notes
      WHERE user_id = $1 AND id <> $2
        AND (
          (parent_id = $3 AND $3 IS NOT NULL)
@@ -206,6 +206,28 @@ export async function getHoverInsight(noteId, userId, opts = {}) {
   const onNoteNames = new Set(onNoteR.rows.map((t) => t.name.toLowerCase()));
   const onNoteIds = new Set(onNoteR.rows.map((t) => t.id));
 
+  /** Approved tags only on parent, siblings, or immediate children — “neighbor” UI must not use linked-peer tags. */
+  const neighborNoteIds = [
+    ...new Set(
+      [parentId, ...siblingsR.rows.map((r) => r.id), ...kidsR.rows.map((r) => r.id)].filter(Boolean)
+    ),
+  ];
+  const neighborTagIds = new Set();
+  const neighborTagNames = new Set();
+  if (neighborNoteIds.length > 0) {
+    const ntr = await pool.query(
+      `SELECT DISTINCT t.id, t.name
+       FROM note_tags nt
+       JOIN tags t ON t.id = nt.tag_id
+       WHERE nt.note_id = ANY($1::uuid[]) AND nt.status = 'approved'`,
+      [neighborNoteIds]
+    );
+    for (const row of ntr.rows) {
+      neighborTagIds.add(row.id);
+      neighborTagNames.add(row.name.toLowerCase());
+    }
+  }
+
   const tagList =
     activeTagRows.rows.map((t) => t.name).join(', ') || '(no tags in use yet — you may suggest up to 6 new hyphenated tags)';
 
@@ -223,7 +245,7 @@ export async function getHoverInsight(noteId, userId, opts = {}) {
   if (body.trim()) {
     const prompt = `You tag notes in Hermes. The HOVERED NOTE is the focus; parent, sibling, and child sections give thread context. Child notes are ONLY immediate replies (one level under the hovered note), not grandchildren or deeper thread. Suggest tags for the hovered note (and context). Use ACTIVE TAGS when they fit; otherwise at most 6 NEW tags (lowercase, hyphenated).
 
-Return ONLY a JSON array: [{"tag":"name","from_vocab":true|false}, ...] with 1–12 items. from_vocab is true only if the tag appears in ACTIVE TAGS.
+Return ONLY a JSON array: [{"tag":"name","from_vocab":true|false}, ...] with 1–12 items. from_vocab is true only if the tag appears in ACTIVE TAGS **and** it reasonably applies because of the parent, sibling, or child sections (not merely because that tag exists on some other unrelated note in your library).
 
 ACTIVE TAGS: ${tagList}
 
@@ -259,12 +281,21 @@ JSON array only, no markdown:`;
   const ollamaTags = [];
   for (const t of ollamaParsed) {
     if (seenNames.has(t.name)) continue;
-    seenNames.add(t.name);
     const known = activeByName.get(t.name);
+    const tid = known?.id ?? null;
+    if (t.from_vocab) {
+      const inNeighborContext =
+        neighborTagNames.has(t.name) || (tid != null && neighborTagIds.has(tid));
+      if (!inNeighborContext) {
+        /* Tag exists in library (e.g. only on linked notes) — skip here; “connected” / similar lists handle it. */
+        continue;
+      }
+    }
+    seenNames.add(t.name);
     ollamaTags.push({
       key: `o-${t.name}`,
       name: t.name,
-      tagId: known?.id ?? null,
+      tagId: tid,
       source: 'ollama',
       fromVocab: !!t.from_vocab,
     });
@@ -357,10 +388,11 @@ JSON array only, no markdown:`;
   } catch (err) {
     console.error('connected-note tags query:', err.message || err);
   }
+  /* Linked peers only; tags not already on the hovered (selected) note. */
   const connectedTags = [];
   for (const row of connectedTagRows.rows) {
     const ln = row.name.toLowerCase();
-    if (onNoteIds.has(row.id) || seenNames.has(ln)) continue;
+    if (onNoteIds.has(row.id) || onNoteNames.has(ln) || seenNames.has(ln)) continue;
     seenNames.add(ln);
     connectedTags.push({
       key: `c-${row.id}`,

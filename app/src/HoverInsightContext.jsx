@@ -102,7 +102,7 @@ const HoverInsightContext = createContext(null);
 
 function tagSuggestionTitle(t, highlightConnection) {
   if (highlightConnection) return 'Also on the connection note you highlighted';
-  if (t.source === 'connected') return 'From a note you linked to this one';
+  if (t.source === 'connected') return 'On a linked note; not on the selected note yet';
   if (t.source === 'similar') return 'From similar notes in your library';
   if (t.fromVocab === true) return 'From thread context (parent, siblings, replies) using your tags';
   return 'New tag from model (may create tag when added)';
@@ -603,9 +603,9 @@ function HoverInsightPanels() {
               maxHeight: `${Math.max(120, Math.min(roomBelow, window.innerHeight * 0.5))}px`,
             },
             stackTopPx,
-            /* Vertical spine centered on the connected-note column; runs behind cards (z-index). */
+            /* Vertical spine centered on the stack; starts at stack top so it hangs below the anchor note only. */
             spineX: left + stackW / 2,
-            spineYStart: rect.bottom + 4,
+            spineYStart: stackTopPx,
           };
         })()
       : null;

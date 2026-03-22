@@ -21,25 +21,7 @@
   border-left-color: var(--border);
 }
 
-/* Right edge: match left threadline weight + hue (left uses opaque depth colors; avoid faded rgba so it doesn’t look thinner) */
-.note-card--linked {
-  border-right-style: solid;
-  border-right-color: var(--accent-dim);
-}
-
-.note-card--leaf.note-card--linked {
-  border-right-color: var(--border);
-}
-
-.note-card--depth-1.note-card--linked {
-  border-right-color: #5a4a2a;
-}
-.note-card--depth-2.note-card--linked {
-  border-right-color: #4a3a1a;
-}
-.note-card--depth-3.note-card--linked {
-  border-right-color: #3a2a12;
-}
+/* Linked notes: `note-card--linked` — right border is inline in NoteCard.jsx (matches left threadline). */
 
 /* Stream insight: no focus ring on the selected card */
 .note-card.note-card--insight-selected:focus,
