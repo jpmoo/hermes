@@ -125,7 +125,8 @@ export async function getLinkedNotesWithTags(anchorNoteId, userId) {
  * Tag suggestions + persisted links + vector similar notes for Stream hover.
  * Tags: (1) neighbor — approved tags on parent/siblings/immediate children not on hovered note;
  * (2) Ollama — up to 6 new hyphenated tags; (3) connected — approved tags on linked peers not on hovered note.
- * Similar notes: cosine nearest neighbors (embeddings), excluding self and explicit connection peers.
+ * Similar notes: cosine nearest neighbors (embeddings), excluding self, connection peers, parent,
+ * siblings (same parent), and immediate children (already surfaced as thread neighbors).
  */
 export async function getHoverInsight(noteId, userId, _opts = {}) {
   const noteR = await pool.query(
@@ -326,11 +327,32 @@ JSON array only, no markdown:`;
 
   const { persistedLinks } = await loadPersistedLinksMetadata(id, userId);
 
-  /** Vector similar notes (exclude self and explicit connection peers). */
+  /** Vector similar notes: exclude linked peers + full thread neighborhood (not capped like Ollama context). */
   let similarNotes = [];
   try {
-    const peerIds = persistedLinks.map((p) => p.id);
-    const similarSql = (excludePeers) => `WITH RECURSIVE roots AS (
+    const linkedPeerIds = persistedLinks.map((p) => p.id);
+    let threadNeighborIds = [];
+    try {
+      const tn = await pool.query(
+        `WITH h AS (SELECT parent_id FROM notes WHERE id = $1::uuid AND user_id = $2)
+         SELECT n.id FROM notes n, h
+         WHERE n.user_id = $2
+           AND n.id <> $1::uuid
+           AND (
+             n.id = h.parent_id
+             OR n.parent_id = $1::uuid
+             OR (h.parent_id IS NOT NULL AND n.parent_id = h.parent_id)
+             OR (h.parent_id IS NULL AND n.parent_id IS NULL)
+           )`,
+        [id, userId]
+      );
+      threadNeighborIds = tn.rows.map((r) => r.id);
+    } catch (tnErr) {
+      console.error('hover similar thread-neighbor ids:', tnErr.message || tnErr);
+    }
+    const similarExcludeIds = [...new Set([...linkedPeerIds, ...threadNeighborIds])];
+
+    const similarSql = (hasExclude) => `WITH RECURSIVE roots AS (
          SELECT n.id, n.id AS root_id
          FROM notes n
          WHERE n.parent_id IS NULL AND n.user_id = $2
@@ -349,11 +371,11 @@ JSON array only, no markdown:`;
          AND n.user_id = $2
          AND n.embedding IS NOT NULL
          AND n.id <> $1::uuid
-         ${excludePeers ? 'AND NOT (n.id = ANY($3::uuid[]))' : ''}
+         ${hasExclude ? 'AND NOT (n.id = ANY($3::uuid[]))' : ''}
        ORDER BY n.embedding <=> an.embedding
        LIMIT 12`;
-    const simR = peerIds.length
-      ? await pool.query(similarSql(true), [id, userId, peerIds])
+    const simR = similarExcludeIds.length
+      ? await pool.query(similarSql(true), [id, userId, similarExcludeIds])
       : await pool.query(similarSql(false), [id, userId]);
     similarNotes = simR.rows.map((row) => ({
       id: row.id,

@@ -300,22 +300,17 @@ export default function NoteCard({
         }`
       : undefined;
 
-  /** Right threadline color (custom props drive ::after — survives float box-shadow / border quirks). */
-  const linkBarColor = !showThreadline
-    ? 'var(--border)'
-    : depth <= 0
-      ? 'var(--accent-dim, #6d5610)'
-      : depth === 1
-        ? '#5a4a2a'
-        : depth === 2
-          ? '#4a3a1a'
-          : '#3a2a12';
-
   return (
     <article
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
+        ...(hasConnections
+          ? {
+              borderRightWidth: borderWidth,
+              borderRightStyle: 'solid',
+            }
+          : {}),
       }}
       onClick={editing ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
@@ -346,11 +341,7 @@ export default function NoteCard({
             }
       }
     >
-      <div
-        className={`note-card-body${hasConnections ? ' note-card-body--linked' : ''}`}
-        style={hasConnections ? { '--hermes-link-rw': `${borderWidth}px` } : undefined}
-      >
-        <div className="note-card-main">
+      <div className="note-card-body">
         {editing ? (
           <form className="note-card-edit" onSubmit={handleSaveEdit} onClick={(e) => e.stopPropagation()}>
             <textarea
@@ -471,10 +462,6 @@ export default function NoteCard({
             </button>
           </div>
         </div>
-        </div>
-        {hasConnections ? (
-          <div className="note-card-link-rail" style={{ backgroundColor: linkBarColor }} aria-hidden />
-        ) : null}
       </div>
     </article>
   );

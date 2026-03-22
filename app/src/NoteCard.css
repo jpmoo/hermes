@@ -21,32 +21,28 @@
   border-left-color: var(--border);
 }
 
-/* Linked notes: dedicated grid column (always visible; ::after was painted under body content). */
-.note-card.note-card--linked {
-  position: relative;
-  box-sizing: border-box;
+/*
+ * Connected notes: right edge matches the left “threadline” pattern — same border width (inline on
+ * <article> as borderRightWidth) and the same colors as border-left-color for leaf / depth.
+ */
+.note-card.note-card--linked.note-card--leaf {
+  border-right-color: var(--border);
 }
 
-.note-card-body.note-card-body--linked {
-  display: grid;
-  align-items: stretch;
-  grid-template-columns: minmax(0, 1fr) var(--hermes-link-rw, 3px);
-  column-gap: 0;
+.note-card.note-card--linked.note-card--depth-0 {
+  border-right-color: var(--accent-dim, #6d5610);
 }
 
-.note-card-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 0;
+.note-card.note-card--linked.note-card--depth-1 {
+  border-right-color: #5a4a2a;
 }
 
-.note-card-link-rail {
-  align-self: stretch;
-  min-height: 2rem;
-  border-radius: 0 9px 9px 0;
-  pointer-events: none;
-  flex-shrink: 0;
+.note-card.note-card--linked.note-card--depth-2 {
+  border-right-color: #4a3a1a;
+}
+
+.note-card.note-card--linked.note-card--depth-3 {
+  border-right-color: #3a2a12;
 }
 
 /* Stream insight: no focus ring on the selected card */
@@ -59,11 +55,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-/* .note-card-main wraps inner content when linked; when not linked, body acts as main (see JSX). */
-.note-card-body:not(.note-card-body--linked) > .note-card-main {
-  display: contents;
 }
 
 .note-card-content {
