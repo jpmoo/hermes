@@ -91,6 +91,29 @@ function partitionTagSuggestions(list) {
   return { neighbor, connected, novel };
 }
 
+/** Group RAG hits by collection; docs sorted by similarity desc; groups ordered by best hit first. */
+function groupRagdollDocumentsByCollection(documents) {
+  if (!Array.isArray(documents) || documents.length === 0) return [];
+  const by = new Map();
+  for (const d of documents) {
+    const raw = d?.group;
+    const g =
+      raw != null && String(raw).trim() !== '' ? String(raw).trim() : '_other';
+    if (!by.has(g)) by.set(g, []);
+    by.get(g).push(d);
+  }
+  for (const docs of by.values()) {
+    docs.sort((a, b) => Number(b?.similarity ?? 0) - Number(a?.similarity ?? 0));
+  }
+  const rows = [...by.entries()].map(([group, docs]) => {
+    const maxSim = docs.reduce((m, x) => Math.max(m, Number(x?.similarity ?? 0)), 0);
+    const label = group === '_other' ? 'Other' : group;
+    return { group, label, docs, maxSim };
+  });
+  rows.sort((a, b) => b.maxSim - a.maxSim);
+  return rows;
+}
+
 const HoverInsightContext = createContext(null);
 
 function tagSuggestionTitle(t) {
@@ -104,12 +127,15 @@ function tagSuggestionTitle(t) {
 function HoverInsightTagSection({ title, tags, note, addTag, addingKey }) {
   if (tags.length === 0) return null;
   return (
-    <div className="hover-insight-tag-section">
-      <p className="hover-insight-tag-section-title">{title}</p>
-      <ul className="hover-insight-tag-list">
+    <div className="hover-insight-stack-section">
+      <p className="hover-insight-stack-section-title">{title}</p>
+      <ul className="hover-insight-stack-list">
         {tags.map((t) => {
           return (
-            <li key={t.key} className="hover-insight-tag-row hover-insight-tag-row--no-dismiss">
+            <li
+              key={t.key}
+              className="hover-insight-tag-row hover-insight-tag-row--no-dismiss hover-insight-stack-item-row"
+            >
               <button
                 type="button"
                 className="hover-insight-icon-btn hover-insight-icon-btn--add"
@@ -769,29 +795,33 @@ function HoverInsightPanels() {
                     {!ragdollLoading && !ragdollError && ragdollDocs.length === 0 && (
                       <p className="hover-insight-muted">No matching documents.</p>
                     )}
-                    {!ragdollLoading && ragdollDocs.length > 0 && (
-                      <ul className="hover-insight-ragdoll-list">
-                        {ragdollDocs.map((d) => (
-                          <li key={`${d.group}|${d.source_url}`}>
-                            <button
-                              type="button"
-                              className="hover-insight-ragdoll-link"
-                              title={d.source_summary || d.source_name}
-                              onClick={() => openRagdollDoc(d.source_url, d.source_name)}
-                            >
-                              <span className="hover-insight-ragdoll-name">{d.source_name}</span>
-                              {d.similarity != null && (
-                                <span className="hover-insight-ragdoll-sim">
-                                  {Math.round(Number(d.similarity) * 100)}%
-                                </span>
-                              )}
-                            </button>
-                            {d.group ? (
-                              <span className="hover-insight-ragdoll-collection">{d.group}</span>
-                            ) : null}
-                          </li>
+                    {!ragdollLoading && ragdollByCollection.length > 0 && (
+                      <div className="hover-insight-ragdoll-grouped">
+                        {ragdollByCollection.map(({ group, label, docs }) => (
+                          <div key={group} className="hover-insight-stack-section">
+                            <p className="hover-insight-stack-section-title">{label}</p>
+                            <ul className="hover-insight-stack-list hover-insight-ragdoll-list">
+                              {docs.map((d, i) => (
+                                <li key={`${group}|${d.source_url || d.source_name || 'doc'}|${i}`}>
+                                  <button
+                                    type="button"
+                                    className="hover-insight-ragdoll-link"
+                                    title={d.source_summary || d.source_name}
+                                    onClick={() => openRagdollDoc(d.source_url, d.source_name)}
+                                  >
+                                    <span className="hover-insight-ragdoll-name">{d.source_name}</span>
+                                    {d.similarity != null && (
+                                      <span className="hover-insight-ragdoll-sim">
+                                        {Math.round(Number(d.similarity) * 100)}%
+                                      </span>
+                                    )}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     )}
                   </div>
                 </div>

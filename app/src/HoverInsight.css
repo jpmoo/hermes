@@ -8,6 +8,9 @@
   display: flex;
   align-items: flex-start;
   padding-top: 5.5rem;
+  /* Same total height as Similar notes (below header, small bottom inset) */
+  --hi-insight-panel-height: calc(100vh - 5.5rem - 0.75rem);
+  --hi-insight-panel-height: calc(100dvh - 5.5rem - 0.75rem);
 }
 
 .hover-insight-margin--left {
@@ -65,20 +68,38 @@
   transform-origin: left center;
 }
 
+/* Tag + RAG: split the shared column height evenly; scroll inside each panel */
+.hover-insight-margin--left-with-ragdoll .hover-insight-left-stack > .hover-insight-panel--left {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.hover-insight-margin--left-with-ragdoll .hover-insight-left-stack > .hover-insight-panel--left > .hover-insight-title,
+.hover-insight-margin--left-with-ragdoll .hover-insight-left-stack > .hover-insight-panel--left > .hover-insight-muted {
+  flex-shrink: 0;
+}
+
+.hover-insight-margin--left-with-ragdoll .hover-insight-left-stack > .hover-insight-panel--left .hover-insight-tag-groups {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .hover-insight-panel--right {
   transform-origin: right center;
   animation-name: hover-insight-slide-in-right;
 }
 
-/* Similar notes: use full viewport below header; scroll long lists inside body */
+/* Similar notes: same total height as tag+RAG column */
 .hover-insight-panel.hover-insight-panel--right {
-  /* Match .hover-insight-margin padding-top + small bottom inset */
-  --hi-similar-panel-inset-top: 5.5rem;
-  --hi-similar-panel-inset-bottom: 0.75rem;
-  height: calc(100vh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
-  max-height: calc(100vh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
-  height: calc(100dvh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
-  max-height: calc(100dvh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
+  height: var(--hi-insight-panel-height);
+  max-height: var(--hi-insight-panel-height);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -144,28 +165,61 @@
   color: var(--text-muted);
 }
 
-/* Flex + gap avoids margin collapse; padding-top matches gap so space above first section too. */
-.hover-insight-tag-groups {
-  --hi-tag-gap: calc(0.75rem - 2px);
-  display: flex;
-  flex-direction: column;
-  gap: var(--hi-tag-gap);
-  margin-top: 0.2rem;
-  padding-top: var(--hi-tag-gap);
+/* Shared: RAG collections + tag suggestion sections */
+.hover-insight-stack-section {
+  margin-bottom: 0.55rem;
 }
 
-.hover-insight-tag-section {
-  margin-top: 0;
+.hover-insight-stack-section:last-child {
+  margin-bottom: 0;
 }
 
-.hover-insight-tag-section-title {
-  margin: 0 0 0.3rem;
-  font-size: 0.65rem;
+.hover-insight-stack-section-title {
+  margin: 0 0 0.28rem;
+  font-size: 0.6rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
-  opacity: 0.92;
+  color: var(--accent, #c9a227);
+  opacity: 0.95;
+}
+
+.hover-insight-stack-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Tag + RAG rows: same padded “card” strip */
+.hover-insight-stack-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.25rem;
+  margin-bottom: 0.4rem;
+  border-radius: 6px;
+  background: var(--bg-muted, rgba(0, 0, 0, 0.04));
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hover-insight-stack-item-row:last-child {
+  margin-bottom: 0;
+}
+
+.hover-insight-stack-item-row:hover {
+  filter: brightness(1.02);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* Tag suggestion groups (uses stack sections) */
+.hover-insight-tag-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0.2rem;
+  padding-top: 0.15rem;
 }
 
 .hover-insight-muted {
@@ -174,23 +228,8 @@
   color: var(--text-muted);
 }
 
-.hover-insight-tag-list {
-  list-style: none;
-  margin: 0.35rem 0 0;
-  padding: 0;
-}
-
 .hover-insight-tag-row {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-bottom: 0.35rem;
   font-size: 0.8125rem;
-  border-radius: 6px;
-  padding: 0.12rem 0.2rem;
-  margin-left: -0.2rem;
-  margin-right: -0.2rem;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 /* Tag rows: no dismiss column — align with left edge */
@@ -229,6 +268,10 @@
 .hover-insight-icon-btn--add:hover {
   color: var(--accent);
   background: rgba(201, 162, 39, 0.12);
+}
+
+.hover-insight-stack-item-row .hover-insight-icon-btn {
+  background: var(--bg-card, var(--bg));
 }
 
 .hover-insight-persisted-list {
@@ -615,14 +658,21 @@
   filter: brightness(0.97);
 }
 
-/* RAGDoll: stacked under tag suggestions; grows to same column bottom */
-.hover-insight-panel--ragdoll {
-  flex: 1 1 auto;
+/* RAGDoll: second half of shared column height with tag panel */
+.hover-insight-margin--left-with-ragdoll .hover-insight-left-stack > .hover-insight-panel--ragdoll {
+  flex: 1 1 0;
   min-height: 0;
+  max-height: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   margin-left: 0;
+}
+
+.hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-title,
+.hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-ragdoll-hint,
+.hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-ragdoll-checkboxes {
+  flex-shrink: 0;
 }
 
 .hover-insight-ragdoll-checkboxes {
@@ -664,6 +714,12 @@
   opacity: 0.95;
 }
 
+.hover-insight-ragdoll-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 .hover-insight-ragdoll-list {
   list-style: none;
   margin: 0;
@@ -671,7 +727,11 @@
 }
 
 .hover-insight-ragdoll-list li {
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.4rem;
+}
+
+.hover-insight-ragdoll-list li:last-child {
+  margin-bottom: 0;
 }
 
 .hover-insight-ragdoll-link {
@@ -689,11 +749,13 @@
   font-size: 0.72rem;
   line-height: 1.3;
   cursor: pointer;
+  box-sizing: border-box;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
 }
 
 .hover-insight-ragdoll-link:hover {
   filter: brightness(1.03);
-  outline: 1px solid var(--border);
+  box-shadow: 0 0 0 1px var(--border);
 }
 
 .hover-insight-ragdoll-name {
@@ -709,13 +771,3 @@
   font-variant-numeric: tabular-nums;
 }
 
-.hover-insight-ragdoll-collection {
-  display: block;
-  margin-top: 0.15rem;
-  margin-left: 0.25rem;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--accent, #c9a227);
-  opacity: 0.9;
-}
