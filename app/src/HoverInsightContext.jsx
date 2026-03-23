@@ -16,10 +16,9 @@ import {
   addNoteTag,
   createNoteConnection,
   deleteNoteConnection,
-  getNote,
-  getNoteThreadPath,
   getNoteThreadRoot,
 } from './api';
+import ConnectionNoteModal from './ConnectionNoteModal';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -564,6 +563,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setRagdollIncludeChildren,
       ragdollIncludeConnected,
       setRagdollIncludeConnected,
+      onNoteUpdated,
     }),
     [
       selectInsightNote,
@@ -587,6 +587,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       ragdollIncludeSiblings,
       ragdollIncludeChildren,
       ragdollIncludeConnected,
+      onNoteUpdated,
     ]
   );
 
@@ -627,6 +628,7 @@ function HoverInsightPanels() {
     setRagdollIncludeChildren,
     ragdollIncludeConnected,
     setRagdollIncludeConnected,
+    onNoteUpdated,
   } = ctx;
 
   const openRagdollDoc = useCallback(async (sourcePath, label) => {
@@ -645,58 +647,6 @@ function HoverInsightPanels() {
       window.alert(e?.message || `Could not open ${label || 'document'}`);
     }
   }, []);
-
-  /** Peer shown in the modal: merge stack row with latest insight row (ids, threadPath updates). */
-  const connectionModalLinked = useMemo(() => {
-    if (!connectionModal?.linked) return null;
-    const l = connectionModal.linked;
-    const fresh = insight?.persistedLinks?.find((x) => x.id === l.id);
-    return fresh ? { ...l, ...fresh, threadPath: fresh.threadPath ?? l.threadPath, content: fresh.content ?? l.content } : l;
-  }, [connectionModal, insight?.persistedLinks]);
-
-  /** Ancestor breadcrumb only (exclude linked note text) + authoritative body from API — stack payload can be stale/minimal. */
-  const [connectionModalFetched, setConnectionModalFetched] = useState({
-    threadPath: '',
-    content: '',
-    loading: false,
-  });
-
-  useEffect(() => {
-    const linked = connectionModal?.linked;
-    if (!linked?.id) {
-      setConnectionModalFetched({ threadPath: '', content: '', loading: false });
-      return undefined;
-    }
-    let cancelled = false;
-    setConnectionModalFetched({
-      threadPath: linked.threadPath || '',
-      content: linked.content != null ? String(linked.content) : '',
-      loading: true,
-    });
-    Promise.all([
-      getNoteThreadPath(linked.id, { excludeLeaf: true }),
-      getNote(linked.id).then((n) => (n?.content != null ? String(n.content) : '')),
-    ])
-      .then(([path, content]) => {
-        if (cancelled) return;
-        setConnectionModalFetched({
-          threadPath: path || '',
-          content: content,
-          loading: false,
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setConnectionModalFetched({
-          threadPath: linked.threadPath || '',
-          content: linked.content != null ? String(linked.content) : '',
-          loading: false,
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [connectionModal?.linked?.id]);
 
   const [layoutRev, setLayoutRev] = useState(0);
   const [similarMinPct, setSimilarMinPct] = useState(readStoredSimilarMinPct);
@@ -1045,81 +995,15 @@ function HoverInsightPanels() {
         </>
       )}
 
-      {connectionModal && (
-        <div
-          className="hover-insight-modal-backdrop"
-          data-insight-ui
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setConnectionModal(null);
-          }}
-        >
-          <div
-            className="hover-insight-modal"
-            data-insight-ui
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="hover-insight-modal-title"
-          >
-            <h2 id="hover-insight-modal-title" className="hover-insight-modal-title">
-              Connected note
-            </h2>
-            <div className="hover-insight-modal-body">
-              <p className="hover-insight-modal-section-label">Thread path</p>
-              {connectionModalFetched.loading && !connectionModalFetched.threadPath ? (
-                <p className="hover-insight-muted">Loading path…</p>
-              ) : connectionModalFetched.threadPath ? (
-                <p
-                  className="hover-insight-thread-path hover-insight-thread-path--modal"
-                  title={connectionModalFetched.threadPath}
-                >
-                  {connectionModalFetched.threadPath}
-                </p>
-              ) : (
-                <p className="hover-insight-muted">No path</p>
-              )}
-              <p className="hover-insight-modal-section-label">Note</p>
-              {connectionModalFetched.loading && !connectionModalFetched.content ? (
-                <p className="hover-insight-muted">Loading note…</p>
-              ) : (
-                <div className="hover-insight-modal-note-text">
-                  {connectionModalFetched.content?.trim()
-                    ? connectionModalFetched.content
-                    : connectionModalLinked?.content?.trim()
-                      ? connectionModalLinked.content
-                      : '—'}
-                </div>
-              )}
-            </div>
-            <div className="hover-insight-modal-actions">
-              <button
-                type="button"
-                className="hover-insight-modal-btn hover-insight-modal-btn--danger"
-                onClick={() => {
-                  if (!window.confirm(CONFIRM_UNLINK)) return;
-                  const anchorId = connectionModal.anchorNoteId;
-                  const linkedId = connectionModal.linked?.id;
-                  if (anchorId && linkedId) unlinkPersisted(anchorId, linkedId);
-                  else setConnectionModal(null);
-                }}
-              >
-                Disconnect
-              </button>
-              <div className="hover-insight-modal-actions-right">
-                <button type="button" className="hover-insight-modal-btn hover-insight-modal-btn--secondary" onClick={() => setConnectionModal(null)}>
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className="hover-insight-modal-btn hover-insight-modal-btn--primary"
-                  onClick={() => navigateToConnection(connectionModal.linked)}
-                >
-                  Go to note
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {connectionModal?.linked && connectionModal.anchorNoteId && (
+        <ConnectionNoteModal
+          linked={connectionModal.linked}
+          anchorNoteId={connectionModal.anchorNoteId}
+          onClose={() => setConnectionModal(null)}
+          unlinkPersisted={unlinkPersisted}
+          navigateToConnection={navigateToConnection}
+          onNoteUpdated={onNoteUpdated}
+        />
       )}
     </>
   );

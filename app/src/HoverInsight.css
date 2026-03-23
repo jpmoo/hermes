@@ -559,8 +559,8 @@
 }
 
 .hover-insight-modal {
-  width: min(560px, 100%);
-  max-height: min(80vh, 640px);
+  width: min(640px, 100%);
+  max-height: min(85vh, 720px);
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
@@ -605,6 +605,21 @@
   color: var(--text);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Full NoteCard inside connected-note modal (same edit / tag / star / delete as stream) */
+.hover-insight-modal-note-embed {
+  margin-top: 0.25rem;
+}
+
+.hover-insight-modal-note-embed .note-card {
+  max-width: 100%;
+  box-sizing: border-box;
+  cursor: default;
+}
+
+.hover-insight-modal-note-embed .note-card:hover {
+  background: var(--bg-card);
 }
 
 .hover-insight-modal-actions {
