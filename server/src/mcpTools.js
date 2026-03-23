@@ -107,7 +107,7 @@ export const TOOL_DEFS = [
   {
     name: 'hermes_get_root_feed',
     description:
-      'List all top-level notes (root threads / main feed), newest first. Use for: what notes do I have, show my threads, root-level list.',
+      'List all top-level notes (root threads / main feed), oldest first by last edit (events by start time). Use for: what notes do I have, show my threads, root-level list.',
   },
   {
     name: 'hermes_add_attachments',

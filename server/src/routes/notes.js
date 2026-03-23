@@ -10,8 +10,12 @@ import {
 } from '../services/hoverInsight.js';
 import { attachBlobListToNotes, MAX_BYTES } from '../services/noteFileBlobs.js';
 import { canAttachTagIdByReference } from '../services/tagAccess.js';
+import { compareNotesSortDesc } from '../utils/noteSortAt.js';
 
 const router = Router();
+
+/** SQL: timestamp used for list ordering (events → start, else last edit). */
+const SQL_NOTE_SORT_AT = `(CASE WHEN n.note_type = 'event' AND n.event_start_at IS NOT NULL THEN n.event_start_at ELSE COALESCE(n.updated_at, n.created_at) END)`;
 router.use(requireAuth);
 
 /** Columns returned for list/detail note JSON (PostgreSQL → camel stays snake_case). */
@@ -75,7 +79,7 @@ router.post('/:id/attachments', (req, res, next) => {
   }
 });
 
-// Root feed: root notes, reverse chron by last_activity_at, optional starred filter
+// Root feed: root threads only; optional starred filter. Order ASC by edit time (events use start time), matching in-thread message order (oldest first, newest at bottom).
 router.get('/roots', async (req, res) => {
   try {
     const starredOnly = req.query.starred === 'true';
@@ -97,7 +101,7 @@ router.get('/roots', async (req, res) => {
                 WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
         FROM notes n
         WHERE n.parent_id IS NULL AND n.user_id = $1 AND n.id IN (SELECT root_id FROM starred_roots)
-        ORDER BY n.last_activity_at DESC
+        ORDER BY ${SQL_NOTE_SORT_AT} ASC NULLS LAST
       `
       : `
         SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
@@ -106,7 +110,7 @@ router.get('/roots', async (req, res) => {
                 WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
         FROM notes n
         WHERE n.parent_id IS NULL AND n.user_id = $1
-        ORDER BY n.last_activity_at DESC
+        ORDER BY ${SQL_NOTE_SORT_AT} ASC NULLS LAST
       `;
     const r = await pool.query(q, [userId]);
     const notes = r.rows;
@@ -196,7 +200,7 @@ const NOTE_LIST_FROM_MATCHES = `
     SELECT id AS root_id FROM anc WHERE parent_id IS NULL LIMIT 1
   ) r ON true
   WHERE n.user_id = $1
-  ORDER BY m.last_activity_at DESC NULLS LAST`;
+  ORDER BY m.sort_at DESC NULLS LAST`;
 
 // Substring search in note body (no Ollama; use when semantic search unavailable)
 router.get('/search-content', async (req, res) => {
@@ -211,10 +215,10 @@ router.get('/search-content', async (req, res) => {
     const pattern = `%${escaped}%`;
     const r = await pool.query(
       `WITH matches AS (
-        SELECT n.id, n.last_activity_at
+        SELECT n.id, ${SQL_NOTE_SORT_AT} AS sort_at
         FROM notes n
         WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
-        ORDER BY n.last_activity_at DESC NULLS LAST
+        ORDER BY sort_at DESC NULLS LAST
         LIMIT $3
       )
       ${NOTE_LIST_FROM_MATCHES}`,
@@ -251,10 +255,10 @@ router.get('/mention-recent', async (req, res) => {
     const userId = req.userId;
     const r = await pool.query(
       `WITH matches AS (
-        SELECT n.id, n.last_activity_at
+        SELECT n.id, ${SQL_NOTE_SORT_AT} AS sort_at
         FROM notes n
         WHERE n.user_id = $1
-        ORDER BY n.last_activity_at DESC NULLS LAST
+        ORDER BY sort_at DESC NULLS LAST
         LIMIT $2
       )
       ${NOTE_LIST_FROM_MATCHES}`,
@@ -313,7 +317,7 @@ router.get('/search-by-tags', async (req, res) => {
       ${starredOnly ? 'AND n.starred = true' : ''}
       GROUP BY n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, r.root_id
       ${havingClause}
-      ORDER BY n.last_activity_at DESC
+      ORDER BY ${SQL_NOTE_SORT_AT} DESC NULLS LAST
     `;
     const r = await pool.query(q, [userId, ...tagIds]);
     const notes = r.rows;
@@ -361,7 +365,7 @@ router.get('/search-semantic', async (req, res) => {
       FROM notes n
       JOIN roots r ON r.id = n.id
       WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
-      ORDER BY n.last_activity_at DESC
+      ORDER BY ${SQL_NOTE_SORT_AT} DESC NULLS LAST
       LIMIT $3`;
     const textR = await pool.query(textSql, [userId, pattern, textFetchLimit]);
 
@@ -450,6 +454,7 @@ router.get('/search-semantic', async (req, res) => {
       });
     }
     await attachBlobListToNotes(notes, userId);
+    notes.sort(compareNotesSortDesc);
     res.json(notes);
   } catch (err) {
     console.error('search-semantic:', err);

@@ -19,6 +19,11 @@
   opacity: 0.92;
 }
 
+/* One color for all types on the bubble (overrides per-type --note-type-icon-* from index.css) */
+.note-card .note-card-type-icon.note-type-icon {
+  color: var(--text-muted);
+}
+
 .note-card--has-type-icon .note-card-body {
   padding-right: 2.1rem;
 }

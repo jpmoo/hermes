@@ -15,6 +15,7 @@ import Layout from './Layout';
 import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from './outlineExpansionStorage';
 import NoteTypeIcon from './NoteTypeIcon';
 import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
+import { sortNoteTreeByThreadOrder } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './OutlineView.css';
 
@@ -223,7 +224,8 @@ export default function OutlineView() {
     }
     const p = getThread(id, false)
       .then((flat) => {
-        const built = buildTree(flat)[0];
+        const rootsSorted = sortNoteTreeByThreadOrder(buildTree(flat));
+        const built = rootsSorted[0];
         if (built) {
           setRootThreads((prev) => (prev[id] ? prev : { ...prev, [id]: built }));
         }
@@ -262,7 +264,7 @@ export default function OutlineView() {
   );
 
   const tree = useMemo(
-    () => filterTreeByVisibleNoteTypes(treeRaw, visibleNoteTypes),
+    () => sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeRaw, visibleNoteTypes)),
     [treeRaw, visibleNoteTypes]
   );
 

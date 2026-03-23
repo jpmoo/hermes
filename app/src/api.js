@@ -113,6 +113,18 @@ export async function getTags() {
   return r.json();
 }
 
+/** Create tag in global vocabulary (server normalizes name). Returns { id, name, created_at? }. */
+export async function createTag(name) {
+  const r = await fetch(`${API}/tags`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: String(name || '').trim() }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to create tag');
+  return data;
+}
+
 /** Connect two notes (server stores one row; link is bidirectional in the UI). */
 export async function createNoteConnection(anchorNoteId, linkedNoteId) {
   const r = await fetch(`${API}/notes/${anchorNoteId}/connections`, {

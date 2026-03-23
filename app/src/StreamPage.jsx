@@ -11,6 +11,7 @@ import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync'
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
+import { sortNoteTreeByThreadOrder } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './StreamPage.css';
 
@@ -348,7 +349,7 @@ export default function StreamPage() {
   const threadReady = Boolean(threadRootId && !loadingThread && thread.length > 0);
   const treeFull = useMemo(() => buildTree(thread), [thread]);
   const tree = useMemo(
-    () => filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes),
+    () => sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes)),
     [treeFull, visibleNoteTypes]
   );
   const filteredRoots = useMemo(
@@ -962,6 +963,9 @@ export default function StreamPage() {
                 disabled={submitting}
                 slashNoteTypeOptions={NOTE_TYPE_OPTIONS}
                 onSlashNoteTypeSelect={setComposeNoteType}
+                composeNoteType={composeNoteType}
+                composeNoteTypeOptions={NOTE_TYPE_OPTIONS}
+                onComposeNoteTypeChange={setComposeNoteType}
               />
               <NoteTypeEventFields
                 idPrefix="stream-reply"
@@ -1010,6 +1014,9 @@ export default function StreamPage() {
                 disabled={submitting}
                 slashNoteTypeOptions={NOTE_TYPE_OPTIONS}
                 onSlashNoteTypeSelect={setComposeNoteType}
+                composeNoteType={composeNoteType}
+                composeNoteTypeOptions={NOTE_TYPE_OPTIONS}
+                onComposeNoteTypeChange={setComposeNoteType}
               />
               <NoteTypeEventFields
                 idPrefix="stream-root"
