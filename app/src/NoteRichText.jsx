@@ -8,6 +8,27 @@ function trimTrailingPunct(url) {
   return u;
 }
 
+/** Short visible label for http(s) / mailto; full URL stays on `href` and `title`. */
+export function formatUrlDisplayLabel(href) {
+  const raw = String(href || '').trim();
+  if (!raw) return 'Link';
+  try {
+    const u = new URL(raw);
+    if (u.protocol === 'mailto:') {
+      const addr = decodeURIComponent(u.pathname).replace(/^\/+/, '');
+      return addr || 'Email';
+    }
+    const host = u.hostname.replace(/^www\./i, '');
+    const path = u.pathname === '/' ? '' : u.pathname;
+    const tail = path + u.search;
+    if (!tail) return host;
+    if (tail.length <= 22) return `${host}${tail}`;
+    return `${host}/…`;
+  } catch {
+    return raw.length > 32 ? `${raw.slice(0, 30)}…` : raw;
+  }
+}
+
 const BARE_URL_AT_START = /^([a-z][a-z0-9+.-]*:\/\/[^\s<]+|mailto:[^\s<]+)/i;
 
 function tryTagAt(s, pos, tagSet) {
@@ -95,19 +116,21 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
       }
       if (/^https?:\/\//i.test(md.url) || /^mailto:/i.test(md.url)) {
         const href = md.url;
+        const label = md.label?.trim();
         pushText(last, pos);
         if (!UNSAFE_HREF.test(href)) {
           parts.push(
             <a
               key={`a-${key++}`}
               href={href}
+              title={href}
               className="note-rich-link"
               {...(/^https?:\/\//i.test(href)
                 ? { target: '_blank', rel: 'noopener noreferrer' }
                 : {})}
               onClick={(e) => e.stopPropagation()}
             >
-              {md.label || href}
+              {label || formatUrlDisplayLabel(href)}
             </a>
           );
         } else {
@@ -148,11 +171,12 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
           <a
             key={`a-${key++}`}
             href={url}
+            title={url}
             className="note-rich-link"
             {...(/^https?:\/\//i.test(url) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             onClick={(e) => e.stopPropagation()}
           >
-            {raw}
+            {formatUrlDisplayLabel(url)}
           </a>
         );
       } else {

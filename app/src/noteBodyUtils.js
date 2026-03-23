@@ -49,24 +49,13 @@ export function stripHashtagPrefixFromContent(content, tagName) {
 }
 
 /**
- * @param {{ allowSlashNoteType?: boolean }} [opts]
- * @returns {{ type: '@' | '#' | '/', start: number, query: string } | null}
+ * @returns {{ type: '@' | '#', start: number, query: string } | null}
  */
-export function getActiveTrigger(text, caretPos, opts = {}) {
+export function getActiveTrigger(text, caretPos) {
   const s = text == null ? '' : String(text);
   const pos = Math.min(Math.max(0, caretPos), s.length);
   const before = s.slice(0, pos);
   const candidates = [];
-
-  if (opts.allowSlashNoteType) {
-    const slash = before.lastIndexOf('/');
-    if (slash >= 0 && /^\s*$/.test(s.slice(0, slash))) {
-      const afterSlash = before.slice(slash + 1);
-      if (!afterSlash.includes('\n') && /^[a-zA-Z]*$/.test(afterSlash)) {
-        candidates.push({ type: '/', start: slash, query: afterSlash });
-      }
-    }
-  }
 
   const at = before.lastIndexOf('@');
   if (at >= 0) {
@@ -84,7 +73,8 @@ export function getActiveTrigger(text, caretPos, opts = {}) {
     const prev = hash > 0 ? s[hash - 1] : ' ';
     if (hash === 0 || /[\s\n([{'"`]/.test(prev)) {
       const after = before.slice(hash + 1);
-      if (!after.includes('\n') && !after.includes(']') && /^[a-z0-9-]*$/.test(after)) {
+      /* Same token rules as @ so you can type multi-word text to match note titles */
+      if (!after.includes('\n') && !after.includes(']') && /^[a-zA-Z0-9\s\-_.]*$/.test(after)) {
         candidates.push({ type: '#', start: hash, query: after });
       }
     }

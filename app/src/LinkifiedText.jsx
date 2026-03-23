@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatUrlDisplayLabel } from './NoteRichText';
 
 /** http(s), custom scheme:// (e.g. obsidian://), mailto: */
 const LINK_RE = /([a-z][a-z0-9+.-]*:\/\/[^\s<]+|mailto:[^\s<]+)/gi;
@@ -44,12 +45,13 @@ export default function LinkifiedText({ text, className }) {
           <a
             key={p.key}
             href={p.v}
+            title={p.v}
             {...(/^https?:\/\//i.test(p.v)
               ? { target: '_blank', rel: 'noopener noreferrer' }
               : {})}
             onClick={(e) => e.stopPropagation()}
           >
-            {p.v}
+            {formatUrlDisplayLabel(p.v)}
           </a>
         )
       )}

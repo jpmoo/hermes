@@ -114,3 +114,8 @@
 .mentions-menu-item--create:hover {
   color: var(--accent, #c9a227);
 }
+
+.mentions-menu-item--note-ref {
+  font-style: italic;
+  color: var(--text-muted, #888);
+}

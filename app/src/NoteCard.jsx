@@ -461,7 +461,6 @@ export default function NoteCard({
               value={editContent}
               onChange={setEditContent}
               noteId={note.id}
-              excludeNoteIds={[note.id]}
               rows={3}
               className="note-card-edit-textarea"
               autoFocus

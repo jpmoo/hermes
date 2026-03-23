@@ -19,6 +19,7 @@ import {
   getNoteThreadRoot,
 } from './api';
 import ConnectionNoteModal from './ConnectionNoteModal';
+import NoteRichText from './NoteRichText';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -483,6 +484,19 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [clearAll, onGoToNote]
   );
 
+  const openNoteFromRichText = useCallback(
+    async (linkedId) => {
+      try {
+        const root = await getNoteThreadRoot(linkedId);
+        clearAll();
+        onGoToNote?.({ noteId: linkedId, threadRootId: root });
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [clearAll, onGoToNote]
+  );
+
   /** Connect a similar note: optimistic reorder (similar list + linked stack by similarity), then sync from API. */
   const connectSimilarNote = useCallback(
     async (similarNoteId) => {
@@ -896,17 +910,23 @@ function HoverInsightPanels() {
                     ) : (
                       <ul className="hover-insight-similar-list">
                         {filteredSimilarNotes.map((sn) => {
-                          const raw = sn.content != null ? String(sn.content).trim().replace(/\s+/g, ' ') : '';
+                          const raw = sn.content != null ? String(sn.content).trim() : '';
                           const path = sn.threadPath || sn.thread_path || '';
-                          const snippet =
-                            raw.length > 160 ? `${raw.slice(0, 160)}…` : raw || '—';
+                          const tagNames = Array.isArray(sn.tags) ? sn.tags.map((t) => t.name || t) : [];
                           return (
                             <li key={sn.id}>
-                              <button
-                                type="button"
+                              <div
+                                role="button"
+                                tabIndex={0}
                                 className="hover-insight-similar-btn"
                                 title="Add as connected note to the selected card"
                                 onClick={() => connectSimilarNote(sn.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    connectSimilarNote(sn.id);
+                                  }
+                                }}
                               >
                                 <span className="hover-insight-similar-btn-main">
                                   {path ? (
@@ -925,13 +945,22 @@ function HoverInsightPanels() {
                                     className="hover-insight-connection-card-snippet hover-insight-similar-note-snippet"
                                     title={raw || undefined}
                                   >
-                                    {snippet}
+                                    {raw ? (
+                                      <NoteRichText
+                                        text={raw.slice(0, 900)}
+                                        tagNames={tagNames}
+                                        className="hover-insight-card-rich-text"
+                                        onNoteClick={openNoteFromRichText}
+                                      />
+                                    ) : (
+                                      '—'
+                                    )}
                                   </p>
                                 </span>
                                 {sn.similarity != null && (
                                   <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
                                 )}
-                              </button>
+                              </div>
                             </li>
                           );
                         })}
@@ -952,12 +981,22 @@ function HoverInsightPanels() {
           data-insight-ui
           style={connectionLayout.stackStyle}
         >
-          {persisted.map((pn) => (
+          {persisted.map((pn) => {
+            const body = pn.content != null ? String(pn.content).trim() : '';
+            const tagNames = Array.isArray(pn.tags) ? pn.tags.map((t) => t.name || t) : [];
+            return (
             <div key={pn.id} className="hover-insight-connection-card">
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 className="hover-insight-connection-card-main"
                 onClick={() => setConnectionModal({ linked: pn, anchorNoteId: note.id })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setConnectionModal({ linked: pn, anchorNoteId: note.id });
+                  }
+                }}
                 title="Open linked note"
               >
                 <span className="hover-insight-connection-card-label">Linked</span>
@@ -971,11 +1010,19 @@ function HoverInsightPanels() {
                     {pn.threadPath}
                   </p>
                 ) : null}
-                <p className="hover-insight-connection-card-snippet">
-                  {(pn.content || '—').slice(0, 160)}
-                  {(pn.content?.length || 0) > 160 ? '…' : ''}
+                <p className="hover-insight-connection-card-snippet" title={body || undefined}>
+                  {body ? (
+                    <NoteRichText
+                      text={body.slice(0, 900)}
+                      tagNames={tagNames}
+                      className="hover-insight-card-rich-text"
+                      onNoteClick={openNoteFromRichText}
+                    />
+                  ) : (
+                    '—'
+                  )}
                 </p>
-              </button>
+              </div>
               <button
                 type="button"
                 className="hover-insight-icon-btn hover-insight-connection-unlink"
@@ -990,7 +1037,8 @@ function HoverInsightPanels() {
                 ×
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
         </>
       )}

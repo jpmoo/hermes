@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useId, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import {
   searchContent,
   getMentionRecentNotes,
@@ -26,8 +26,9 @@ function caretMenuPosition(textarea, caretPos) {
   const pt = parseFloat(cs.paddingTop) || 0;
   const cw = 7.2;
   const r = textarea.getBoundingClientRect();
-  const top = r.top + pt + (line + 1) * lh + window.scrollY;
-  const left = r.left + pl + col * cw + window.scrollX;
+  /* position:fixed is viewport-relative; do not add scroll offsets (getBoundingClientRect is already viewport) */
+  const top = r.top + pt + (line + 1) * lh;
+  const left = r.left + pl + col * cw;
   return { top, left };
 }
 
@@ -35,16 +36,12 @@ export default function MentionsTextarea({
   value,
   onChange,
   noteId = null,
-  excludeNoteIds = [],
   rows = 3,
   className = '',
   placeholder,
   disabled = false,
   autoFocus = false,
-  /** `{ value, label }[]` — when set with `onSlashNoteTypeSelect`, `/` at start opens type picker */
-  slashNoteTypeOptions = null,
-  onSlashNoteTypeSelect = null,
-  /** Stream compose: show type icon left of box; click cycles types (same list as `/`) */
+  /** Stream compose: show type icon left of box; click cycles types */
   composeNoteType = null,
   composeNoteTypeOptions = null,
   onComposeNoteTypeChange = null,
@@ -58,11 +55,6 @@ export default function MentionsTextarea({
   const searchTimer = useRef(null);
   const tagsCache = useRef(null);
   const menuDomId = useId();
-
-  const triggerOpts = useMemo(
-    () => ({ allowSlashNoteType: Boolean(onSlashNoteTypeSelect && slashNoteTypeOptions?.length) }),
-    [onSlashNoteTypeSelect, slashNoteTypeOptions]
-  );
 
   const showComposeTypeChrome = Boolean(
     composeNoteType != null && composeNoteTypeOptions?.length && onComposeNoteTypeChange
@@ -94,7 +86,9 @@ export default function MentionsTextarea({
     const el = taRef.current;
     if (!el) return;
     const pos = el.selectionStart ?? 0;
-    const trig = getActiveTrigger(value, pos, triggerOpts);
+    /* Use live DOM value: onChange + rAF runs before React re-renders with new `value` prop */
+    const text = el.value;
+    const trig = getActiveTrigger(text, pos);
     if (!trig) {
       closeMenu();
       return;
@@ -106,7 +100,7 @@ export default function MentionsTextarea({
       }
       return { ...trig, caret: pos, ...coords };
     });
-  }, [value, closeMenu, triggerOpts]);
+  }, [closeMenu]);
 
   const menuQueryKey = menu ? `${menu.type}\0${menu.start}\0${menu.query}` : '';
 
@@ -120,11 +114,11 @@ export default function MentionsTextarea({
     const el = taRef.current;
     if (!el) return;
     const pos = el.selectionStart ?? 0;
-    const trig = getActiveTrigger(value, pos, triggerOpts);
+    const trig = getActiveTrigger(el.value, pos);
     if (!trig || trig.start !== menu.start || trig.type !== menu.type) {
       closeMenu();
     }
-  }, [value, menu, closeMenu, triggerOpts]);
+  }, [value, menu, closeMenu]);
 
   useEffect(() => {
     if (!menu) return undefined;
@@ -139,24 +133,6 @@ export default function MentionsTextarea({
   useEffect(() => {
     if (!menu) return;
 
-    if (menu.type === '/') {
-      const q = menu.query.toLowerCase();
-      const opts = slashNoteTypeOptions || [];
-      const filtered = opts.filter(
-        (o) =>
-          !q || o.value.toLowerCase().startsWith(q) || o.label.toLowerCase().startsWith(q)
-      );
-      setItems(
-        filtered.map((o) => ({
-          key: o.value,
-          value: o.value,
-          label: o.label,
-        }))
-      );
-      setLoading(false);
-      return undefined;
-    }
-
     if (menu.type === '@') {
       const q = menu.query.trim();
       if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -167,11 +143,8 @@ export default function MentionsTextarea({
           try {
             const list = await getMentionRecentNotes(12);
             if (cancelled) return;
-            const ex = new Set(excludeNoteIds.map(String));
-            if (noteId) ex.add(String(noteId));
-            const filtered = list.filter((n) => !ex.has(String(n.id)));
             setItems(
-              filtered.map((n) => ({
+              list.map((n) => ({
                 key: n.id,
                 id: n.id,
                 label:
@@ -183,7 +156,7 @@ export default function MentionsTextarea({
             console.error(e);
             if (!cancelled) setItems([]);
           } finally {
-            if (!cancelled) setLoading(false);
+            setLoading(false);
           }
         })();
         return () => {
@@ -196,11 +169,8 @@ export default function MentionsTextarea({
       searchTimer.current = setTimeout(async () => {
         try {
           const list = await searchContent(q, 12);
-          const ex = new Set(excludeNoteIds.map(String));
-          if (noteId) ex.add(String(noteId));
-          const filtered = list.filter((n) => !ex.has(String(n.id)));
           setItems(
-            filtered.map((n) => ({
+            list.map((n) => ({
               key: n.id,
               id: n.id,
               label:
@@ -217,63 +187,153 @@ export default function MentionsTextarea({
       }, 180);
       return () => {
         if (searchTimer.current) clearTimeout(searchTimer.current);
+        searchTimer.current = null;
         setLoading(false);
       };
     }
 
     if (menu.type === '#') {
-      let cancelled = false;
+      const qRaw = menu.query;
+      const q = qRaw.trim();
+      const qLower = q.toLowerCase();
+
+      if (q.length < 1) {
+        let cancelled = false;
+        setLoading(true);
+        setItems([]);
+        (async () => {
+          try {
+            if (!tagsCache.current) tagsCache.current = await getTags();
+            if (cancelled) return;
+            const all = Array.isArray(tagsCache.current) ? tagsCache.current : [];
+            const tagItems = all.slice(0, 40).map((t) => ({
+              kind: 'tag',
+              key: `t-${t.id}`,
+              id: t.id,
+              name: t.name,
+              label: t.name,
+            }));
+            let noteItems = [];
+            try {
+              const list = await getMentionRecentNotes(12);
+              if (!cancelled) {
+                noteItems = list.map((n) => ({
+                  kind: 'note',
+                  key: `n-${n.id}`,
+                  id: n.id,
+                  label:
+                    (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
+                }));
+              }
+            } catch (e) {
+              console.error(e);
+            }
+            if (cancelled) return;
+            setItems([...tagItems, ...noteItems]);
+          } catch (e) {
+            console.error(e);
+            if (!cancelled) setItems([]);
+          } finally {
+            setLoading(false);
+          }
+        })();
+        return () => {
+          cancelled = true;
+          setLoading(false);
+        };
+      }
+
+      if (searchTimer.current) clearTimeout(searchTimer.current);
       setLoading(true);
       setItems([]);
+
       (async () => {
         try {
           if (!tagsCache.current) tagsCache.current = await getTags();
-          if (cancelled) return;
           const all = Array.isArray(tagsCache.current) ? tagsCache.current : [];
-          const q = menu.query.toLowerCase();
-          const filtered = all
-            .filter((t) => !q || (t.name && t.name.toLowerCase().includes(q)))
-            .slice(0, 40)
-            .map((t) => ({ key: t.id, id: t.id, name: t.name, label: t.name }));
-          const rawTag = menu.query.trim();
+          const tagItems = all
+            .filter((t) => !qLower || (t.name && t.name.toLowerCase().includes(qLower)))
+            .slice(0, 24)
+            .map((t) => ({
+              kind: 'tag',
+              key: `t-${t.id}`,
+              id: t.id,
+              name: t.name,
+              label: t.name,
+            }));
+          const rawTag = q;
           const normalized = rawTag.toLowerCase().replace(/\s+/g, '-');
           const validNewTag = /^[a-z0-9-]+$/.test(normalized) && normalized.length > 0;
-          const exactExists = all.some((t) => (t.name || '').toLowerCase() === normalized);
-          const showCreateRow = validNewTag && filtered.length === 0 && !exactExists;
-          setItems(
-            showCreateRow
-              ? [
-                  {
-                    key: '__create__',
-                    createNew: true,
-                    createName: rawTag,
-                    name: normalized,
-                    label: `Create tag #${normalized}`,
-                  },
-                ]
-              : filtered
-          );
+          const exactTagExists = all.some((t) => (t.name || '').toLowerCase() === normalized);
+
+          searchTimer.current = setTimeout(async () => {
+            try {
+              const list = await searchContent(q, 12);
+              const noteItems = list.map((n) => ({
+                kind: 'note',
+                key: `n-${n.id}`,
+                id: n.id,
+                label:
+                  (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
+              }));
+              const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
+              const createRow = showCreateRow
+                ? [
+                    {
+                      kind: 'tag',
+                      key: '__create__',
+                      createNew: true,
+                      createName: rawTag,
+                      name: normalized,
+                      label: `Create tag #${normalized}`,
+                    },
+                  ]
+                : [];
+              setItems([...tagItems, ...noteItems, ...createRow]);
+            } catch (e) {
+              console.error(e);
+              const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
+              const createRow = showCreateRow
+                ? [
+                    {
+                      kind: 'tag',
+                      key: '__create__',
+                      createNew: true,
+                      createName: rawTag,
+                      name: normalized,
+                      label: `Create tag #${normalized}`,
+                    },
+                  ]
+                : [];
+              setItems([...tagItems, ...createRow]);
+            } finally {
+              setLoading(false);
+            }
+          }, 180);
         } catch (e) {
           console.error(e);
-          if (!cancelled) setItems([]);
-        } finally {
-          if (!cancelled) setLoading(false);
+          setItems([]);
+          setLoading(false);
         }
       })();
+
       return () => {
-        cancelled = true;
+        if (searchTimer.current) {
+          clearTimeout(searchTimer.current);
+          searchTimer.current = null;
+        }
         setLoading(false);
       };
     }
     return undefined;
-  }, [menuQueryKey, menu?.type, noteId, excludeNoteIds, slashNoteTypeOptions]);
+  }, [menuQueryKey, menu?.type]);
 
   const applyMention = async (item) => {
     const el = taRef.current;
     if (!menu || !el) return;
     const caret = el.selectionStart ?? menu.caret;
     const link = formatNoteMentionLink(item.label, item.id);
-    const next = replaceTriggerQuery(value, menu.start, caret, link);
+    const next = replaceTriggerQuery(el.value, menu.start, caret, link);
     onChange(next);
     if (noteId) {
       try {
@@ -292,7 +352,7 @@ export default function MentionsTextarea({
 
   const applyTag = async (item) => {
     const el = taRef.current;
-    if (!menu || !el) return;
+    if (!menu || !el || item.kind === 'note') return;
     const caret = el.selectionStart ?? menu.caret;
     let tagId = item.id;
     let tagName = item.name;
@@ -308,7 +368,7 @@ export default function MentionsTextarea({
       }
     }
     const insertion = `#${tagName}`;
-    const next = replaceTriggerQuery(value, menu.start, caret, insertion);
+    const next = replaceTriggerQuery(el.value, menu.start, caret, insertion);
     onChange(next);
     if (noteId) {
       try {
@@ -325,24 +385,9 @@ export default function MentionsTextarea({
     });
   };
 
-  const applySlashNoteType = (item) => {
-    const el = taRef.current;
-    if (!menu || !el || !onSlashNoteTypeSelect) return;
-    const caret = el.selectionStart ?? menu.caret;
-    onSlashNoteTypeSelect(item.value);
-    const next = replaceTriggerQuery(value, menu.start, caret, '');
-    onChange(next);
-    closeMenu();
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(menu.start, menu.start);
-    });
-  };
-
   const onKeyDown = (e) => {
-    const slashOn = Boolean(onSlashNoteTypeSelect && slashNoteTypeOptions?.length);
     if (!menu) {
-      if (e.key === '@' || e.key === '#' || (slashOn && e.key === '/')) {
+      if (e.key === '@' || e.key === '#') {
         requestAnimationFrame(refreshMenu);
       }
       return;
@@ -368,7 +413,7 @@ export default function MentionsTextarea({
       const item = items[highlight] ?? items[0];
       if (!item) return;
       if (menu.type === '@') void applyMention(item);
-      else if (menu.type === '/') applySlashNoteType(item);
+      else if (item.kind === 'note') void applyMention(item);
       else void applyTag(item);
     }
   };
@@ -376,7 +421,7 @@ export default function MentionsTextarea({
   const onSelect = (item) => {
     if (!menu) return;
     if (menu.type === '@') void applyMention(item);
-    else if (menu.type === '/') applySlashNoteType(item);
+    else if (item.kind === 'note') void applyMention(item);
     else void applyTag(item);
   };
 
@@ -440,9 +485,7 @@ export default function MentionsTextarea({
             zIndex: 10000,
           }}
           role="listbox"
-          aria-label={
-            menu.type === '@' ? 'Notes' : menu.type === '#' ? 'Tags' : 'Note type'
-          }
+          aria-label={menu.type === '@' ? 'Notes' : 'Tags and notes'}
         >
           {menu.type === '@' && menu.query.trim().length < 1 && loading && (
             <div className="mentions-menu-hint">Loading recent notes…</div>
@@ -451,7 +494,7 @@ export default function MentionsTextarea({
             <div className="mentions-menu-hint">Searching…</div>
           )}
           {menu.type === '#' && loading && (
-            <div className="mentions-menu-hint">Loading tags…</div>
+            <div className="mentions-menu-hint">Loading tags and notes…</div>
           )}
           {!loading &&
             items.map((it, i) => (
@@ -460,14 +503,14 @@ export default function MentionsTextarea({
                 type="button"
                 role="option"
                 aria-selected={i === highlight}
-                className={`mentions-menu-item ${it.createNew ? 'mentions-menu-item--create' : ''} ${i === highlight ? 'mentions-menu-item--active' : ''}`}
+                className={`mentions-menu-item ${it.createNew ? 'mentions-menu-item--create' : ''} ${it.kind === 'note' ? 'mentions-menu-item--note-ref' : ''} ${i === highlight ? 'mentions-menu-item--active' : ''}`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onSelect(it)}
                 onMouseEnter={() => setHighlight(i)}
               >
                 {menu.type === '@'
                   ? it.label
-                  : menu.type === '/'
+                  : it.kind === 'note'
                     ? it.label
                     : it.createNew
                       ? it.label
@@ -482,11 +525,8 @@ export default function MentionsTextarea({
           )}
           {!loading && menu.type === '#' && items.length === 0 && (
             <div className="mentions-menu-hint">
-              No matching tags. Type a name (letters, numbers, hyphens) to create one.
+              No matching tags or notes. For a new tag, use letters, numbers, and hyphens.
             </div>
-          )}
-          {!loading && menu.type === '/' && items.length === 0 && (
-            <div className="mentions-menu-hint">No matching type</div>
           )}
         </div>
       )}

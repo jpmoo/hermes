@@ -31,11 +31,11 @@ html {
   --status-danger-btn-bg: #a33636;
   --status-danger-btn-hover: #8f2d2d;
   --on-danger-btn: #fff;
-  /* Note type icons (NoteTypeIcon): override per theme */
+  /* Note type icons (NoteTypeIcon): same value range as note/org — avoid bright accent on person/event */
   --note-type-icon-note: color-mix(in srgb, var(--accent) 42%, var(--text-muted));
   --note-type-icon-organization: var(--accent-dim);
-  --note-type-icon-person: var(--accent);
-  --note-type-icon-event: #9a7038;
+  --note-type-icon-person: color-mix(in srgb, var(--accent) 36%, var(--text-muted));
+  --note-type-icon-event: color-mix(in srgb, #6b4c30 34%, var(--text-muted));
 }
 
 .note-type-icon {
