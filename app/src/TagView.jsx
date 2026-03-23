@@ -16,7 +16,7 @@ export default function TagView() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getTags({ inUseOnly: true }).then(setAllTags).catch(() => setAllTags([]));
+    getTags().then(setAllTags).catch(() => setAllTags([]));
   }, []);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function TagView() {
   };
 
   const load = () => {
-    getTags({ inUseOnly: true })
+    getTags()
       .then((tags) => {
         setAllTags(tags);
         const valid = selectedIds.filter((id) => tags.some((t) => t.id === id));

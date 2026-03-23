@@ -20,7 +20,7 @@ router.post('/register', async (req, res) => {
       [username, hash]
     );
     const user = r.rows[0];
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ user: { id: user.id, username: user.username }, token });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Username taken' });
@@ -43,7 +43,7 @@ router.post('/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ user: { id: user.id, username: user.username }, token });
   } catch (err) {
     console.error(err);

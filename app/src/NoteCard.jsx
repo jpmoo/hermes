@@ -146,7 +146,7 @@ export default function NoteCard({
       return;
     }
     try {
-      const list = await getTags({ inUseOnly: true });
+      const list = await getTags();
       let pTags = [];
       if (parentTagsForInherit !== undefined) {
         pTags = parentTagsForInherit;
@@ -203,7 +203,7 @@ export default function NoteCard({
       setNewTagName('');
       setAddingTag(false);
       onNoteUpdate?.();
-      const list = await getTags({ inUseOnly: true });
+      const list = await getTags();
       setTagOptions(list);
     } catch (err) {
       console.error(err);

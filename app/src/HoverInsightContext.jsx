@@ -10,6 +10,9 @@ import React, {
 import {
   fetchHoverInsight,
   fetchLinkedNotesQuick,
+  fetchRagdollConfig,
+  fetchRagdollRelevant,
+  fetchRagdollSource,
   addNoteTag,
   createNoteConnection,
   deleteNoteConnection,
@@ -143,6 +146,49 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const activeHoverId = useRef(null);
   /** Selected card element for layout (connection stack / scroll sync). */
   const insightAnchorRef = useRef(null);
+  const ragdollEnabledRef = useRef(false);
+  const ragdollReqId = useRef(0);
+  const [ragdollEnabled, setRagdollEnabled] = useState(false);
+  const [ragdollLoading, setRagdollLoading] = useState(false);
+  const [ragdollDocs, setRagdollDocs] = useState([]);
+  const [ragdollError, setRagdollError] = useState(null);
+
+  useEffect(() => {
+    fetchRagdollConfig()
+      .then((c) => {
+        const en = !!c?.enabled;
+        ragdollEnabledRef.current = en;
+        setRagdollEnabled(en);
+      })
+      .catch(() => {
+        ragdollEnabledRef.current = false;
+        setRagdollEnabled(false);
+      });
+  }, []);
+
+  /** If config arrived after the user already selected a note, run RAG search now. */
+  useEffect(() => {
+    if (!ragdollEnabled) return;
+    const nid = activeHoverId.current;
+    if (!nid) return;
+    const rid = ++ragdollReqId.current;
+    setRagdollLoading(true);
+    setRagdollError(null);
+    setRagdollDocs([]);
+    fetchRagdollRelevant(nid)
+      .then((data) => {
+        if (ragdollReqId.current !== rid) return;
+        setRagdollDocs(Array.isArray(data?.documents) ? data.documents : []);
+      })
+      .catch((err) => {
+        if (ragdollReqId.current !== rid) return;
+        setRagdollError(err?.message || 'RAGDoll failed');
+        setRagdollDocs([]);
+      })
+      .finally(() => {
+        if (ragdollReqId.current === rid) setRagdollLoading(false);
+      });
+  }, [ragdollEnabled]);
 
   /** Clear insight selection (Stream: single-click mode). */
   const clearInsightSelection = useCallback(() => {
@@ -155,6 +201,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     setDismissedKeys(new Set());
     setAddingKey(null);
     setConnectionModal(null);
+    setRagdollDocs([]);
+    setRagdollLoading(false);
+    setRagdollError(null);
+    ragdollReqId.current += 1;
   }, []);
 
   /** Full reset (e.g. after navigating away). */
@@ -182,6 +232,25 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       const id = ++reqId.current;
       setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
       setLoading(true);
+      setRagdollDocs([]);
+      setRagdollError(null);
+      if (ragdollEnabledRef.current) {
+        const rid = ++ragdollReqId.current;
+        setRagdollLoading(true);
+        fetchRagdollRelevant(note.id)
+          .then((data) => {
+            if (ragdollReqId.current !== rid) return;
+            setRagdollDocs(Array.isArray(data?.documents) ? data.documents : []);
+          })
+          .catch((err) => {
+            if (ragdollReqId.current !== rid) return;
+            setRagdollError(err?.message || 'RAGDoll failed');
+            setRagdollDocs([]);
+          })
+          .finally(() => {
+            if (ragdollReqId.current === rid) setRagdollLoading(false);
+          });
+      }
 
       fetchLinkedNotesQuick(note.id)
         .then((data) => {
@@ -386,6 +455,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setConnectionModal,
       navigateToConnection,
       connectSimilarNote,
+      ragdollEnabled,
+      ragdollLoading,
+      ragdollDocs,
+      ragdollError,
     }),
     [
       selectInsightNote,
@@ -401,6 +474,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setConnectionModal,
       navigateToConnection,
       connectSimilarNote,
+      ragdollEnabled,
+      ragdollLoading,
+      ragdollDocs,
+      ragdollError,
     ]
   );
 
@@ -429,7 +506,28 @@ function HoverInsightPanels() {
     navigateToConnection,
     connectSimilarNote,
     insightAnchorRef,
+    ragdollEnabled,
+    ragdollLoading,
+    ragdollDocs,
+    ragdollError,
   } = ctx;
+
+  const openRagdollDoc = useCallback(async (sourcePath, label) => {
+    try {
+      const blob = await fetchRagdollSource(sourcePath);
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, '_blank', 'noopener');
+      if (!w) {
+        URL.revokeObjectURL(url);
+        window.alert('Popup blocked — allow popups to view the document.');
+        return;
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } catch (e) {
+      console.error(e);
+      window.alert(e?.message || `Could not open ${label || 'document'}`);
+    }
+  }, []);
 
   /** Peer shown in the modal: merge stack row with latest insight row (ids, threadPath updates). */
   const connectionModalLinked = useMemo(() => {
@@ -562,6 +660,55 @@ function HoverInsightPanels() {
 
   return (
     <>
+      {hover && rect && ragdollEnabled && (
+        <div
+          className="hover-insight-ragdoll-wrap"
+          data-insight-ui
+        >
+          <div
+            className={`hover-insight-panel hover-insight-panel--ragdoll ${ragdollLoading ? 'hover-insight-panel--loading' : ''}`}
+          >
+            <p className="hover-insight-title">RAG documents</p>
+            <p className="hover-insight-ragdoll-hint">
+              From selected note, parent, siblings, and direct replies — sent to RAGDoll for search.
+            </p>
+            {ragdollLoading && <p className="hover-insight-muted">Searching library…</p>}
+            {!ragdollLoading && ragdollError && (
+              <p className="hover-insight-muted" title={ragdollError}>
+                {ragdollError}
+              </p>
+            )}
+            {!ragdollLoading && !ragdollError && ragdollDocs.length === 0 && (
+              <p className="hover-insight-muted">No matching documents.</p>
+            )}
+            {!ragdollLoading && ragdollDocs.length > 0 && (
+              <ul className="hover-insight-ragdoll-list">
+                {ragdollDocs.map((d) => (
+                  <li key={`${d.group}|${d.source_url}`}>
+                    <button
+                      type="button"
+                      className="hover-insight-ragdoll-link"
+                      title={d.source_summary || d.source_name}
+                      onClick={() => openRagdollDoc(d.source_url, d.source_name)}
+                    >
+                      <span className="hover-insight-ragdoll-name">{d.source_name}</span>
+                      {d.similarity != null && (
+                        <span className="hover-insight-ragdoll-sim">
+                          {Math.round(Number(d.similarity) * 100)}%
+                        </span>
+                      )}
+                    </button>
+                    {d.group ? (
+                      <span className="hover-insight-ragdoll-collection">{d.group}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
       {hover && rect && (
         <>
           <div
@@ -604,86 +751,88 @@ function HoverInsightPanels() {
             data-insight-ui
           >
             <div className={`hover-insight-panel hover-insight-panel--right ${loading ? 'hover-insight-panel--loading' : ''}`}>
-              <p className="hover-insight-title">Similar notes</p>
-              {loading && <p className="hover-insight-muted">Thinking…</p>}
-              {!loading && similarNotes.length === 0 && (
-                <p className="hover-insight-muted">
-                  No similar notes (needs embeddings, or nothing close enough yet).
-                </p>
-              )}
-              {!loading && similarNotes.length > 0 && (
-                <>
-                  <div className="hover-insight-similar-slider-wrap">
-                    <div className="hover-insight-similar-slider-label">
-                      <span>Min. similarity</span>
-                      <span className="hover-insight-similar-slider-value">{similarMinPct}%</span>
+              <p className="hover-insight-title hover-insight-similar-panel-heading">Similar notes</p>
+              <div className="hover-insight-similar-panel-body">
+                {loading && <p className="hover-insight-muted">Thinking…</p>}
+                {!loading && similarNotes.length === 0 && (
+                  <p className="hover-insight-muted">
+                    No similar notes (needs embeddings, or nothing close enough yet).
+                  </p>
+                )}
+                {!loading && similarNotes.length > 0 && (
+                  <>
+                    <div className="hover-insight-similar-slider-wrap">
+                      <div className="hover-insight-similar-slider-label">
+                        <span>Min. similarity</span>
+                        <span className="hover-insight-similar-slider-value">{similarMinPct}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        className="hover-insight-similar-slider"
+                        min={5}
+                        max={95}
+                        step={5}
+                        value={similarMinPct}
+                        onChange={(e) => setSimilarMinPct(Number(e.target.value))}
+                        aria-label="Minimum similarity for similar notes"
+                      />
+                      <div className="hover-insight-similar-slider-ticks" aria-hidden>
+                        <span>5%</span>
+                        <span>25%</span>
+                        <span>50%</span>
+                        <span>75%</span>
+                        <span>95%</span>
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      className="hover-insight-similar-slider"
-                      min={5}
-                      max={95}
-                      step={5}
-                      value={similarMinPct}
-                      onChange={(e) => setSimilarMinPct(Number(e.target.value))}
-                      aria-label="Minimum similarity for similar notes"
-                    />
-                    <div className="hover-insight-similar-slider-ticks" aria-hidden>
-                      <span>5%</span>
-                      <span>25%</span>
-                      <span>50%</span>
-                      <span>75%</span>
-                      <span>95%</span>
-                    </div>
-                  </div>
-                  {filteredSimilarNotes.length === 0 ? (
-                    <p className="hover-insight-muted">No notes at or above this threshold.</p>
-                  ) : (
-                    <ul className="hover-insight-similar-list">
-                      {filteredSimilarNotes.map((sn) => {
-                        const raw = sn.content != null ? String(sn.content).trim().replace(/\s+/g, ' ') : '';
-                        const path = sn.threadPath || sn.thread_path || '';
-                        const snippet =
-                          raw.length > 160 ? `${raw.slice(0, 160)}…` : raw || '—';
-                        return (
-                          <li key={sn.id}>
-                            <button
-                              type="button"
-                              className="hover-insight-similar-btn"
-                              title="Add as connected note to the selected card"
-                              onClick={() => connectSimilarNote(sn.id)}
-                            >
-                              <span className="hover-insight-similar-btn-main">
-                                {path ? (
+                    {filteredSimilarNotes.length === 0 ? (
+                      <p className="hover-insight-muted">No notes at or above this threshold.</p>
+                    ) : (
+                      <ul className="hover-insight-similar-list">
+                        {filteredSimilarNotes.map((sn) => {
+                          const raw = sn.content != null ? String(sn.content).trim().replace(/\s+/g, ' ') : '';
+                          const path = sn.threadPath || sn.thread_path || '';
+                          const snippet =
+                            raw.length > 160 ? `${raw.slice(0, 160)}…` : raw || '—';
+                          return (
+                            <li key={sn.id}>
+                              <button
+                                type="button"
+                                className="hover-insight-similar-btn"
+                                title="Add as connected note to the selected card"
+                                onClick={() => connectSimilarNote(sn.id)}
+                              >
+                                <span className="hover-insight-similar-btn-main">
+                                  {path ? (
+                                    <p
+                                      className="hover-insight-thread-path hover-insight-thread-path--card hover-insight-similar-thread-path"
+                                      title={path}
+                                    >
+                                      {path}
+                                    </p>
+                                  ) : (
+                                    <p className="hover-insight-thread-path hover-insight-thread-path--card hover-insight-similar-thread-path hover-insight-muted">
+                                      (Thread root)
+                                    </p>
+                                  )}
                                   <p
-                                    className="hover-insight-thread-path hover-insight-thread-path--card hover-insight-similar-thread-path"
-                                    title={path}
+                                    className="hover-insight-connection-card-snippet hover-insight-similar-note-snippet"
+                                    title={raw || undefined}
                                   >
-                                    {path}
+                                    {snippet}
                                   </p>
-                                ) : (
-                                  <p className="hover-insight-thread-path hover-insight-thread-path--card hover-insight-similar-thread-path hover-insight-muted">
-                                    (Thread root)
-                                  </p>
+                                </span>
+                                {sn.similarity != null && (
+                                  <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
                                 )}
-                                <p
-                                  className="hover-insight-connection-card-snippet hover-insight-similar-note-snippet"
-                                  title={raw || undefined}
-                                >
-                                  {snippet}
-                                </p>
-                              </span>
-                              {sn.similarity != null && (
-                                <span className="hover-insight-sim-pct">{Math.round(sn.similarity * 100)}%</span>
-                              )}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </>
-              )}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </>

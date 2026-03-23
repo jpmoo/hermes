@@ -29,6 +29,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Regions view (spatial clusters by embedding) | Not yet |
 | Tag Canvas (graph of tags + edges) | Not yet |
 | Attachments (BYTEA in DB, Stream upload, `POST /api/notes/:id/attachments` multipart) | Done |
+| **RAGDoll** (optional): Stream insight bottom-left panel for allowed usernames; thread context → RAGDoll query; open docs via Hermes proxy | Done (env + `RAGDOLL_ENABLED_USERNAMES`) |
 | external_anchor (API field; optional link to ticket/URL outside Hermes) | API only; UI field not yet |
 | Suggested threading / duplicate / orphan rescue | Not yet |
 
@@ -137,7 +138,7 @@ A note-taking system built around conversation and tree structure. Specification
 - **`POST /api/notes/:id/attachments`** — **multipart/form-data**, field name **`files`** (one or more parts, up to 20 per request). Same as the web Stream UI. **`Authorization: Bearer <jwt>`** required. Use this for **large images/PDFs**; no base64, streams straight into Postgres. Max size per file: `HERMES_MAX_ATTACHMENT_BYTES` (default 20MB).
 - `PATCH /api/notes/:id` — update `{ content?, starred?, external_anchor? }`
 - `POST /api/notes/:id/star`, `DELETE /api/notes/:id/star`
-- `GET /api/tags` (all tags for typeahead), `GET /api/tags?in_use=1` (tags with ≥1 approved use on your notes — Tags page), `POST /api/tags`, relationships endpoints
+- `GET /api/tags` — tags with ≥1 **approved** use on **your** notes only (typeahead / Tags page). `DELETE /api/tags/:id` removes that tag from **your** notes only; the global tag row is deleted only if no one else still has an approved link. `GET/POST/DELETE /api/tags/relationships` only expose or mutate pairs where **both** tags are in approved use on **your** notes. `POST /api/notes/:id/tags` with **`tag_id`** (no `name`) is allowed only if the tag is already on your notes or has no approved links anywhere yet (so you can’t attach another user’s tag IDs). **`name`** continues to resolve/create by normalized name.
 - `GET /api/notes/search-by-tags?tagIds=...&mode=and|or`, `GET /api/notes/search-semantic?q=...` (hybrid text + semantic; 503 only if Ollama fails and nothing matches the substring)
 - `GET /api/notes/search-content?q=...` — substring search in note text (no Ollama)
 - `POST /api/notes/hover-insight` — body `{ noteId }`. **Tag suggestions** (flat `tagSuggestions[]` with `source`): **`neighbor`** — approved tags on **parent, siblings, or immediate children** not on the hovered note; **`ollama`** — up to **6** new hyphenated tags from the model; **`connected`** — approved tags on **linked** peers not on the hovered note. **`similarNotes`** — up to 12 vector nearest neighbors (requires embeddings; excludes self, linked peers, parent, siblings, and direct children); each item includes **`threadPath`** (ancestor snippets only, not the similar note’s own text). In the Stream UI, clicking a similar row **creates a connection** to the selected note (does not navigate). Response also includes **`persistedLinks`**. **Ollama** required for the novel tag slice (neighbor + connected are SQL-only).
@@ -148,6 +149,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `POST /api/notes/:id/connections` — `{ linkedNoteId }` — connect two notes (one DB row; idempotent — if a link already exists in either direction, returns it)
 - `DELETE /api/notes/:id/connections/:linkedNoteId` — remove the link between the two notes (either stored orientation)
 - `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphans**)
+- **`RAGDoll` (optional):** `GET /api/ragdoll/config` — `{ enabled, hasCollectionsOverride }` for the current user. `POST /api/ragdoll/relevant` — body `{ noteId }`; builds text from **selected note + parent + siblings + direct children** (same neighborhood as neighbor tag suggestions), POSTs to RAGDoll `/query`, returns deduped `{ documents: [{ group, source_name, source_url, source_summary, similarity, sample_count }] }`. `GET /api/ragdoll/fetch?path=` — proxied `GET` to RAGDoll (path must start with `/fetch/`). **Enabled only** for usernames listed in **`RAGDOLL_ENABLED_USERNAMES`** (default `jpmoo`). Server env: **`RAGDOLL_BASE_URL`** or **`RAGDOLL_HOST`** + **`RAGDOLL_PORT`**, optional **`RAGDOLL_COLLECTIONS`** (comma-separated), **`RAGDOLL_QUERY_THRESHOLD`**. See `server/.env.example`.
 
 ## MCP (Claude)
 

@@ -92,10 +92,9 @@ export async function unstarNote(id) {
   return r.json();
 }
 
-/** @param {{ inUseOnly?: boolean }} opts - inUseOnly: tags that appear on at least one of your notes (approved) */
-export async function getTags(opts = {}) {
-  const q = opts.inUseOnly ? '?in_use=1' : '';
-  const r = await fetch(`${API}/tags${q}`, { headers: headers() });
+/** Tags that appear on at least one of your notes (approved). */
+export async function getTags() {
+  const r = await fetch(`${API}/tags`, { headers: headers() });
   if (!r.ok) throw new Error('Failed to load tags');
   return r.json();
 }
@@ -153,6 +152,34 @@ export async function fetchLinkedNotesQuick(noteId) {
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Failed to load linked notes');
   return data;
+}
+
+/** RAGDoll (optional; server enables per username). */
+export async function fetchRagdollConfig() {
+  const r = await fetch(`${API}/ragdoll/config`, { headers: headers() });
+  if (!r.ok) return { enabled: false };
+  return r.json();
+}
+
+export async function fetchRagdollRelevant(noteId) {
+  const r = await fetch(`${API}/ragdoll/relevant`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ noteId }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'RAGDoll search failed');
+  return data;
+}
+
+/** Open a RAGDoll source path (e.g. `/fetch/group/file.pdf`) via Hermes proxy; returns Blob. */
+export async function fetchRagdollSource(sourcePath) {
+  const t = getToken();
+  const r = await fetch(`${API}/ragdoll/fetch?path=${encodeURIComponent(sourcePath)}`, {
+    headers: t ? { Authorization: `Bearer ${t}` } : {},
+  });
+  if (!r.ok) throw new Error('Could not fetch document');
+  return r.blob();
 }
 
 export async function fetchHoverInsight(noteId) {

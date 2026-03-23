@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
     if (t) {
       try {
         const payload = JSON.parse(atob(t.split('.')[1]));
-        setUser({ id: payload.userId });
+        setUser({ id: payload.userId, username: payload.username });
       } catch {
         localStorage.removeItem('hermes_token');
       }

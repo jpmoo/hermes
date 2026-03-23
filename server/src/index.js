@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js';
 import notesRoutes from './routes/notes.js';
 import tagsRoutes from './routes/tags.js';
 import noteFilesRoutes from './routes/noteFiles.js';
+import ragdollRoutes from './routes/ragdoll.js';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { existsSync } from 'fs';
@@ -41,6 +42,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/tags', tagsRoutes);
 app.use('/api/note-files', noteFilesRoutes);
+app.use('/api/ragdoll', ragdollRoutes);
 
 // Health for systemd and load balancers
 app.get('/health', (_, res) => res.json({ status: 'ok' }));

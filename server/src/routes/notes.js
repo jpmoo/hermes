@@ -9,6 +9,7 @@ import {
   getNoteThreadPathDisplay,
 } from '../services/hoverInsight.js';
 import { attachBlobListToNotes, MAX_BYTES } from '../services/noteFileBlobs.js';
+import { canAttachTagIdByReference } from '../services/tagAccess.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -403,12 +404,16 @@ router.post('/hover-insight', async (req, res) => {
 // Get tags for a note (approved only)
 router.get('/:id/tags', async (req, res) => {
   try {
+    const noteId = req.params.id;
+    const userId = req.userId;
+    const own = await pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+    if (own.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
     const r = await pool.query(
       `SELECT t.id, t.name FROM tags t
        JOIN note_tags nt ON nt.tag_id = t.id AND nt.note_id = $1 AND nt.status = 'approved'
        JOIN notes n ON n.id = nt.note_id AND n.user_id = $2
        ORDER BY t.name`,
-      [req.params.id, req.userId]
+      [noteId, userId]
     );
     res.json(r.rows);
   } catch (err) {
@@ -434,6 +439,12 @@ router.post('/:id/tags', async (req, res) => {
       }
     }
     if (!tid) return res.status(400).json({ error: 'tag_id or name required' });
+    // By id: your tags, or unused tag rows (e.g. after POST /api/tags). By name: resolve/create as today.
+    if (tagId && !name) {
+      if (!(await canAttachTagIdByReference(tid, userId))) {
+        return res.status(400).json({ error: 'Tag not available' });
+      }
+    }
     const noteCheck = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
     if (noteCheck.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
     await pool.query(

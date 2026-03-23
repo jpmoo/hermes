@@ -50,6 +50,42 @@
   animation-name: hover-insight-slide-in-right;
 }
 
+/* Similar notes: use full viewport below header; scroll long lists inside body */
+.hover-insight-panel.hover-insight-panel--right {
+  /* Match .hover-insight-margin padding-top + small bottom inset */
+  --hi-similar-panel-inset-top: 5.5rem;
+  --hi-similar-panel-inset-bottom: 0.75rem;
+  height: calc(100vh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
+  max-height: calc(100vh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
+  height: calc(100dvh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
+  max-height: calc(100dvh - var(--hi-similar-panel-inset-top) - var(--hi-similar-panel-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.hover-insight-similar-panel-heading {
+  flex-shrink: 0;
+}
+
+.hover-insight-similar-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Keep threshold slider visible while scrolling the note list */
+.hover-insight-panel--right .hover-insight-similar-slider-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-card);
+  padding-bottom: 0.15rem;
+  margin-top: 0;
+}
+
 @keyframes hover-insight-slide-in {
   from {
     opacity: 0;
@@ -557,4 +593,86 @@
 
 .hover-insight-modal-btn--danger:hover {
   filter: brightness(0.97);
+}
+
+/* RAGDoll panel: fixed bottom-left, same width as tag / similar side panels */
+.hover-insight-ragdoll-wrap {
+  position: fixed;
+  bottom: 0.75rem;
+  left: 0;
+  width: 250px;
+  z-index: 250;
+  pointer-events: none;
+  padding-left: 0;
+  box-sizing: border-box;
+}
+
+.hover-insight-panel--ragdoll {
+  pointer-events: auto;
+  max-height: min(38vh, 420px);
+  margin-left: 0;
+}
+
+.hover-insight-ragdoll-hint {
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  opacity: 0.95;
+}
+
+.hover-insight-ragdoll-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hover-insight-ragdoll-list li {
+  margin-bottom: 0.45rem;
+}
+
+.hover-insight-ragdoll-link {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.35rem 0.25rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-muted, rgba(0, 0, 0, 0.04));
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.hover-insight-ragdoll-link:hover {
+  filter: brightness(1.03);
+  outline: 1px solid var(--border);
+}
+
+.hover-insight-ragdoll-name {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.hover-insight-ragdoll-sim {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.hover-insight-ragdoll-collection {
+  display: block;
+  margin-top: 0.15rem;
+  margin-left: 0.25rem;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent, #c9a227);
+  opacity: 0.9;
 }
