@@ -186,7 +186,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   useEffect(() => {
     fetchRagdollConfig()
       .then((c) => {
-        const en = !!c?.enabled;
+        const en = c?.enabled === true;
         ragdollEnabledRef.current = en;
         setRagdollEnabled(en);
       })
@@ -198,9 +198,21 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
 
   /** RAGDoll search when a note is selected, options change, or feature becomes enabled. */
   useEffect(() => {
-    if (!ragdollEnabled) return;
+    if (!ragdollEnabled) {
+      ragdollReqId.current += 1;
+      setRagdollLoading(false);
+      setRagdollError(null);
+      setRagdollDocs([]);
+      return;
+    }
     const nid = hover?.note?.id;
-    if (!nid) return;
+    if (!nid) {
+      ragdollReqId.current += 1;
+      setRagdollLoading(false);
+      setRagdollError(null);
+      setRagdollDocs([]);
+      return;
+    }
     const rid = ++ragdollReqId.current;
     setRagdollLoading(true);
     setRagdollError(null);

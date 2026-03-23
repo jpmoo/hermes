@@ -154,11 +154,19 @@ export async function fetchLinkedNotesQuick(noteId) {
   return data;
 }
 
-/** RAGDoll (optional; server enables per username). */
+/** RAGDoll (optional; server enables per username). Only `enabled: true` turns the UI on. */
 export async function fetchRagdollConfig() {
   const r = await fetch(`${API}/ragdoll/config`, { headers: headers() });
-  if (!r.ok) return { enabled: false };
-  return r.json();
+  if (!r.ok) return { enabled: false, hasCollectionsOverride: false };
+  try {
+    const c = await r.json();
+    return {
+      enabled: c?.enabled === true,
+      hasCollectionsOverride: c?.hasCollectionsOverride === true,
+    };
+  } catch {
+    return { enabled: false, hasCollectionsOverride: false };
+  }
 }
 
 export async function fetchRagdollRelevant(noteId, options = {}) {

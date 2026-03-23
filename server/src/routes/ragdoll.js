@@ -22,7 +22,11 @@ function ragdollCollectionGroups() {
 }
 
 function ragdollEnabledUsernames() {
-  return (process.env.RAGDOLL_ENABLED_USERNAMES || 'jpmoo')
+  const raw = process.env.RAGDOLL_ENABLED_USERNAMES;
+  if (raw === undefined || raw === null) {
+    return ['jpmoo'];
+  }
+  return String(raw)
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
