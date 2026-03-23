@@ -675,6 +675,11 @@ function HoverInsightPanels() {
     [insight?.persistedLinks]
   );
 
+  const ragdollByCollection = useMemo(
+    () => groupRagdollDocumentsByCollection(ragdollDocs),
+    [ragdollDocs]
+  );
+
   const note = hover?.note;
 
   /** Below the card; stack’s right edge aligns with note’s right + 60px (viewport coords). */
