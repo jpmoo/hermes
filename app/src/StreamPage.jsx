@@ -6,7 +6,7 @@ import Layout from './Layout';
 import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
-import { eventFieldsToPayload } from './noteEventUtils';
+import { eventFieldsToPayload, NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
@@ -953,18 +953,21 @@ export default function StreamPage() {
               <MentionsTextarea
                 placeholder={
                   replyParentId === threadRootId
-                    ? 'Reply to thread…'
-                    : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”…`
+                    ? 'Reply to thread… (@ link note, # tag, / type)'
+                    : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”… (@ # /)`
                 }
                 value={replyContent}
                 onChange={setReplyContent}
                 rows={2}
                 disabled={submitting}
+                slashNoteTypeOptions={NOTE_TYPE_OPTIONS}
+                onSlashNoteTypeSelect={setComposeNoteType}
               />
               <NoteTypeEventFields
                 idPrefix="stream-reply"
                 noteType={composeNoteType}
                 onNoteTypeChange={setComposeNoteType}
+                hideTypeSelect
                 startDate={composeStartDate}
                 onStartDateChange={setComposeStartDate}
                 startTime={composeStartTime}
@@ -1000,16 +1003,19 @@ export default function StreamPage() {
           ) : (
             <form className="stream-page-compose" onSubmit={handleNewRoot}>
               <MentionsTextarea
-                placeholder="New thread…"
+                placeholder="New thread… Type / for note type, @ to link, # for tag"
                 value={newRootContent}
                 onChange={setNewRootContent}
                 rows={2}
                 disabled={submitting}
+                slashNoteTypeOptions={NOTE_TYPE_OPTIONS}
+                onSlashNoteTypeSelect={setComposeNoteType}
               />
               <NoteTypeEventFields
                 idPrefix="stream-root"
                 noteType={composeNoteType}
                 onNoteTypeChange={setComposeNoteType}
+                hideTypeSelect
                 startDate={composeStartDate}
                 onStartDateChange={setComposeStartDate}
                 startTime={composeStartTime}

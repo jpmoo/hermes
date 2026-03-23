@@ -6,6 +6,7 @@ export default function NoteTypeEventFields({
   idPrefix = 'note',
   noteType,
   onNoteTypeChange,
+  hideTypeSelect = false,
   startDate,
   onStartDateChange,
   startTime,
@@ -18,21 +19,23 @@ export default function NoteTypeEventFields({
 }) {
   return (
     <div className="note-type-event-fields">
-      <label className="note-type-event-fields-type">
-        <span className="note-type-event-fields-label">Type</span>
-        <select
-          id={`${idPrefix}-type`}
-          value={noteType || 'note'}
-          onChange={(e) => onNoteTypeChange(e.target.value)}
-          disabled={disabled}
-        >
-          {NOTE_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!hideTypeSelect && (
+        <label className="note-type-event-fields-type">
+          <span className="note-type-event-fields-label">Type</span>
+          <select
+            id={`${idPrefix}-type`}
+            value={noteType || 'note'}
+            onChange={(e) => onNoteTypeChange(e.target.value)}
+            disabled={disabled}
+          >
+            {NOTE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {noteType === 'event' && (
         <div className="note-type-event-fields-event">
           <div className="note-type-event-fields-row">

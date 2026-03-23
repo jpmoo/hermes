@@ -249,6 +249,14 @@ export async function searchContent(q, limit = 40) {
   return Array.isArray(data) ? data : [];
 }
 
+/** Recent notes for @ menu when query is empty (avoids full-text scan). */
+export async function getMentionRecentNotes(limit = 12) {
+  const r = await fetch(`${API}/notes/mention-recent?limit=${limit}`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load recent notes');
+  return Array.isArray(data) ? data : [];
+}
+
 /** Approved tags on a note (for parent lookup when inheriting). */
 export async function getNoteTags(noteId) {
   const r = await fetch(`${API}/notes/${noteId}/tags`, { headers: headers() });

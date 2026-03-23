@@ -37,11 +37,16 @@
 
 .layout-header-middle {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
   gap: clamp(1rem, 4vw, 2.75rem);
-  max-width: 100%;
+  max-width: min(100%, 100vw - 2rem);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .layout-logo {
@@ -73,7 +78,9 @@
   min-width: 0;
 }
 
-.layout-nav-link {
+/* Main nav links + header filter/star buttons share the same chrome */
+.layout-nav-link,
+.layout-toolbar-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -84,148 +91,82 @@
   color: var(--text-muted);
   font-size: 0.9rem;
   text-decoration: none;
+  background: none;
+  border: none;
+  line-height: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 
-.layout-nav-icon {
+.layout-nav-link {
+  text-decoration: none;
+}
+
+.layout-nav-icon,
+.layout-toolbar-icon {
   width: 1.3rem;
   height: 1.3rem;
   flex-shrink: 0;
+  display: block;
 }
 
-.layout-nav-link:hover {
+.layout-header .layout-toolbar-btn .note-type-icon {
+  color: currentColor;
+}
+
+.layout-nav-link:hover,
+.layout-toolbar-btn:hover:not(:disabled) {
   color: var(--text);
+  background: rgba(201, 162, 39, 0.08);
 }
 
-.layout-nav-link--active {
+.layout-nav-link--active,
+.layout-toolbar-btn--active {
   color: var(--accent);
   background: rgba(201, 162, 39, 0.12);
 }
 
-/* Type toggles + star: one cluster with a clear gap before the star */
-.layout-filters-cluster {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(0.65rem, 2.5vw, 1.1rem);
+.layout-nav-link--active:hover,
+.layout-toolbar-btn--active:hover:not(:disabled) {
+  color: var(--accent);
+  background: rgba(201, 162, 39, 0.12);
 }
 
-.layout-action-icon {
-  width: 1.3rem;
-  height: 1.3rem;
-  flex-shrink: 0;
-  display: block;
-}
-
-.layout-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.35rem;
-  min-height: 2.35rem;
-  padding: 0.4rem 0.55rem;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  line-height: 0;
-  cursor: pointer;
-}
-
-.layout-toggle .layout-action-icon {
-  opacity: 0.4;
-}
-
-.layout-toggle:hover {
-  color: var(--text);
-  background: rgba(201, 162, 39, 0.08);
-}
-
-.layout-toggle:hover .layout-action-icon {
-  opacity: 0.65;
-}
-
-.layout-toggle--on {
-  color: var(--star);
-}
-
-.layout-toggle--on .layout-action-icon {
-  opacity: 1;
-}
-
-.layout-toggle--on:hover {
-  color: var(--star);
-  background: rgba(201, 162, 39, 0.1);
-}
-
-.layout-toggle:disabled {
+.layout-toolbar-btn:disabled {
   cursor: not-allowed;
   opacity: 0.38;
 }
 
-.layout-toggle:disabled:hover {
+.layout-toolbar-btn:disabled:hover {
   color: var(--text-muted);
   background: none;
+  opacity: 0.38;
 }
 
-/* Four type slots: equal width so icons are evenly spaced */
-.layout-type-filters {
+/* Type toggles + star: one row; scroll with the middle bar if needed */
+.layout-filters-cluster {
   display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 0.25rem;
-  width: min(100%, 13.5rem);
-}
-
-.layout-type-toggle {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 3rem;
-  display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  min-height: 2.35rem;
-  padding: 0.25rem 0.2rem;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  line-height: 0;
-  cursor: pointer;
-  /* Do not set color here — NoteTypeIcon uses --note-type-icon-* per type */
-}
-
-.layout-type-toggle-icon {
-  width: 1.15rem;
-  height: 1.15rem;
-  display: block;
+  gap: 0.35rem;
   flex-shrink: 0;
 }
 
-/* Header icons: always use theme tokens (avoids button text color masking the note swatch) */
-.layout-type-toggle .note-type-icon--note {
-  color: var(--note-type-icon-note);
-}
-.layout-type-toggle .note-type-icon--event {
-  color: var(--note-type-icon-event);
-}
-.layout-type-toggle .note-type-icon--person {
-  color: var(--note-type-icon-person);
-}
-.layout-type-toggle .note-type-icon--organization {
-  color: var(--note-type-icon-organization);
+/* Extra separation: star filter is a different control than type toggles */
+.layout-filters-cluster-star-gap {
+  flex: 0 0 clamp(0.65rem, 2.2vw, 1.15rem);
+  min-width: 0.5rem;
+  pointer-events: none;
 }
 
-.layout-type-toggle:hover {
-  background: rgba(201, 162, 39, 0.08);
-}
-
-.layout-type-toggle--dim {
-  opacity: 0.32;
-}
-
-.layout-type-toggle--dim:hover {
-  opacity: 0.55;
+.layout-type-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.5rem;
+  flex-shrink: 0;
 }
 
 .layout-logout {

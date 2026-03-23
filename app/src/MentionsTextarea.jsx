@@ -1,5 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
-import { searchContent, getTags, createNoteConnection, addNoteTag } from './api';
+import React, { useState, useRef, useEffect, useCallback, useId, useMemo } from 'react';
+import {
+  searchContent,
+  getMentionRecentNotes,
+  getTags,
+  createNoteConnection,
+  addNoteTag,
+} from './api';
 import {
   getActiveTrigger,
   replaceTriggerQuery,
@@ -33,6 +39,9 @@ export default function MentionsTextarea({
   placeholder,
   disabled = false,
   autoFocus = false,
+  /** `{ value, label }[]` — when set with `onSlashNoteTypeSelect`, `/` at start opens type picker */
+  slashNoteTypeOptions = null,
+  onSlashNoteTypeSelect = null,
 }) {
   const taRef = useRef(null);
   const menuRef = useRef(null);
@@ -43,6 +52,11 @@ export default function MentionsTextarea({
   const searchTimer = useRef(null);
   const tagsCache = useRef(null);
   const menuDomId = useId();
+
+  const triggerOpts = useMemo(
+    () => ({ allowSlashNoteType: Boolean(onSlashNoteTypeSelect && slashNoteTypeOptions?.length) }),
+    [onSlashNoteTypeSelect, slashNoteTypeOptions]
+  );
 
   const closeMenu = useCallback(() => {
     setMenu(null);
@@ -59,7 +73,7 @@ export default function MentionsTextarea({
     const el = taRef.current;
     if (!el) return;
     const pos = el.selectionStart ?? 0;
-    const trig = getActiveTrigger(value, pos);
+    const trig = getActiveTrigger(value, pos, triggerOpts);
     if (!trig) {
       closeMenu();
       return;
@@ -71,7 +85,7 @@ export default function MentionsTextarea({
       }
       return { ...trig, caret: pos, ...coords };
     });
-  }, [value, closeMenu]);
+  }, [value, closeMenu, triggerOpts]);
 
   const menuQueryKey = menu ? `${menu.type}\0${menu.start}\0${menu.query}` : '';
 
@@ -85,11 +99,11 @@ export default function MentionsTextarea({
     const el = taRef.current;
     if (!el) return;
     const pos = el.selectionStart ?? 0;
-    const trig = getActiveTrigger(value, pos);
+    const trig = getActiveTrigger(value, pos, triggerOpts);
     if (!trig || trig.start !== menu.start || trig.type !== menu.type) {
       closeMenu();
     }
-  }, [value, menu, closeMenu]);
+  }, [value, menu, closeMenu, triggerOpts]);
 
   useEffect(() => {
     if (!menu) return undefined;
@@ -104,13 +118,57 @@ export default function MentionsTextarea({
   useEffect(() => {
     if (!menu) return;
 
+    if (menu.type === '/') {
+      const q = menu.query.toLowerCase();
+      const opts = slashNoteTypeOptions || [];
+      const filtered = opts.filter(
+        (o) =>
+          !q || o.value.toLowerCase().startsWith(q) || o.label.toLowerCase().startsWith(q)
+      );
+      setItems(
+        filtered.map((o) => ({
+          key: o.value,
+          value: o.value,
+          label: o.label,
+        }))
+      );
+      setLoading(false);
+      return undefined;
+    }
+
     if (menu.type === '@') {
       const q = menu.query.trim();
       if (searchTimer.current) clearTimeout(searchTimer.current);
       if (q.length < 1) {
-        setItems([]);
-        setLoading(false);
-        return;
+        let cancelled = false;
+        setLoading(true);
+        (async () => {
+          try {
+            const list = await getMentionRecentNotes(12);
+            if (cancelled) return;
+            const ex = new Set(excludeNoteIds.map(String));
+            if (noteId) ex.add(String(noteId));
+            const filtered = list.filter((n) => !ex.has(String(n.id)));
+            setItems(
+              filtered.map((n) => ({
+                key: n.id,
+                id: n.id,
+                label:
+                  (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
+                raw: n,
+              }))
+            );
+          } catch (e) {
+            console.error(e);
+            if (!cancelled) setItems([]);
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+        })();
+        return () => {
+          cancelled = true;
+          if (searchTimer.current) clearTimeout(searchTimer.current);
+        };
       }
       setLoading(true);
       searchTimer.current = setTimeout(async () => {
@@ -123,7 +181,8 @@ export default function MentionsTextarea({
             filtered.map((n) => ({
               key: n.id,
               id: n.id,
-              label: (n.content || '').replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
+              label:
+                (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
               raw: n,
             }))
           );
@@ -133,7 +192,7 @@ export default function MentionsTextarea({
         } finally {
           setLoading(false);
         }
-      }, 200);
+      }, 180);
       return () => {
         if (searchTimer.current) clearTimeout(searchTimer.current);
       };
@@ -157,7 +216,7 @@ export default function MentionsTextarea({
       })();
     }
     return undefined;
-  }, [menuQueryKey, menu?.type, noteId, excludeNoteIds]);
+  }, [menuQueryKey, menu?.type, noteId, excludeNoteIds, slashNoteTypeOptions]);
 
   const applyMention = async (item) => {
     const el = taRef.current;
@@ -203,9 +262,24 @@ export default function MentionsTextarea({
     });
   };
 
+  const applySlashNoteType = (item) => {
+    const el = taRef.current;
+    if (!menu || !el || !onSlashNoteTypeSelect) return;
+    const caret = el.selectionStart ?? menu.caret;
+    onSlashNoteTypeSelect(item.value);
+    const next = replaceTriggerQuery(value, menu.start, caret, '');
+    onChange(next);
+    closeMenu();
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(menu.start, menu.start);
+    });
+  };
+
   const onKeyDown = (e) => {
-    if (!menu || items.length === 0) {
-      if (e.key === '@' || e.key === '#') {
+    const slashOn = Boolean(onSlashNoteTypeSelect && slashNoteTypeOptions?.length);
+    if (!menu) {
+      if (e.key === '@' || e.key === '#' || (slashOn && e.key === '/')) {
         requestAnimationFrame(refreshMenu);
       }
       return;
@@ -215,6 +289,7 @@ export default function MentionsTextarea({
       closeMenu();
       return;
     }
+    if (items.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setHighlight((h) => Math.min(h + 1, items.length - 1));
@@ -229,14 +304,16 @@ export default function MentionsTextarea({
       e.preventDefault();
       const item = items[highlight] ?? items[0];
       if (!item) return;
-      if (menu.type === '@') applyMention(item);
+      if (menu.type === '@') void applyMention(item);
+      else if (menu.type === '/') applySlashNoteType(item);
       else applyTag(item);
     }
   };
 
   const onSelect = (item) => {
     if (!menu) return;
-    if (menu.type === '@') applyMention(item);
+    if (menu.type === '@') void applyMention(item);
+    else if (menu.type === '/') applySlashNoteType(item);
     else applyTag(item);
   };
 
@@ -264,7 +341,7 @@ export default function MentionsTextarea({
         onSelect={onSelectInner}
         aria-autocomplete={menu ? 'list' : undefined}
         aria-controls={menu ? menuDomId : undefined}
-        aria-expanded={Boolean(menu && items.length > 0)}
+        aria-expanded={Boolean(menu && (items.length > 0 || loading))}
       />
       {menu && (
         <div
@@ -278,12 +355,16 @@ export default function MentionsTextarea({
             zIndex: 10000,
           }}
           role="listbox"
-          aria-label={menu.type === '@' ? 'Notes' : 'Tags'}
+          aria-label={
+            menu.type === '@' ? 'Notes' : menu.type === '#' ? 'Tags' : 'Note type'
+          }
         >
-          {menu.type === '@' && menu.query.trim().length < 1 && !loading && (
-            <div className="mentions-menu-hint">Keep typing to search notes…</div>
+          {menu.type === '@' && menu.query.trim().length < 1 && loading && (
+            <div className="mentions-menu-hint">Loading recent notes…</div>
           )}
-          {loading && <div className="mentions-menu-hint">Searching…</div>}
+          {menu.type === '@' && menu.query.trim().length >= 1 && loading && (
+            <div className="mentions-menu-hint">Searching…</div>
+          )}
           {!loading &&
             items.map((it, i) => (
               <button
@@ -296,14 +377,24 @@ export default function MentionsTextarea({
                 onClick={() => onSelect(it)}
                 onMouseEnter={() => setHighlight(i)}
               >
-                {menu.type === '@' ? it.label : `#${it.name}`}
+                {menu.type === '@'
+                  ? it.label
+                  : menu.type === '/'
+                    ? it.label
+                    : `#${it.name}`}
               </button>
             ))}
+          {!loading && menu.type === '@' && menu.query.trim().length < 1 && items.length === 0 && (
+            <div className="mentions-menu-hint">No recent notes</div>
+          )}
           {!loading && menu.type === '@' && menu.query.trim().length >= 1 && items.length === 0 && (
             <div className="mentions-menu-hint">No matching notes</div>
           )}
           {!loading && menu.type === '#' && items.length === 0 && (
             <div className="mentions-menu-hint">No matching tags</div>
+          )}
+          {!loading && menu.type === '/' && items.length === 0 && (
+            <div className="mentions-menu-hint">No matching type</div>
           )}
         </div>
       )}

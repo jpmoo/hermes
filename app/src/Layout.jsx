@@ -98,40 +98,46 @@ export default function Layout({
               )}
             </nav>
             <div className="layout-filters-cluster">
-              {noteTypeFilterEnabled && (
-                <div className="layout-type-filters" role="group" aria-label="Filter notes by type">
-                  {NOTE_TYPE_HEADER_ORDER.map((t) => {
-                    const on = visibleNoteTypes.has(t);
-                    const label = TYPE_FILTER_LABELS[t] ?? t;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        className={`layout-type-toggle ${on ? '' : 'layout-type-toggle--dim'}`}
-                        onClick={() => toggleNoteType(t)}
-                        aria-pressed={on}
-                        aria-label={
-                          on
+              <div className="layout-type-filters" role="group" aria-label="Filter notes by type">
+                {NOTE_TYPE_HEADER_ORDER.map((t) => {
+                  const on = visibleNoteTypes.has(t);
+                  const label = TYPE_FILTER_LABELS[t] ?? t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      disabled={!noteTypeFilterEnabled}
+                      className={`layout-toolbar-btn ${on ? 'layout-toolbar-btn--active' : ''}`}
+                      onClick={() => noteTypeFilterEnabled && toggleNoteType(t)}
+                      aria-pressed={noteTypeFilterEnabled ? on : undefined}
+                      aria-disabled={!noteTypeFilterEnabled}
+                      aria-label={
+                        !noteTypeFilterEnabled
+                          ? `${label} filter (available on Stream and Outline)`
+                          : on
                             ? `${label} visible — hide from Stream and Outline`
                             : `${label} hidden — show in Stream and Outline`
-                        }
-                        title={
-                          on
+                      }
+                      title={
+                        !noteTypeFilterEnabled
+                          ? 'Type filters apply on Stream and Outline'
+                          : on
                             ? `${label} visible — click to hide from Stream and Outline`
                             : `${label} hidden — click to show`
-                        }
-                      >
-                        <NoteTypeIcon type={t} className="layout-type-toggle-icon" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                      }
+                    >
+                      <NoteTypeIcon type={t} className="layout-toolbar-icon" />
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="layout-filters-cluster-star-gap" aria-hidden />
               <button
                 type="button"
-                className={`layout-toggle ${starFilterEnabled && starredOnly ? 'layout-toggle--on' : ''}`}
+                className={`layout-toolbar-btn ${starFilterEnabled && starredOnly ? 'layout-toolbar-btn--active' : ''}`}
                 disabled={!starFilterEnabled}
                 onClick={() => starFilterEnabled && onStarredOnlyChange?.(!starredOnly)}
+                aria-pressed={starFilterEnabled ? starredOnly : undefined}
                 aria-label={
                   !starFilterEnabled
                     ? 'Starred filter (available on Stream)'
@@ -147,7 +153,7 @@ export default function Layout({
                       : 'All notes — click to show starred only'
                 }
               >
-                <NavIconStar className="layout-action-icon" />
+                <NavIconStar className="layout-toolbar-icon" />
               </button>
             </div>
           </div>
@@ -162,7 +168,7 @@ export default function Layout({
               aria-label="Sign out"
               title="Sign out"
             >
-              <NavIconSignOut className="layout-action-icon" />
+              <NavIconSignOut className="layout-toolbar-icon" />
             </button>
           </div>
         </div>

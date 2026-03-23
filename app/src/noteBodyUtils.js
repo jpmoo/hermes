@@ -49,28 +49,49 @@ export function stripHashtagPrefixFromContent(content, tagName) {
 }
 
 /**
- * @returns {{ type: '@' | '#', start: number, query: string } | null}
+ * @param {{ allowSlashNoteType?: boolean }} [opts]
+ * @returns {{ type: '@' | '#' | '/', start: number, query: string } | null}
  */
-export function getActiveTrigger(text, caretPos) {
+export function getActiveTrigger(text, caretPos, opts = {}) {
   const s = text == null ? '' : String(text);
   const pos = Math.min(Math.max(0, caretPos), s.length);
   const before = s.slice(0, pos);
-  const at = before.lastIndexOf('@');
-  const hash = before.lastIndexOf('#');
-  const i = Math.max(at, hash);
-  if (i < 0) return null;
-  const trigger = s[i];
-  if (trigger !== '@' && trigger !== '#') return null;
-  const prev = i > 0 ? s[i - 1] : ' ';
-  if (i > 0 && !/[\s\n([{'"`]/.test(prev)) return null;
-  const after = before.slice(i + 1);
-  if (after.includes('\n') || after.includes(']')) return null;
-  if (trigger === '@') {
-    if (!/^[a-zA-Z0-9\s\-_.]*$/.test(after)) return null;
-    return { type: '@', start: i, query: after };
+  const candidates = [];
+
+  if (opts.allowSlashNoteType) {
+    const slash = before.lastIndexOf('/');
+    if (slash >= 0 && /^\s*$/.test(s.slice(0, slash))) {
+      const afterSlash = before.slice(slash + 1);
+      if (!afterSlash.includes('\n') && /^[a-zA-Z]*$/.test(afterSlash)) {
+        candidates.push({ type: '/', start: slash, query: afterSlash });
+      }
+    }
   }
-  if (!/^[a-z0-9-]*$/.test(after)) return null;
-  return { type: '#', start: i, query: after };
+
+  const at = before.lastIndexOf('@');
+  if (at >= 0) {
+    const prev = at > 0 ? s[at - 1] : ' ';
+    if (at === 0 || /[\s\n([{'"`]/.test(prev)) {
+      const after = before.slice(at + 1);
+      if (!after.includes('\n') && !after.includes(']') && /^[a-zA-Z0-9\s\-_.]*$/.test(after)) {
+        candidates.push({ type: '@', start: at, query: after });
+      }
+    }
+  }
+
+  const hash = before.lastIndexOf('#');
+  if (hash >= 0) {
+    const prev = hash > 0 ? s[hash - 1] : ' ';
+    if (hash === 0 || /[\s\n([{'"`]/.test(prev)) {
+      const after = before.slice(hash + 1);
+      if (!after.includes('\n') && !after.includes(']') && /^[a-z0-9-]*$/.test(after)) {
+        candidates.push({ type: '#', start: hash, query: after });
+      }
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  return candidates.reduce((a, b) => (a.start >= b.start ? a : b));
 }
 
 export function replaceTriggerQuery(text, triggerStart, caretPos, insertion) {

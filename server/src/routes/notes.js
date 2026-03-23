@@ -178,6 +178,26 @@ router.get('/thread/:id', async (req, res) => {
   }
 });
 
+/** Match rows then resolve thread root per note (avoids building the full tree before filtering). */
+const NOTE_LIST_FROM_MATCHES = `
+  SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+         r.root_id,
+         (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+         (SELECT COUNT(*)::int FROM note_connections nc
+          WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
+  FROM notes n
+  INNER JOIN matches m ON m.id = n.id
+  INNER JOIN LATERAL (
+    WITH RECURSIVE anc AS (
+      SELECT id, parent_id FROM notes WHERE id = n.id
+      UNION ALL
+      SELECT p.id, p.parent_id FROM notes p INNER JOIN anc ON p.id = anc.parent_id
+    )
+    SELECT id AS root_id FROM anc WHERE parent_id IS NULL LIMIT 1
+  ) r ON true
+  WHERE n.user_id = $1
+  ORDER BY m.last_activity_at DESC NULLS LAST`;
+
 // Substring search in note body (no Ollama; use when semantic search unavailable)
 router.get('/search-content', async (req, res) => {
   try {
@@ -190,21 +210,14 @@ router.get('/search-content', async (req, res) => {
     const escaped = raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     const pattern = `%${escaped}%`;
     const r = await pool.query(
-      `WITH RECURSIVE roots AS (
-        SELECT id, id AS root_id FROM notes WHERE parent_id IS NULL AND user_id = $1
-        UNION ALL
-        SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
+      `WITH matches AS (
+        SELECT n.id, n.last_activity_at
+        FROM notes n
+        WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
+        ORDER BY n.last_activity_at DESC NULLS LAST
+        LIMIT $3
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
-             r.root_id,
-             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
-             (SELECT COUNT(*)::int FROM note_connections nc
-              WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
-      FROM notes n
-      JOIN roots r ON r.id = n.id
-      WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
-      ORDER BY n.last_activity_at DESC
-      LIMIT $3`,
+      ${NOTE_LIST_FROM_MATCHES}`,
       [userId, pattern, limit]
     );
     const notes = r.rows;
@@ -228,6 +241,46 @@ router.get('/search-content', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to search content' });
+  }
+});
+
+// Recent notes for @-mention menu when the query is still empty (fast path; no ILIKE scan)
+router.get('/mention-recent', async (req, res) => {
+  try {
+    const limit = Math.min(30, Math.max(1, parseInt(req.query.limit, 10) || 12));
+    const userId = req.userId;
+    const r = await pool.query(
+      `WITH matches AS (
+        SELECT n.id, n.last_activity_at
+        FROM notes n
+        WHERE n.user_id = $1
+        ORDER BY n.last_activity_at DESC NULLS LAST
+        LIMIT $2
+      )
+      ${NOTE_LIST_FROM_MATCHES}`,
+      [userId, limit]
+    );
+    const notes = r.rows;
+    if (notes.length > 0) {
+      const ids = notes.map((n) => n.id);
+      const tagRows = await pool.query(
+        `SELECT nt.note_id, t.id AS tag_id, t.name FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = ANY($1) AND nt.status = 'approved' ORDER BY t.name`,
+        [ids]
+      );
+      const byNote = {};
+      tagRows.rows.forEach((row) => {
+        if (!byNote[row.note_id]) byNote[row.note_id] = [];
+        byNote[row.note_id].push({ id: row.tag_id, name: row.name });
+      });
+      notes.forEach((n) => {
+        n.tags = byNote[n.id] || [];
+      });
+    }
+    await attachBlobListToNotes(notes, userId);
+    res.json(notes);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load recent notes' });
   }
 });
 
