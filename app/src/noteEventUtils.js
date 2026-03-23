@@ -1,6 +1,7 @@
 export const NOTE_TYPE_OPTIONS = [
   { value: 'note', label: 'Note' },
   { value: 'person', label: 'Person' },
+  { value: 'organization', label: 'Organization' },
   { value: 'event', label: 'Event' },
 ];
 

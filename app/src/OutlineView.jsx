@@ -1,9 +1,21 @@
-import React, { useState, useEffect, useContext, createContext, useCallback, useRef, useLayoutEffect } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  createContext,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+  useMemo,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getRoots, getThread } from './api';
 import Layout from './Layout';
 import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from './outlineExpansionStorage';
+import NoteTypeIcon from './NoteTypeIcon';
+import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
+import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './OutlineView.css';
 
 const OutlineExpandContext = createContext({
@@ -112,6 +124,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
 
   const rowMain = (
     <>
+      <NoteTypeIcon type={node.note_type || 'note'} className="outline-type-icon" />
       <span className={`outline-content ${node.starred ? 'outline-content--starred' : ''}`}>
         {node.content || '—'}
       </span>
@@ -189,6 +202,7 @@ export default function OutlineView() {
   const rootThreadsRef = useRef({});
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { visibleNoteTypes } = useNoteTypeFilter();
 
   useEffect(() => {
     rootThreadsRef.current = rootThreads;
@@ -235,13 +249,22 @@ export default function OutlineView() {
     void Promise.all(needLoad.map((r) => loadThreadForRoot(r.id)));
   }, [loading, roots, rootThreads, loadThreadForRoot]);
 
-  const tree = roots.map((r) => {
-    const loaded = rootThreads[r.id];
-    return {
-      ...r,
-      children: loaded?.children ?? [],
-    };
-  });
+  const treeRaw = useMemo(
+    () =>
+      roots.map((r) => {
+        const loaded = rootThreads[r.id];
+        return {
+          ...r,
+          children: loaded?.children ?? [],
+        };
+      }),
+    [roots, rootThreads]
+  );
+
+  const tree = useMemo(
+    () => filterTreeByVisibleNoteTypes(treeRaw, visibleNoteTypes),
+    [treeRaw, visibleNoteTypes]
+  );
 
   const treeRef = useRef(tree);
   treeRef.current = tree;
@@ -300,6 +323,7 @@ export default function OutlineView() {
   return (
     <Layout
       title="Outline"
+      noteTypeFilterEnabled
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },
@@ -322,6 +346,8 @@ export default function OutlineView() {
 
         {loading ? (
           <p className="outline-view-loading">Loading…</p>
+        ) : !loading && roots.length > 0 && tree.length === 0 ? (
+          <p className="outline-view-empty">No notes match the current type filters.</p>
         ) : tree.length === 0 ? (
           <p className="outline-view-empty">No notes.</p>
         ) : (

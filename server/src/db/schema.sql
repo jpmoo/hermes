@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS notes (
   last_activity_at TIMESTAMPTZ DEFAULT now(),
   starred         BOOLEAN DEFAULT false,
   external_anchor TEXT,
-  note_type       TEXT NOT NULL DEFAULT 'note' CHECK (note_type IN ('note', 'person', 'event')),
+  note_type       TEXT NOT NULL DEFAULT 'note' CHECK (note_type IN ('note', 'person', 'event', 'organization')),
   event_start_at  TIMESTAMPTZ,
   event_end_at    TIMESTAMPTZ,
   embedding       vector(768),  -- nomic-embed-text default dimension; adjust if different model

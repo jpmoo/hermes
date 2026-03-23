@@ -31,6 +31,24 @@ html {
   --status-danger-btn-bg: #a33636;
   --status-danger-btn-hover: #8f2d2d;
   --on-danger-btn: #fff;
+  /* Note type icons (NoteTypeIcon): override per theme */
+  --note-type-icon-note: var(--text-muted);
+  --note-type-icon-organization: var(--accent-dim);
+  --note-type-icon-person: var(--accent);
+  --note-type-icon-event: #9a7038;
+}
+
+.note-type-icon--note {
+  color: var(--note-type-icon-note);
+}
+.note-type-icon--organization {
+  color: var(--note-type-icon-organization);
+}
+.note-type-icon--person {
+  color: var(--note-type-icon-person);
+}
+.note-type-icon--event {
+  color: var(--note-type-icon-event);
 }
 
 * {

@@ -5,9 +5,13 @@ import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
+import MentionsTextarea from './MentionsTextarea';
 import { eventFieldsToPayload } from './noteEventUtils';
+import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
+import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
+import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './StreamPage.css';
 
 function buildTree(flat) {
@@ -31,6 +35,18 @@ function findNode(nodes, id) {
     if (n.id === id) return n;
     const f = findNode(n.children || [], id);
     if (f) return f;
+  }
+  return null;
+}
+
+/** Parent id of targetId in the filtered tree, or null if target is at top level / missing. */
+function parentInFilteredTree(nodes, targetId) {
+  for (const n of nodes) {
+    for (const c of n.children || []) {
+      if (c.id === targetId) return n.id;
+    }
+    const p = parentInFilteredTree(n.children || [], targetId);
+    if (p != null) return p;
   }
   return null;
 }
@@ -252,6 +268,7 @@ export default function StreamPage() {
   const [flipTick, setFlipTick] = useState(0);
   const flipPayloadRef = useRef(null);
   const levelNavBusyRef = useRef(false);
+  const { visibleNoteTypes } = useNoteTypeFilter();
 
   const loadRoots = useCallback(() => {
     setLoadError(null);
@@ -329,14 +346,44 @@ export default function StreamPage() {
   }, [threadRootId]);
 
   const threadReady = Boolean(threadRootId && !loadingThread && thread.length > 0);
+  const treeFull = useMemo(() => buildTree(thread), [thread]);
+  const tree = useMemo(
+    () => filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes),
+    [treeFull, visibleNoteTypes]
+  );
+  const filteredRoots = useMemo(
+    () => filterRootsByVisibleNoteTypes(roots, visibleNoteTypes),
+    [roots, visibleNoteTypes]
+  );
+  const actualRootId = thread[0]?.id;
+  const displayTree = useMemo(() => {
+    const fn = focusId && actualRootId ? findNode(tree, focusId) : null;
+    if (fn && focusId !== actualRootId) {
+      return [{ ...fn, children: fn.children || [] }];
+    }
+    return tree;
+  }, [tree, focusId, actualRootId]);
+  const focusedNode = focusId && actualRootId ? findNode(tree, focusId) : null;
+
   useEffect(() => {
     if (!threadReady || !focusParam || !thread.length) return;
     const key = `${threadRootId}|${focusParam}`;
     if (focusFromUrlApplied.current === key) return;
-    if (!findNode(buildTree(thread), focusParam)) return;
+    if (!findNode(tree, focusParam)) return;
     focusFromUrlApplied.current = key;
     setFocusId(focusParam);
-  }, [threadReady, threadRootId, focusParam, thread]);
+  }, [threadReady, threadRootId, focusParam, thread, tree]);
+
+  useEffect(() => {
+    if (!focusId || !thread.length || !threadRootId) return;
+    const row = thread.find((n) => n.id === focusId);
+    if (!row) return;
+    const t = row.note_type || 'note';
+    if (!visibleNoteTypes.has(t)) {
+      setFocusId(null);
+      setSearchParams({ thread: threadRootId });
+    }
+  }, [focusId, thread, threadRootId, visibleNoteTypes, setSearchParams]);
 
   useEffect(() => {
     if (!threadRootId || !thread.length || loadingThread) return;
@@ -366,7 +413,7 @@ export default function StreamPage() {
 
   const beginOpenThread = useCallback(
     (rootId, e) => {
-      const n = roots.find((r) => r.id === rootId);
+      const n = filteredRoots.find((r) => r.id === rootId);
       const li = e?.currentTarget?.closest?.('li.stream-page-root-item');
       if (!n || !li || typeof li.getBoundingClientRect !== 'function') {
         openThreadDirect(rootId);
@@ -404,7 +451,7 @@ export default function StreamPage() {
         setFocusId(null);
       }, 480);
     },
-    [roots, openThreadDirect, setSearchParams]
+    [filteredRoots, openThreadDirect, setSearchParams]
   );
 
   const closeThread = useCallback(() => {
@@ -417,9 +464,6 @@ export default function StreamPage() {
       loadRoots();
     }, 220);
   }, [setSearchParams, loadRoots]);
-
-  const tree = buildTree(thread);
-  const actualRootId = thread[0]?.id;
 
   const clearLevelDropSoon = useCallback(() => {
     window.setTimeout(() => setLevelDropDelays(null), 1550);
@@ -435,17 +479,16 @@ export default function StreamPage() {
       setBranchHeadExiting(false);
       setFocusId(null);
       setSearchParams({ thread: threadRootId });
-      setLevelDropDelays(buildFullThreadLevelDrops(buildTree(thread)));
+      setLevelDropDelays(buildFullThreadLevelDrops(tree));
       clearLevelDropSoon();
       levelNavBusyRef.current = false;
     }, 400);
-  }, [threadRootId, focusId, actualRootId, thread, setSearchParams, clearLevelDropSoon]);
+  }, [threadRootId, focusId, actualRootId, thread, tree, setSearchParams, clearLevelDropSoon]);
 
   const upOneLevel = useCallback(() => {
     if (!threadRootId || !focusId || focusId === actualRootId) return;
     if (levelNavBusyRef.current || floatTimerRef.current) return;
-    const row = thread.find((n) => n.id === focusId);
-    const parentId = row?.parent_id;
+    const parentId = parentInFilteredTree(tree, focusId);
     if (!parentId || parentId === actualRootId) {
       animateToFullThread();
       return;
@@ -460,8 +503,7 @@ export default function StreamPage() {
       ? { left: fr.left, top: fr.top, width: fr.width, height: fr.height, noteId: leavingHeadId }
       : null;
 
-    const t = buildTree(thread);
-    const parentNode = findNode(t, parentId);
+    const parentNode = findNode(tree, parentId);
     const delays = parentNode ? buildParentBranchLevelDrops(parentNode, leavingHeadId) : new Map();
 
     setFocusId(parentId);
@@ -484,6 +526,7 @@ export default function StreamPage() {
     focusId,
     actualRootId,
     thread,
+    tree,
     setSearchParams,
     animateToFullThread,
     clearLevelDropSoon,
@@ -532,21 +575,11 @@ export default function StreamPage() {
       });
     });
   }, [flipTick]);
-  const focusedNode = focusId && actualRootId ? findNode(tree, focusId) : null;
-  const displayTree =
-    focusedNode && focusId !== actualRootId
-      ? [{ ...focusedNode, children: focusedNode.children || [] }]
-      : tree;
 
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
 
   const replyStaggerDelays = useMemo(() => {
     if (!replyStagger || !thread.length) return null;
-    const t = buildTree(thread);
-    const tr = thread[0]?.id;
-    const fn = focusId && tr ? findNode(t, focusId) : null;
-    const dt =
-      fn && focusId !== tr ? [{ ...fn, children: fn.children || [] }] : t;
     const m = new Map();
     let i = 0;
     function walk(nodes, depth) {
@@ -555,9 +588,9 @@ export default function StreamPage() {
         walk(n.children || [], depth + 1);
       }
     }
-    walk(dt, 0);
+    walk(displayTree, 0);
     return m;
-  }, [replyStagger, thread, focusId]);
+  }, [replyStagger, thread, displayTree]);
 
   useEffect(() => {
     if (!replyStagger || !threadReady) return;
@@ -586,8 +619,7 @@ export default function StreamPage() {
         applyFocusImmediate(id);
         return;
       }
-      const t = buildTree(thread);
-      const fullPath = pathFromRootToId(t, id);
+      const fullPath = pathFromRootToId(displayTree, id);
       if (!fullPath) {
         applyFocusImmediate(id);
         return;
@@ -623,7 +655,7 @@ export default function StreamPage() {
         applyFocusImmediate(id);
         return;
       }
-      const node = findNode(t, id);
+      const node = findNode(tree, id);
       const note = {
         ...row,
         reply_count: node?.children?.length ?? row.reply_count ?? 0,
@@ -652,6 +684,8 @@ export default function StreamPage() {
     [
       loadingThread,
       thread,
+      tree,
+      displayTree,
       actualRootId,
       focusId,
       threadRootId,
@@ -717,6 +751,8 @@ export default function StreamPage() {
     setSubmitting(true);
     try {
       const note = await createNote({ content: text, ...meta });
+      await syncConnectionsFromContent(note.id, text);
+      await syncTagsFromContent(note.id, text, [], '');
       if (pendingRootFiles.length > 0) await uploadNoteFiles(note.id, pendingRootFiles);
       const full =
         pendingRootFiles.length > 0
@@ -758,6 +794,8 @@ export default function StreamPage() {
     setSubmitting(true);
     try {
       const note = await createNote({ content: text, parent_id: replyParentId, ...meta });
+      await syncConnectionsFromContent(note.id, text);
+      await syncTagsFromContent(note.id, text, [], '');
       if (pendingReplyFiles.length > 0) await uploadNoteFiles(note.id, pendingReplyFiles);
       setReplyContent('');
       setPendingReplyFiles([]);
@@ -794,6 +832,7 @@ export default function StreamPage() {
     <Layout
       title={layoutTitle}
       starFilterEnabled
+      noteTypeFilterEnabled
       starredOnly={starredOnly}
       onStarredOnlyChange={setStarredOnly}
       onLogout={logout}
@@ -839,6 +878,8 @@ export default function StreamPage() {
                 <p className="stream-page-muted">Loading thread…</p>
               ) : thread.length === 0 ? (
                 <p className="stream-page-muted">Thread not found.</p>
+              ) : tree.length === 0 ? (
+                <p className="stream-page-muted">No notes match the current type filters.</p>
               ) : (
                 <div
                   className={`stream-page-thread-enter ${threadExiting ? 'stream-page-thread-enter--exit' : ''} ${levelDropDelays ? 'stream-page-thread-enter--level-drop' : ''}`}
@@ -882,9 +923,11 @@ export default function StreamPage() {
                 <p className="stream-page-muted">
                   {starredOnly ? 'No starred threads yet.' : 'No threads yet. Start one below.'}
                 </p>
+              ) : filteredRoots.length === 0 && roots.length > 0 ? (
+                <p className="stream-page-muted">No threads match the current type filters.</p>
               ) : roots.length > 0 ? (
                 <ul className="stream-page-list">
-                  {roots.map((n) => (
+                  {filteredRoots.map((n) => (
                     <li key={n.id} className="stream-page-root-item">
                       <NoteCard
                         note={n}
@@ -907,15 +950,16 @@ export default function StreamPage() {
         <div className="stream-page-compose-wrap">
           {threadRootId ? (
             <form className="stream-page-compose" onSubmit={handleReply}>
-              <textarea
+              <MentionsTextarea
                 placeholder={
                   replyParentId === threadRootId
                     ? 'Reply to thread…'
                     : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”…`
                 }
                 value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
+                onChange={setReplyContent}
                 rows={2}
+                disabled={submitting}
               />
               <NoteTypeEventFields
                 idPrefix="stream-reply"
@@ -955,11 +999,12 @@ export default function StreamPage() {
             </form>
           ) : (
             <form className="stream-page-compose" onSubmit={handleNewRoot}>
-              <textarea
+              <MentionsTextarea
                 placeholder="New thread…"
                 value={newRootContent}
-                onChange={(e) => setNewRootContent(e.target.value)}
+                onChange={setNewRootContent}
                 rows={2}
+                disabled={submitting}
               />
               <NoteTypeEventFields
                 idPrefix="stream-root"

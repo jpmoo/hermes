@@ -161,6 +161,46 @@
   background: none;
 }
 
+.layout-type-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.layout-type-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2.35rem;
+  padding: 0.25rem 0.35rem;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.layout-type-toggle-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+}
+
+.layout-type-toggle:hover {
+  color: var(--text);
+  background: rgba(201, 162, 39, 0.08);
+}
+
+.layout-type-toggle--dim {
+  opacity: 0.32;
+}
+
+.layout-type-toggle--dim:hover {
+  opacity: 0.55;
+}
+
 .layout-logout {
   display: inline-flex;
   align-items: center;

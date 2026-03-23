@@ -7,6 +7,7 @@ import OutlineView from './OutlineView';
 import TagView from './TagView';
 import SearchView from './SearchView';
 import OrphanFilesView from './OrphanFilesView';
+import { NoteTypeFilterProvider } from './NoteTypeFilterContext';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -85,7 +86,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter basename="/hermes">
-        <AppRoutes />
+        <NoteTypeFilterProvider>
+          <AppRoutes />
+        </NoteTypeFilterProvider>
       </BrowserRouter>
     </AuthProvider>
   );

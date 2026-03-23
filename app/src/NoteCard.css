@@ -1,4 +1,5 @@
 .note-card {
+  position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent-dim);
@@ -6,6 +7,20 @@
   padding: 1rem 1.25rem;
   cursor: pointer;
   transition: background 0.15s;
+}
+
+.note-card-type-icon {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.85rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+.note-card--has-type-icon .note-card-body {
+  padding-right: 2.1rem;
 }
 
 .note-card:hover {
@@ -104,7 +119,8 @@
   color: var(--text-muted);
 }
 
-.note-card-edit textarea {
+.note-card-edit textarea,
+.note-card-edit-textarea {
   width: 100%;
   padding: 0.5rem;
   background: var(--bg);
@@ -113,6 +129,45 @@
   color: var(--text);
   font-size: 1rem;
   resize: vertical;
+}
+
+.note-card-content-rich {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-rich-mention {
+  display: inline;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.35rem;
+  font: inherit;
+  color: var(--accent, #c9a227);
+  background: color-mix(in srgb, var(--accent, #c9a227) 12%, transparent);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.note-rich-mention:hover {
+  color: var(--text, #eee);
+}
+
+.note-rich-tag-pill {
+  display: inline;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.88em;
+  color: var(--text-muted, #aaa);
+  background: var(--bg, #252525);
+  border-radius: 4px;
+  border: 1px solid var(--border, #444);
+}
+
+.note-rich-link {
+  color: var(--accent, #c9a227);
+  word-break: break-all;
 }
 
 .note-card-edit-attachments {

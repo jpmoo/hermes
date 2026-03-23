@@ -1,0 +1,41 @@
+.mentions-textarea-wrap {
+  position: relative;
+}
+
+.mentions-menu {
+  min-width: 12rem;
+  max-width: min(28rem, calc(100vw - 1.5rem));
+  max-height: 14rem;
+  overflow-y: auto;
+  margin-top: 2px;
+  padding: 0.25rem 0;
+  background: var(--bg-card, #1a1a1a);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.mentions-menu-hint {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+}
+
+.mentions-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text, #eee);
+  font-size: 0.85rem;
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.mentions-menu-item:hover,
+.mentions-menu-item--active {
+  background: var(--bg, #252525);
+  color: var(--accent, #c9a227);
+}

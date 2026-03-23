@@ -18,7 +18,7 @@ router.use(requireAuth);
 const NOTE_RETURNING =
   'id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at';
 
-const NOTE_TYPES = new Set(['note', 'person', 'event']);
+const NOTE_TYPES = new Set(['note', 'person', 'event', 'organization']);
 
 function coerceNoteType(v, fallback = 'note') {
   if (v == null || v === '') return fallback;

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   starNote,
   unstarNote,
@@ -10,12 +11,17 @@ import {
   removeNoteTag,
   deleteNoteFile,
   uploadNoteFiles,
+  getNoteThreadRoot,
 } from './api';
-import LinkifiedText from './LinkifiedText';
+import NoteRichText from './NoteRichText';
 import NoteAttachments from './NoteAttachments';
 import NoteTypeEventFields from './NoteTypeEventFields';
+import MentionsTextarea from './MentionsTextarea';
 import { formatEventRange, eventFieldsToPayload, isoToDateTimeFields } from './noteEventUtils';
+import { stripHashtagPrefixFromContent } from './noteBodyUtils';
+import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { useHoverInsight } from './HoverInsightContext';
+import NoteTypeIcon from './NoteTypeIcon';
 import './NoteCard.css';
 
 export default function NoteCard({
@@ -31,6 +37,7 @@ export default function NoteCard({
   /** Stream: single-click tag/connection panels; double-click opens thread (any depth) */
   hoverInsightEnabled = false,
 }) {
+  const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
   const insightClickTimerRef = useRef(null);
   const tagDropdownRef = useRef(null);
@@ -98,6 +105,18 @@ export default function NoteCard({
   const insightActive = Boolean(insightSelectedId);
   const isInsightSelected = insightActive && insightSelectedId === note.id;
 
+  const openLinkedNote = useCallback(
+    async (linkedId) => {
+      try {
+        const root = await getNoteThreadRoot(linkedId);
+        navigate({ pathname: '/', search: `?thread=${root}&focus=${linkedId}` });
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [navigate]
+  );
+
   const handleStar = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -123,8 +142,11 @@ export default function NoteCard({
       console.error(meta.error);
       return;
     }
+    const trimmed = editContent.trim();
     try {
-      await updateNote(note.id, { content: editContent.trim(), ...meta });
+      await updateNote(note.id, { content: trimmed, ...meta });
+      await syncTagsFromContent(note.id, trimmed, note.tags, note.content || '');
+      await syncConnectionsFromContent(note.id, trimmed);
       setEditing(false);
       onNoteUpdate?.();
     } catch (err) {
@@ -162,7 +184,13 @@ export default function NoteCard({
   const handleRemoveTag = async (e, tagId) => {
     e.preventDefault();
     e.stopPropagation();
+    const t = tags.find((x) => x.id === tagId);
+    if (!t) return;
     try {
+      const nextContent = stripHashtagPrefixFromContent(note.content || '', t.name);
+      if (nextContent !== (note.content || '')) {
+        await updateNote(note.id, { content: nextContent });
+      }
       await removeNoteTag(note.id, tagId);
       onNoteUpdate?.();
     } catch (err) {
@@ -319,6 +347,7 @@ export default function NoteCard({
 
   const cardClassNames = [
     cardClass,
+    editing ? 'note-card--editing' : 'note-card--has-type-icon',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
   ]
@@ -394,13 +423,17 @@ export default function NoteCard({
             }
       }
     >
+      {!editing && <NoteTypeIcon type={note.note_type || 'note'} className="note-card-type-icon" />}
       <div className="note-card-body">
         {editing ? (
           <form className="note-card-edit" onSubmit={handleSaveEdit} onClick={(e) => e.stopPropagation()}>
-            <textarea
+            <MentionsTextarea
               value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
+              onChange={setEditContent}
+              noteId={note.id}
+              excludeNoteIds={[note.id]}
               rows={3}
+              className="note-card-edit-textarea"
               autoFocus
             />
             <NoteTypeEventFields
@@ -440,9 +473,18 @@ export default function NoteCard({
           </form>
         ) : (
           <>
-            <p className="note-card-content">
-              {note.content?.trim() ? <LinkifiedText text={note.content} /> : note.attachments?.length ? null : '—'}
-            </p>
+            <div className="note-card-content">
+              {note.content?.trim() ? (
+                <NoteRichText
+                  text={note.content}
+                  tagNames={tags.map((t) => t.name)}
+                  className="note-card-content-rich"
+                  onNoteClick={openLinkedNote}
+                />
+              ) : note.attachments?.length ? null : (
+                '—'
+              )}
+            </div>
             {eventRangeLabel ? <p className="note-card-event-range">{eventRangeLabel}</p> : null}
             <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
             {tags.length > 0 && (

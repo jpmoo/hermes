@@ -8,6 +8,9 @@ import {
   NavIconStar,
   NavIconSignOut,
 } from './icons/NavIcons.jsx';
+import NoteTypeIcon from './NoteTypeIcon';
+import { NOTE_TYPE_FILTER_ORDER } from './noteTypeFilter';
+import { useNoteTypeFilter } from './NoteTypeFilterContext';
 
 const LAYOUT_THEME_COLOR = '#f4f3f0';
 
@@ -16,12 +19,14 @@ export default function Layout({
   starredOnly = false,
   onStarredOnlyChange,
   starFilterEnabled = false,
+  noteTypeFilterEnabled = false,
   onLogout,
   viewLinks,
   children,
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { visibleNoteTypes, toggleNoteType } = useNoteTypeFilter();
 
   useEffect(() => {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', LAYOUT_THEME_COLOR);
@@ -105,6 +110,37 @@ export default function Layout({
             >
               <NavIconStar className="layout-action-icon" />
             </button>
+            {noteTypeFilterEnabled && (
+              <div className="layout-type-filters" role="group" aria-label="Filter notes by type">
+                {NOTE_TYPE_FILTER_ORDER.map((t) => {
+                  const on = visibleNoteTypes.has(t);
+                  const label =
+                    t === 'note'
+                      ? 'Note'
+                      : t === 'organization'
+                        ? 'Organization'
+                        : t === 'person'
+                          ? 'Person'
+                          : 'Event';
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`layout-type-toggle ${on ? '' : 'layout-type-toggle--dim'}`}
+                      onClick={() => toggleNoteType(t)}
+                      aria-pressed={on}
+                      title={
+                        on
+                          ? `${label} visible — click to hide from Stream and Outline`
+                          : `${label} hidden — click to show`
+                      }
+                    >
+                      <NoteTypeIcon type={t} className="layout-type-toggle-icon" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <button
               type="button"
               className="layout-logout"
