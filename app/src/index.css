@@ -32,10 +32,20 @@ html {
   --status-danger-btn-hover: #8f2d2d;
   --on-danger-btn: #fff;
   /* Note type icons (NoteTypeIcon): override per theme */
-  --note-type-icon-note: var(--text-muted);
+  --note-type-icon-note: color-mix(in srgb, var(--accent) 42%, var(--text-muted));
   --note-type-icon-organization: var(--accent-dim);
   --note-type-icon-person: var(--accent);
   --note-type-icon-event: #9a7038;
+}
+
+.note-type-icon {
+  flex-shrink: 0;
+}
+
+.note-type-icon path,
+.note-type-icon circle,
+.note-type-icon rect {
+  fill: none;
 }
 
 .note-type-icon--note {

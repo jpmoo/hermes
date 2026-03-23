@@ -12,16 +12,36 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Logo (left) | centered nav + filters | logout (right) — equal 1fr side columns keep the middle truly centered */
 .layout-header-inner {
   box-sizing: border-box;
   width: 100%;
   max-width: none;
   margin: 0;
   padding: 0.75rem 1rem;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
+  column-gap: clamp(0.75rem, 3vw, 1.75rem);
+}
+
+.layout-header-start {
+  justify-self: start;
+  min-width: 0;
+}
+
+.layout-header-end {
+  justify-self: end;
+  min-width: 0;
+}
+
+.layout-header-middle {
+  display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 4vw, 2.75rem);
+  max-width: 100%;
 }
 
 .layout-logo {
@@ -47,23 +67,10 @@
 .layout-nav {
   display: flex;
   flex-wrap: wrap;
-  flex: 1 1 auto;
   gap: 0.35rem 0.5rem;
   align-items: center;
   justify-content: center;
   min-width: 0;
-}
-
-@media (max-width: 720px) {
-  .layout-nav {
-    flex: 1 1 100%;
-    order: 3;
-    padding-top: 0.35rem;
-    border-top: 1px solid var(--border);
-  }
-  .layout-actions {
-    margin-left: 0;
-  }
 }
 
 .layout-nav-link {
@@ -94,12 +101,13 @@
   background: rgba(201, 162, 39, 0.12);
 }
 
-.layout-actions {
-  margin-left: auto;
+/* Type toggles + star: one cluster with a clear gap before the star */
+.layout-filters-cluster {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.65rem, 2.5vw, 1.1rem);
 }
 
 .layout-action-icon {
@@ -161,35 +169,54 @@
   background: none;
 }
 
+/* Four type slots: equal width so icons are evenly spaced */
 .layout-type-filters {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15rem;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.25rem;
+  width: min(100%, 13.5rem);
 }
 
 .layout-type-toggle {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 3rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2rem;
   min-height: 2.35rem;
-  padding: 0.25rem 0.35rem;
+  padding: 0.25rem 0.2rem;
   background: none;
   border: none;
   border-radius: 6px;
-  color: var(--text-muted);
   line-height: 0;
   cursor: pointer;
+  /* Do not set color here — NoteTypeIcon uses --note-type-icon-* per type */
 }
 
 .layout-type-toggle-icon {
   width: 1.15rem;
   height: 1.15rem;
   display: block;
+  flex-shrink: 0;
+}
+
+/* Header icons: always use theme tokens (avoids button text color masking the note swatch) */
+.layout-type-toggle .note-type-icon--note {
+  color: var(--note-type-icon-note);
+}
+.layout-type-toggle .note-type-icon--event {
+  color: var(--note-type-icon-event);
+}
+.layout-type-toggle .note-type-icon--person {
+  color: var(--note-type-icon-person);
+}
+.layout-type-toggle .note-type-icon--organization {
+  color: var(--note-type-icon-organization);
 }
 
 .layout-type-toggle:hover {
-  color: var(--text);
   background: rgba(201, 162, 39, 0.08);
 }
 
@@ -217,6 +244,32 @@
 
 .layout-logout:hover {
   color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .layout-header-inner {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    row-gap: 0.5rem;
+  }
+
+  .layout-header-start {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .layout-header-end {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .layout-header-middle {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--border);
+  }
 }
 
 .layout-main {

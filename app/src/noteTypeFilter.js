@@ -1,5 +1,8 @@
-/** Order of type toggles in the header (matches NoteTypeIcon). */
+/** Logical order for filtering (e.g. Stream tree). */
 export const NOTE_TYPE_FILTER_ORDER = ['note', 'organization', 'person', 'event'];
+
+/** Header row: Notes → Events → People → Organizations (matches user-facing labels). */
+export const NOTE_TYPE_HEADER_ORDER = ['note', 'event', 'person', 'organization'];
 
 export const ALL_NOTE_TYPES = new Set(NOTE_TYPE_FILTER_ORDER);
 
