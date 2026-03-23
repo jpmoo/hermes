@@ -12,10 +12,11 @@
   padding-top: var(--hi-insight-header-offset);
   --hi-insight-panel-height: calc(100vh - var(--hi-insight-header-offset) - 0.75rem);
   --hi-insight-panel-height: calc(100dvh - var(--hi-insight-header-offset) - 0.75rem);
+  --hi-insight-screen-edge: 5px;
 }
 
 .hover-insight-margin--left {
-  left: 0;
+  left: var(--hi-insight-screen-edge);
   width: 250px;
   justify-content: flex-start;
   padding-left: 0;
@@ -41,7 +42,7 @@
 }
 
 .hover-insight-margin--right {
-  right: 0;
+  right: var(--hi-insight-screen-edge);
   width: 250px;
   justify-content: flex-end;
   padding-right: 0;
