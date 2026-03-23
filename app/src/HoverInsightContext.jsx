@@ -152,6 +152,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const [ragdollLoading, setRagdollLoading] = useState(false);
   const [ragdollDocs, setRagdollDocs] = useState([]);
   const [ragdollError, setRagdollError] = useState(null);
+  const [ragdollIncludeParent, setRagdollIncludeParent] = useState(false);
+  const [ragdollIncludeSiblings, setRagdollIncludeSiblings] = useState(false);
+  const [ragdollIncludeChildren, setRagdollIncludeChildren] = useState(false);
+  const [ragdollIncludeConnected, setRagdollIncludeConnected] = useState(true);
 
   useEffect(() => {
     fetchRagdollConfig()
@@ -166,16 +170,22 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       });
   }, []);
 
-  /** If config arrived after the user already selected a note, run RAG search now. */
+  /** RAGDoll search when a note is selected, options change, or feature becomes enabled. */
   useEffect(() => {
     if (!ragdollEnabled) return;
-    const nid = activeHoverId.current;
+    const nid = hover?.note?.id;
     if (!nid) return;
     const rid = ++ragdollReqId.current;
     setRagdollLoading(true);
     setRagdollError(null);
     setRagdollDocs([]);
-    fetchRagdollRelevant(nid)
+    const opts = {
+      includeParent: ragdollIncludeParent,
+      includeSiblings: ragdollIncludeSiblings,
+      includeChildren: ragdollIncludeChildren,
+      includeConnected: ragdollIncludeConnected,
+    };
+    fetchRagdollRelevant(nid, opts)
       .then((data) => {
         if (ragdollReqId.current !== rid) return;
         setRagdollDocs(Array.isArray(data?.documents) ? data.documents : []);
@@ -188,7 +198,14 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       .finally(() => {
         if (ragdollReqId.current === rid) setRagdollLoading(false);
       });
-  }, [ragdollEnabled]);
+  }, [
+    ragdollEnabled,
+    hover?.note?.id,
+    ragdollIncludeParent,
+    ragdollIncludeSiblings,
+    ragdollIncludeChildren,
+    ragdollIncludeConnected,
+  ]);
 
   /** Clear insight selection (Stream: single-click mode). */
   const clearInsightSelection = useCallback(() => {
@@ -234,23 +251,6 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setLoading(true);
       setRagdollDocs([]);
       setRagdollError(null);
-      if (ragdollEnabledRef.current) {
-        const rid = ++ragdollReqId.current;
-        setRagdollLoading(true);
-        fetchRagdollRelevant(note.id)
-          .then((data) => {
-            if (ragdollReqId.current !== rid) return;
-            setRagdollDocs(Array.isArray(data?.documents) ? data.documents : []);
-          })
-          .catch((err) => {
-            if (ragdollReqId.current !== rid) return;
-            setRagdollError(err?.message || 'RAGDoll failed');
-            setRagdollDocs([]);
-          })
-          .finally(() => {
-            if (ragdollReqId.current === rid) setRagdollLoading(false);
-          });
-      }
 
       fetchLinkedNotesQuick(note.id)
         .then((data) => {
@@ -459,6 +459,14 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       ragdollLoading,
       ragdollDocs,
       ragdollError,
+      ragdollIncludeParent,
+      setRagdollIncludeParent,
+      ragdollIncludeSiblings,
+      setRagdollIncludeSiblings,
+      ragdollIncludeChildren,
+      setRagdollIncludeChildren,
+      ragdollIncludeConnected,
+      setRagdollIncludeConnected,
     }),
     [
       selectInsightNote,
@@ -478,6 +486,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       ragdollLoading,
       ragdollDocs,
       ragdollError,
+      ragdollIncludeParent,
+      ragdollIncludeSiblings,
+      ragdollIncludeChildren,
+      ragdollIncludeConnected,
     ]
   );
 
@@ -510,6 +522,14 @@ function HoverInsightPanels() {
     ragdollLoading,
     ragdollDocs,
     ragdollError,
+    ragdollIncludeParent,
+    setRagdollIncludeParent,
+    ragdollIncludeSiblings,
+    setRagdollIncludeSiblings,
+    ragdollIncludeChildren,
+    setRagdollIncludeChildren,
+    ragdollIncludeConnected,
+    setRagdollIncludeConnected,
   } = ctx;
 
   const openRagdollDoc = useCallback(async (sourcePath, label) => {
@@ -660,88 +680,120 @@ function HoverInsightPanels() {
 
   return (
     <>
-      {hover && rect && ragdollEnabled && (
-        <div
-          className="hover-insight-ragdoll-wrap"
-          data-insight-ui
-        >
-          <div
-            className={`hover-insight-panel hover-insight-panel--ragdoll ${ragdollLoading ? 'hover-insight-panel--loading' : ''}`}
-          >
-            <p className="hover-insight-title">RAG documents</p>
-            <p className="hover-insight-ragdoll-hint">
-              From selected note, parent, siblings, and direct replies — sent to RAGDoll for search.
-            </p>
-            {ragdollLoading && <p className="hover-insight-muted">Searching library…</p>}
-            {!ragdollLoading && ragdollError && (
-              <p className="hover-insight-muted" title={ragdollError}>
-                {ragdollError}
-              </p>
-            )}
-            {!ragdollLoading && !ragdollError && ragdollDocs.length === 0 && (
-              <p className="hover-insight-muted">No matching documents.</p>
-            )}
-            {!ragdollLoading && ragdollDocs.length > 0 && (
-              <ul className="hover-insight-ragdoll-list">
-                {ragdollDocs.map((d) => (
-                  <li key={`${d.group}|${d.source_url}`}>
-                    <button
-                      type="button"
-                      className="hover-insight-ragdoll-link"
-                      title={d.source_summary || d.source_name}
-                      onClick={() => openRagdollDoc(d.source_url, d.source_name)}
-                    >
-                      <span className="hover-insight-ragdoll-name">{d.source_name}</span>
-                      {d.similarity != null && (
-                        <span className="hover-insight-ragdoll-sim">
-                          {Math.round(Number(d.similarity) * 100)}%
-                        </span>
-                      )}
-                    </button>
-                    {d.group ? (
-                      <span className="hover-insight-ragdoll-collection">{d.group}</span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
-
       {hover && rect && (
         <>
           <div
-            className="hover-insight-margin hover-insight-margin--left"
+            className={`hover-insight-margin hover-insight-margin--left ${ragdollEnabled ? 'hover-insight-margin--left-with-ragdoll' : ''}`}
             data-insight-ui
           >
-            <div className={`hover-insight-panel hover-insight-panel--left ${loading ? 'hover-insight-panel--loading' : ''}`}>
-              <p className="hover-insight-title">Tag suggestions</p>
-              {loading && <p className="hover-insight-muted">Thinking…</p>}
-              {!loading && tags.length === 0 && <p className="hover-insight-muted">No suggestions</p>}
-              {!loading && tags.length > 0 && (
-                <div className="hover-insight-tag-groups">
-                  <HoverInsightTagSection
-                    title="Based on neighbor notes"
-                    tags={neighborTags}
-                    note={note}
-                    addTag={addTag}
-                    addingKey={addingKey}
-                  />
-                  <HoverInsightTagSection
-                    title="Based on connected notes"
-                    tags={connectedTags}
-                    note={note}
-                    addTag={addTag}
-                    addingKey={addingKey}
-                  />
-                  <HoverInsightTagSection
-                    title="New tag suggestions"
-                    tags={novelTags}
-                    note={note}
-                    addTag={addTag}
-                    addingKey={addingKey}
-                  />
+            <div className="hover-insight-left-stack">
+              <div className={`hover-insight-panel hover-insight-panel--left ${loading ? 'hover-insight-panel--loading' : ''}`}>
+                <p className="hover-insight-title">Tag suggestions</p>
+                {loading && <p className="hover-insight-muted">Thinking…</p>}
+                {!loading && tags.length === 0 && <p className="hover-insight-muted">No suggestions</p>}
+                {!loading && tags.length > 0 && (
+                  <div className="hover-insight-tag-groups">
+                    <HoverInsightTagSection
+                      title="Based on neighbor notes"
+                      tags={neighborTags}
+                      note={note}
+                      addTag={addTag}
+                      addingKey={addingKey}
+                    />
+                    <HoverInsightTagSection
+                      title="Based on connected notes"
+                      tags={connectedTags}
+                      note={note}
+                      addTag={addTag}
+                      addingKey={addingKey}
+                    />
+                    <HoverInsightTagSection
+                      title="New tag suggestions"
+                      tags={novelTags}
+                      note={note}
+                      addTag={addTag}
+                      addingKey={addingKey}
+                    />
+                  </div>
+                )}
+              </div>
+              {ragdollEnabled && (
+                <div
+                  className={`hover-insight-panel hover-insight-panel--ragdoll ${ragdollLoading ? 'hover-insight-panel--loading' : ''}`}
+                >
+                  <p className="hover-insight-title">RAG documents</p>
+                  <p className="hover-insight-ragdoll-hint">
+                    Selected note is always included. Choose extra context for RAGDoll search:
+                  </p>
+                  <div className="hover-insight-ragdoll-checkboxes" role="group" aria-label="RAG context">
+                    <label className="hover-insight-ragdoll-check">
+                      <input
+                        type="checkbox"
+                        checked={ragdollIncludeConnected}
+                        onChange={(e) => setRagdollIncludeConnected(e.target.checked)}
+                      />
+                      <span>Connected notes</span>
+                    </label>
+                    <label className="hover-insight-ragdoll-check">
+                      <input
+                        type="checkbox"
+                        checked={ragdollIncludeParent}
+                        onChange={(e) => setRagdollIncludeParent(e.target.checked)}
+                      />
+                      <span>Parent</span>
+                    </label>
+                    <label className="hover-insight-ragdoll-check">
+                      <input
+                        type="checkbox"
+                        checked={ragdollIncludeSiblings}
+                        onChange={(e) => setRagdollIncludeSiblings(e.target.checked)}
+                      />
+                      <span>Siblings</span>
+                    </label>
+                    <label className="hover-insight-ragdoll-check">
+                      <input
+                        type="checkbox"
+                        checked={ragdollIncludeChildren}
+                        onChange={(e) => setRagdollIncludeChildren(e.target.checked)}
+                      />
+                      <span>Children</span>
+                    </label>
+                  </div>
+                  <div className="hover-insight-ragdoll-results">
+                    {ragdollLoading && <p className="hover-insight-muted">Searching library…</p>}
+                    {!ragdollLoading && ragdollError && (
+                      <p className="hover-insight-muted" title={ragdollError}>
+                        {ragdollError}
+                      </p>
+                    )}
+                    {!ragdollLoading && !ragdollError && ragdollDocs.length === 0 && (
+                      <p className="hover-insight-muted">No matching documents.</p>
+                    )}
+                    {!ragdollLoading && ragdollDocs.length > 0 && (
+                      <ul className="hover-insight-ragdoll-list">
+                        {ragdollDocs.map((d) => (
+                          <li key={`${d.group}|${d.source_url}`}>
+                            <button
+                              type="button"
+                              className="hover-insight-ragdoll-link"
+                              title={d.source_summary || d.source_name}
+                              onClick={() => openRagdollDoc(d.source_url, d.source_name)}
+                            >
+                              <span className="hover-insight-ragdoll-name">{d.source_name}</span>
+                              {d.similarity != null && (
+                                <span className="hover-insight-ragdoll-sim">
+                                  {Math.round(Number(d.similarity) * 100)}%
+                                </span>
+                              )}
+                            </button>
+                            {d.group ? (
+                              <span className="hover-insight-ragdoll-collection">{d.group}</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

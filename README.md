@@ -29,7 +29,7 @@ A note-taking system built around conversation and tree structure. Specification
 | Regions view (spatial clusters by embedding) | Not yet |
 | Tag Canvas (graph of tags + edges) | Not yet |
 | Attachments (BYTEA in DB, Stream upload, `POST /api/notes/:id/attachments` multipart) | Done |
-| **RAGDoll** (optional): Stream insight bottom-left panel for allowed usernames; thread context → RAGDoll query; open docs via Hermes proxy | Done (env + `RAGDOLL_ENABLED_USERNAMES`) |
+| **RAGDoll** (optional): Stream left column under tags; checkboxes for context (default: selected + connected); proxy fetch | Done (env + `RAGDOLL_ENABLED_USERNAMES`) |
 | external_anchor (API field; optional link to ticket/URL outside Hermes) | API only; UI field not yet |
 | Suggested threading / duplicate / orphan rescue | Not yet |
 
@@ -149,7 +149,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `POST /api/notes/:id/connections` — `{ linkedNoteId }` — connect two notes (one DB row; idempotent — if a link already exists in either direction, returns it)
 - `DELETE /api/notes/:id/connections/:linkedNoteId` — remove the link between the two notes (either stored orientation)
 - `GET /api/note-files/orphans` — blobs with missing note; `DELETE /api/note-files/orphans/:id` — remove orphan (web: **Orphans**)
-- **`RAGDoll` (optional):** `GET /api/ragdoll/config` — `{ enabled, hasCollectionsOverride }` for the current user. `POST /api/ragdoll/relevant` — body `{ noteId }`; builds text from **selected note + parent + siblings + direct children** (same neighborhood as neighbor tag suggestions), POSTs to RAGDoll `/query`, returns deduped `{ documents: [{ group, source_name, source_url, source_summary, similarity, sample_count }] }`. `GET /api/ragdoll/fetch?path=` — proxied `GET` to RAGDoll (path must start with `/fetch/`). **Enabled only** for usernames listed in **`RAGDOLL_ENABLED_USERNAMES`** (default `jpmoo`). Server env: **`RAGDOLL_BASE_URL`** or **`RAGDOLL_HOST`** + **`RAGDOLL_PORT`**, optional **`RAGDOLL_COLLECTIONS`** (comma-separated), **`RAGDOLL_QUERY_THRESHOLD`**. See `server/.env.example`.
+- **`RAGDoll` (optional):** `GET /api/ragdoll/config` — `{ enabled, hasCollectionsOverride }` for the current user. `POST /api/ragdoll/relevant` — body `{ noteId, includeParent?, includeSiblings?, includeChildren?, includeConnected? }` (booleans; **selected note always included**; defaults **connected `true`**, others **`false`**). POSTs built context to RAGDoll `/query`, returns deduped `{ documents: [...] }`. `GET /api/ragdoll/fetch?path=` — proxied `GET` to RAGDoll (path must start with `/fetch/`). **Enabled only** for usernames in **`RAGDOLL_ENABLED_USERNAMES`** (default `jpmoo`). Server env: **`RAGDOLL_BASE_URL`** or **`RAGDOLL_HOST`** + **`RAGDOLL_PORT`**, optional **`RAGDOLL_COLLECTIONS`**, **`RAGDOLL_QUERY_THRESHOLD`**. See `server/.env.example`.
 
 ## MCP (Claude)
 

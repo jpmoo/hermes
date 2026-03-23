@@ -161,11 +161,18 @@ export async function fetchRagdollConfig() {
   return r.json();
 }
 
-export async function fetchRagdollRelevant(noteId) {
+export async function fetchRagdollRelevant(noteId, options = {}) {
+  const body = {
+    noteId,
+    includeParent: !!options.includeParent,
+    includeSiblings: !!options.includeSiblings,
+    includeChildren: !!options.includeChildren,
+    includeConnected: options.includeConnected !== false,
+  };
   const r = await fetch(`${API}/ragdoll/relevant`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ noteId }),
+    body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'RAGDoll search failed');

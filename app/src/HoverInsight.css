@@ -17,6 +17,26 @@
   padding-left: 0;
 }
 
+/* Left column: tag panel + RAG stack; RAG grows to fill remaining viewport below header */
+.hover-insight-margin--left.hover-insight-margin--left-with-ragdoll {
+  align-items: stretch;
+}
+
+.hover-insight-left-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 250px;
+}
+
+.hover-insight-margin--left-with-ragdoll .hover-insight-left-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100vh - 5.5rem - 0.75rem);
+  max-height: calc(100dvh - 5.5rem - 0.75rem);
+}
+
 .hover-insight-margin--right {
   right: 0;
   width: 250px;
@@ -595,22 +615,45 @@
   filter: brightness(0.97);
 }
 
-/* RAGDoll panel: fixed bottom-left, same width as tag / similar side panels */
-.hover-insight-ragdoll-wrap {
-  position: fixed;
-  bottom: 0.75rem;
-  left: 0;
-  width: 250px;
-  z-index: 250;
-  pointer-events: none;
-  padding-left: 0;
-  box-sizing: border-box;
+/* RAGDoll: stacked under tag suggestions; grows to same column bottom */
+.hover-insight-panel--ragdoll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-left: 0;
 }
 
-.hover-insight-panel--ragdoll {
-  pointer-events: auto;
-  max-height: min(38vh, 420px);
-  margin-left: 0;
+.hover-insight-ragdoll-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+}
+
+.hover-insight-ragdoll-check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.hover-insight-ragdoll-check input {
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--accent, #c9a227);
+}
+
+.hover-insight-ragdoll-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .hover-insight-ragdoll-hint {

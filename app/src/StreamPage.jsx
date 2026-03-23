@@ -794,13 +794,6 @@ export default function StreamPage() {
                   Root level
                 </button>
               </div>
-              {!loadingThread &&
-                thread.length > 0 &&
-                (!focusId || focusId === actualRootId) && (
-                  <p className="stream-page-level-hint" role="note">
-                    You are at the root.
-                  </p>
-                )}
               {loadingThread ? (
                 <p className="stream-page-muted">Loading thread…</p>
               ) : thread.length === 0 ? (

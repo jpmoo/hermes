@@ -67,7 +67,14 @@ router.post('/relevant', async (req, res) => {
     const noteId = req.body?.noteId;
     if (!noteId) return res.status(400).json({ error: 'noteId required' });
 
-    const context = await buildRagdollThreadContextText(noteId, req.userId);
+    const includeOpts = {
+      includeParent: req.body?.includeParent === true,
+      includeSiblings: req.body?.includeSiblings === true,
+      includeChildren: req.body?.includeChildren === true,
+      includeConnected: req.body?.includeConnected !== false,
+    };
+
+    const context = await buildRagdollThreadContextText(noteId, req.userId, includeOpts);
     if (context == null) return res.status(404).json({ error: 'Note not found' });
 
     const base = ragdollBaseUrl();
@@ -76,10 +83,17 @@ router.post('/relevant', async (req, res) => {
     const threshold =
       thresholdRaw != null && thresholdRaw !== '' ? Number.parseFloat(thresholdRaw, 10) : undefined;
 
+    const scopeBits = ['the selected note'];
+    if (includeOpts.includeConnected) scopeBits.push('linked (connected) notes');
+    if (includeOpts.includeParent) scopeBits.push('parent');
+    if (includeOpts.includeSiblings) scopeBits.push('siblings');
+    if (includeOpts.includeChildren) scopeBits.push('direct replies (children)');
+    const scopeLine = `Included context: ${scopeBits.join(', ')}.`;
+
     const prompt = [
-      'You are helping find reference documents related to the following thread of short notes.',
-      'The user selected one note; included are its parent, siblings (same parent), and direct children.',
-      'Find sources that would help understand, extend, or fact-check this thread.',
+      'You are helping find reference documents related to the following short notes from a personal knowledge base.',
+      scopeLine,
+      'Find sources that would help understand, extend, or fact-check this material.',
       '',
       context,
     ].join('\n');
