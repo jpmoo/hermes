@@ -1,0 +1,66 @@
+.note-type-event-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.note-type-event-fields-type {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.note-type-event-fields-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.note-type-event-fields-type select {
+  max-width: 12rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.note-type-event-fields-event {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.note-type-event-fields-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.note-type-event-fields-datetime {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.note-type-event-fields-datetime input[type='date'],
+.note-type-event-fields-datetime input[type='time'] {
+  padding: 0.35rem 0.45rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.note-type-event-fields-time-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}

@@ -13,6 +13,8 @@ import {
 } from './api';
 import LinkifiedText from './LinkifiedText';
 import NoteAttachments from './NoteAttachments';
+import NoteTypeEventFields from './NoteTypeEventFields';
+import { formatEventRange, eventFieldsToPayload, isoToDateTimeFields } from './noteEventUtils';
 import { useHoverInsight } from './HoverInsightContext';
 import './NoteCard.css';
 
@@ -34,6 +36,11 @@ export default function NoteCard({
   const tagDropdownRef = useRef(null);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
+  const [editNoteType, setEditNoteType] = useState('note');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
   const [addingTag, setAddingTag] = useState(false);
   const [tagOptions, setTagOptions] = useState([]);
   const [newTagName, setNewTagName] = useState('');
@@ -41,10 +48,21 @@ export default function NoteCard({
   const [inheritLoading, setInheritLoading] = useState(false);
 
   const tags = note.tags || [];
+  const eventRangeLabel = formatEventRange(note);
 
   useEffect(() => {
     setEditContent(note.content || '');
   }, [note.id, note.content]);
+
+  const resetEditMetaFromNote = () => {
+    setEditNoteType(note.note_type || 'note');
+    const s = isoToDateTimeFields(note.event_start_at, false);
+    const e = isoToDateTimeFields(note.event_end_at, true);
+    setEditStartDate(s.date);
+    setEditStartTime(s.time);
+    setEditEndDate(e.date);
+    setEditEndTime(e.time);
+  };
 
   useEffect(() => {
     setDropdownParentTags([]);
@@ -95,12 +113,18 @@ export default function NoteCard({
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (editContent.trim() === (note.content || '').trim()) {
-      setEditing(false);
+    const meta = eventFieldsToPayload(editNoteType, {
+      startDate: editStartDate,
+      startTime: editStartTime,
+      endDate: editEndDate,
+      endTime: editEndTime,
+    });
+    if (meta.error) {
+      console.error(meta.error);
       return;
     }
     try {
-      await updateNote(note.id, { content: editContent.trim() });
+      await updateNote(note.id, { content: editContent.trim(), ...meta });
       setEditing(false);
       onNoteUpdate?.();
     } catch (err) {
@@ -112,7 +136,15 @@ export default function NoteCard({
     e.preventDefault();
     e.stopPropagation();
     setEditContent(note.content || '');
+    resetEditMetaFromNote();
     setEditing(false);
+  };
+
+  const beginEdit = (ev) => {
+    ev.stopPropagation();
+    setEditContent(note.content || '');
+    resetEditMetaFromNote();
+    setEditing(true);
   };
 
   const handleDelete = async (e) => {
@@ -371,6 +403,19 @@ export default function NoteCard({
               rows={3}
               autoFocus
             />
+            <NoteTypeEventFields
+              idPrefix={`edit-${note.id}`}
+              noteType={editNoteType}
+              onNoteTypeChange={setEditNoteType}
+              startDate={editStartDate}
+              onStartDateChange={setEditStartDate}
+              startTime={editStartTime}
+              onStartTimeChange={setEditStartTime}
+              endDate={editEndDate}
+              onEndDateChange={setEditEndDate}
+              endTime={editEndTime}
+              onEndTimeChange={setEditEndTime}
+            />
             <div className="note-card-edit-attachments">
               <p className="note-card-edit-attachments-label">Attachments</p>
               {note.attachments?.length > 0 ? (
@@ -398,6 +443,7 @@ export default function NoteCard({
             <p className="note-card-content">
               {note.content?.trim() ? <LinkifiedText text={note.content} /> : note.attachments?.length ? null : '—'}
             </p>
+            {eventRangeLabel ? <p className="note-card-event-range">{eventRangeLabel}</p> : null}
             <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
             {tags.length > 0 && (
               <div className="note-card-tags">
@@ -423,7 +469,7 @@ export default function NoteCard({
           <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
               <>
-                <button type="button" className="note-card-btn" onClick={(e) => { e.stopPropagation(); setEditing(true); }}>Edit</button>
+                <button type="button" className="note-card-btn" onClick={beginEdit}>Edit</button>
                 <button type="button" className="note-card-btn note-card-btn-delete" onClick={handleDelete}>
                   Delete
                 </button>

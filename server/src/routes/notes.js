@@ -14,6 +14,26 @@ import { canAttachTagIdByReference } from '../services/tagAccess.js';
 const router = Router();
 router.use(requireAuth);
 
+/** Columns returned for list/detail note JSON (PostgreSQL → camel stays snake_case). */
+const NOTE_RETURNING =
+  'id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at';
+
+const NOTE_TYPES = new Set(['note', 'person', 'event']);
+
+function coerceNoteType(v, fallback = 'note') {
+  if (v == null || v === '') return fallback;
+  if (typeof v !== 'string' || !NOTE_TYPES.has(v)) return null;
+  return v;
+}
+
+/** undefined = omit; null = clear; string = parse (invalid → false). */
+function parseOptionalInstant(raw) {
+  if (raw == null || raw === '') return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.toISOString();
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_BYTES, files: 20 },
@@ -71,7 +91,7 @@ router.get('/roots', async (req, res) => {
           SELECT DISTINCT s.root_id FROM subtree s
           JOIN notes n ON n.id = s.note_id AND n.user_id = $1 AND n.starred = true
         )
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
@@ -80,7 +100,7 @@ router.get('/roots', async (req, res) => {
         ORDER BY n.last_activity_at DESC
       `
       : `
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
@@ -119,13 +139,13 @@ router.get('/thread/:id', async (req, res) => {
     const userId = req.userId;
     const r = await pool.query(
       `WITH RECURSIVE tree AS (
-        SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, 0 AS depth,
+        SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at, 0 AS depth,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = notes.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $2 AND (nc.anchor_note_id = notes.id OR nc.linked_note_id = notes.id)) AS connection_count
         FROM notes WHERE id = $1 AND user_id = $2
         UNION ALL
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, t.depth + 1,
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, t.depth + 1,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $2 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
@@ -175,7 +195,7 @@ router.get('/search-content', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
              r.root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
@@ -229,7 +249,7 @@ router.get('/search-by-tags', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, r.root_id,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, r.root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
               WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
@@ -238,7 +258,7 @@ router.get('/search-by-tags', async (req, res) => {
       JOIN roots r ON r.id = n.id
       WHERE n.user_id = $1
       ${starredOnly ? 'AND n.starred = true' : ''}
-      GROUP BY n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, r.root_id
+      GROUP BY n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, r.root_id
       ${havingClause}
       ORDER BY n.last_activity_at DESC
     `;
@@ -280,7 +300,7 @@ router.get('/search-semantic', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
              r.root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
@@ -306,7 +326,7 @@ router.get('/search-semantic', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
              1 - (n.embedding <=> $1::vector) AS similarity, r.root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
@@ -640,7 +660,7 @@ router.get('/:id/linked-notes', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor,
+      `SELECT ${NOTE_RETURNING},
               (SELECT COUNT(*)::int FROM note_connections nc
                WHERE nc.user_id = $2 AND (nc.anchor_note_id = $1::uuid OR nc.linked_note_id = $1::uuid)) AS connection_count
        FROM notes WHERE id = $1 AND user_id = $2`,
@@ -664,16 +684,39 @@ router.get('/:id', async (req, res) => {
 // Create note (root or reply)
 router.post('/', async (req, res) => {
   try {
-    const { content, parent_id: parentId, external_anchor: externalAnchor } = req.body;
+    const {
+      content,
+      parent_id: parentId,
+      external_anchor: externalAnchor,
+      note_type: noteTypeRaw,
+      event_start_at: eventStartRaw,
+      event_end_at: eventEndRaw,
+    } = req.body;
     const userId = req.userId;
     if (typeof content !== 'string') {
       return res.status(400).json({ error: 'Content must be a string' });
     }
     const text = content.trim();
+    const noteType = coerceNoteType(noteTypeRaw, 'note');
+    if (noteType == null) {
+      return res.status(400).json({ error: 'Invalid note_type' });
+    }
+    let eventStart = null;
+    let eventEnd = null;
+    if (noteType === 'event') {
+      const s = parseOptionalInstant(eventStartRaw);
+      const e = parseOptionalInstant(eventEndRaw);
+      if (s === false || e === false) {
+        return res.status(400).json({ error: 'Invalid event_start_at or event_end_at' });
+      }
+      eventStart = s;
+      eventEnd = e;
+    }
     const r = await pool.query(
-      `INSERT INTO notes (parent_id, content, external_anchor, user_id) VALUES ($1, $2, $3, $4)
-       RETURNING id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor`,
-      [parentId || null, text, externalAnchor || null, userId]
+      `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING ${NOTE_RETURNING}`,
+      [parentId || null, text, externalAnchor || null, userId, noteType, eventStart, eventEnd]
     );
     const note = r.rows[0];
     embedNote(note.id, note.content).catch(() => {});
@@ -688,18 +731,64 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, starred, external_anchor: externalAnchor } = req.body;
+    const {
+      content,
+      starred,
+      external_anchor: externalAnchor,
+      note_type: noteTypeBody,
+      event_start_at: eventStartBody,
+      event_end_at: eventEndBody,
+    } = req.body;
     const userId = req.userId;
+    const has = (k) => Object.prototype.hasOwnProperty.call(req.body, k);
+    const touchMeta = has('note_type') || has('event_start_at') || has('event_end_at');
+
     const updates = [];
     const values = [];
     let i = 1;
     if (content !== undefined) { updates.push(`content = $${i++}`); values.push(content); }
     if (starred !== undefined) { updates.push(`starred = $${i++}`); values.push(!!starred); }
     if (externalAnchor !== undefined) { updates.push(`external_anchor = $${i++}`); values.push(externalAnchor); }
+
+    if (touchMeta) {
+      const cur = await pool.query(`SELECT ${NOTE_RETURNING} FROM notes WHERE id = $1 AND user_id = $2`, [id, userId]);
+      if (cur.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+      const prev = cur.rows[0];
+      const mergedType = has('note_type')
+        ? coerceNoteType(noteTypeBody, 'note')
+        : coerceNoteType(prev.note_type, 'note');
+      if (mergedType == null) {
+        return res.status(400).json({ error: 'Invalid note_type' });
+      }
+      let nextStart = prev.event_start_at;
+      let nextEnd = prev.event_end_at;
+      if (mergedType !== 'event') {
+        nextStart = null;
+        nextEnd = null;
+      } else {
+        if (has('event_start_at')) {
+          const s = parseOptionalInstant(eventStartBody);
+          if (s === false) return res.status(400).json({ error: 'Invalid event_start_at' });
+          nextStart = s;
+        }
+        if (has('event_end_at')) {
+          const e = parseOptionalInstant(eventEndBody);
+          if (e === false) return res.status(400).json({ error: 'Invalid event_end_at' });
+          nextEnd = e;
+        }
+      }
+      updates.push(`note_type = $${i++}`);
+      values.push(mergedType);
+      updates.push(`event_start_at = $${i++}`);
+      values.push(nextStart);
+      updates.push(`event_end_at = $${i++}`);
+      values.push(nextEnd);
+    }
+
     if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
     values.push(id, userId);
     const r = await pool.query(
-      `UPDATE notes SET ${updates.join(', ')} WHERE id = $${i++} AND user_id = $${i} RETURNING id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor`,
+      `UPDATE notes SET ${updates.join(', ')} WHERE id = $${i++} AND user_id = $${i} RETURNING ${NOTE_RETURNING}`,
       values
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Note not found' });

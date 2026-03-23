@@ -4,6 +4,8 @@ import { useAuth } from './AuthContext';
 import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
+import NoteTypeEventFields from './NoteTypeEventFields';
+import { eventFieldsToPayload } from './noteEventUtils';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import './StreamPage.css';
@@ -226,6 +228,11 @@ export default function StreamPage() {
   const [replyContent, setReplyContent] = useState('');
   const [pendingRootFiles, setPendingRootFiles] = useState([]);
   const [pendingReplyFiles, setPendingReplyFiles] = useState([]);
+  const [composeNoteType, setComposeNoteType] = useState('note');
+  const [composeStartDate, setComposeStartDate] = useState('');
+  const [composeStartTime, setComposeStartTime] = useState('');
+  const [composeEndDate, setComposeEndDate] = useState('');
+  const [composeEndTime, setComposeEndTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [focusId, setFocusId] = useState(null);
 
@@ -279,6 +286,18 @@ export default function StreamPage() {
     },
     [threadRootId, starredOnly, setSearchParams]
   );
+
+  const resetComposeMeta = useCallback(() => {
+    setComposeNoteType('note');
+    setComposeStartDate('');
+    setComposeStartTime('');
+    setComposeEndDate('');
+    setComposeEndTime('');
+  }, []);
+
+  useEffect(() => {
+    resetComposeMeta();
+  }, [threadRootId, resetComposeMeta]);
 
   useEffect(() => {
     if (!threadRootId) {
@@ -685,9 +704,19 @@ export default function StreamPage() {
     e.preventDefault();
     const text = newRootContent.trim();
     if ((!text && pendingRootFiles.length === 0) || submitting) return;
+    const meta = eventFieldsToPayload(composeNoteType, {
+      startDate: composeStartDate,
+      startTime: composeStartTime,
+      endDate: composeEndDate,
+      endTime: composeEndTime,
+    });
+    if (meta.error) {
+      console.error(meta.error);
+      return;
+    }
     setSubmitting(true);
     try {
-      const note = await createNote({ content: text });
+      const note = await createNote({ content: text, ...meta });
       if (pendingRootFiles.length > 0) await uploadNoteFiles(note.id, pendingRootFiles);
       const full =
         pendingRootFiles.length > 0
@@ -700,6 +729,7 @@ export default function StreamPage() {
             };
       setNewRootContent('');
       setPendingRootFiles([]);
+      resetComposeMeta();
       if (rootFileRef.current) rootFileRef.current.value = '';
       setRoots((prev) => [full, ...prev.filter((x) => x.id !== full.id)]);
       openThreadDirect(full.id);
@@ -715,12 +745,23 @@ export default function StreamPage() {
     if (!threadRootId || !replyParentId) return;
     const text = replyContent.trim();
     if ((!text && pendingReplyFiles.length === 0) || submitting) return;
+    const meta = eventFieldsToPayload(composeNoteType, {
+      startDate: composeStartDate,
+      startTime: composeStartTime,
+      endDate: composeEndDate,
+      endTime: composeEndTime,
+    });
+    if (meta.error) {
+      console.error(meta.error);
+      return;
+    }
     setSubmitting(true);
     try {
-      const note = await createNote({ content: text, parent_id: replyParentId });
+      const note = await createNote({ content: text, parent_id: replyParentId, ...meta });
       if (pendingReplyFiles.length > 0) await uploadNoteFiles(note.id, pendingReplyFiles);
       setReplyContent('');
       setPendingReplyFiles([]);
+      resetComposeMeta();
       if (replyFileRef.current) replyFileRef.current.value = '';
       await loadThread(true);
     } catch (err) {
@@ -876,6 +917,20 @@ export default function StreamPage() {
                 onChange={(e) => setReplyContent(e.target.value)}
                 rows={2}
               />
+              <NoteTypeEventFields
+                idPrefix="stream-reply"
+                noteType={composeNoteType}
+                onNoteTypeChange={setComposeNoteType}
+                startDate={composeStartDate}
+                onStartDateChange={setComposeStartDate}
+                startTime={composeStartTime}
+                onStartTimeChange={setComposeStartTime}
+                endDate={composeEndDate}
+                onEndDateChange={setComposeEndDate}
+                endTime={composeEndTime}
+                onEndTimeChange={setComposeEndTime}
+                disabled={submitting}
+              />
               <div className="stream-page-compose-row">
                 <label className="stream-page-file-label">
                   <input
@@ -905,6 +960,20 @@ export default function StreamPage() {
                 value={newRootContent}
                 onChange={(e) => setNewRootContent(e.target.value)}
                 rows={2}
+              />
+              <NoteTypeEventFields
+                idPrefix="stream-root"
+                noteType={composeNoteType}
+                onNoteTypeChange={setComposeNoteType}
+                startDate={composeStartDate}
+                onStartDateChange={setComposeStartDate}
+                startTime={composeStartTime}
+                onStartTimeChange={setComposeStartTime}
+                endDate={composeEndDate}
+                onEndDateChange={setComposeEndDate}
+                endTime={composeEndTime}
+                onEndTimeChange={setComposeEndTime}
+                disabled={submitting}
               />
               <div className="stream-page-compose-row">
                 <label className="stream-page-file-label">

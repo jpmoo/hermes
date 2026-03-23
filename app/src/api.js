@@ -53,11 +53,25 @@ export async function getNote(id) {
   return r.json();
 }
 
-export async function createNote({ content, parent_id, external_anchor }) {
+export async function createNote({
+  content,
+  parent_id,
+  external_anchor,
+  note_type,
+  event_start_at,
+  event_end_at,
+} = {}) {
   const r = await fetch(`${API}/notes`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ content: content ?? '', parent_id, external_anchor }),
+    body: JSON.stringify({
+      content: content ?? '',
+      parent_id,
+      external_anchor,
+      note_type,
+      event_start_at,
+      event_end_at,
+    }),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Failed to create note');

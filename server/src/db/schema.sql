@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS notes (
   last_activity_at TIMESTAMPTZ DEFAULT now(),
   starred         BOOLEAN DEFAULT false,
   external_anchor TEXT,
+  note_type       TEXT NOT NULL DEFAULT 'note' CHECK (note_type IN ('note', 'person', 'event')),
+  event_start_at  TIMESTAMPTZ,
+  event_end_at    TIMESTAMPTZ,
   embedding       vector(768),  -- nomic-embed-text default dimension; adjust if different model
   user_id         UUID REFERENCES users(id) ON DELETE CASCADE
 );
@@ -30,6 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_notes_parent ON notes(parent_id);
 CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_last_activity ON notes(last_activity_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_starred ON notes(starred) WHERE starred = true;
+CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
 -- ivfflat index for semantic search (create after table has rows, or use lists = 1 for empty)
 -- CREATE INDEX idx_notes_embedding ON notes USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
@@ -114,7 +118,10 @@ BEGIN
   IF NEW.content IS DISTINCT FROM OLD.content
      OR NEW.starred IS DISTINCT FROM OLD.starred
      OR NEW.external_anchor IS DISTINCT FROM OLD.external_anchor
-     OR NEW.parent_id IS DISTINCT FROM OLD.parent_id THEN
+     OR NEW.parent_id IS DISTINCT FROM OLD.parent_id
+     OR NEW.note_type IS DISTINCT FROM OLD.note_type
+     OR NEW.event_start_at IS DISTINCT FROM OLD.event_start_at
+     OR NEW.event_end_at IS DISTINCT FROM OLD.event_end_at THEN
     NEW.updated_at = now();
     NEW.last_activity_at = now();
   ELSE
