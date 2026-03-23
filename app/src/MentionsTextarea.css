@@ -20,19 +20,35 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-card);
-  color: var(--text-muted);
   cursor: pointer;
   line-height: 0;
   transition:
-    color 0.15s ease,
     border-color 0.15s ease,
-    background 0.15s ease;
+    background 0.15s ease,
+    opacity 0.15s ease;
+}
+
+/* Keep per-type hues from index.css (same as outline / header type filters) */
+.mentions-compose-type-btn .note-type-icon--note {
+  color: var(--note-type-icon-note);
+}
+.mentions-compose-type-btn .note-type-icon--organization {
+  color: var(--note-type-icon-organization);
+}
+.mentions-compose-type-btn .note-type-icon--person {
+  color: var(--note-type-icon-person);
+}
+.mentions-compose-type-btn .note-type-icon--event {
+  color: var(--note-type-icon-event);
 }
 
 .mentions-compose-type-btn:hover:not(:disabled) {
-  color: var(--accent);
   border-color: var(--accent-dim);
   background: var(--bg-card-hover);
+}
+
+.mentions-compose-type-btn:hover:not(:disabled) .note-type-icon {
+  filter: brightness(1.08);
 }
 
 .mentions-compose-type-btn:disabled {

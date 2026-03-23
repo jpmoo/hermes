@@ -19,6 +19,40 @@
   opacity: 0.92;
 }
 
+.note-card-type-cycle-btn {
+  position: absolute;
+  top: 0.42rem;
+  right: 0.62rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.note-card-type-cycle-btn:hover {
+  background: var(--bg-card-hover);
+}
+
+.note-card-type-cycle-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.note-card-type-icon--in-btn {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
 /* One color for all types on the bubble (overrides per-type --note-type-icon-* from index.css) */
 .note-card .note-card-type-icon.note-type-icon {
   color: var(--text-muted);

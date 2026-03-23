@@ -110,8 +110,13 @@
   display: block;
 }
 
-.layout-header .layout-toolbar-btn .note-type-icon {
-  color: currentColor;
+/* Type icons use semantic --note-type-icon-* (e.g. event); dim when filter is off */
+.layout-type-filters .layout-toolbar-btn:not(.layout-toolbar-btn--active) .note-type-icon {
+  opacity: 0.48;
+}
+
+.layout-type-filters .layout-toolbar-btn.layout-toolbar-btn--active .note-type-icon {
+  opacity: 1;
 }
 
 .layout-nav-link:hover,

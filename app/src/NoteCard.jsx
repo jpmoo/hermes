@@ -17,7 +17,12 @@ import NoteRichText from './NoteRichText';
 import NoteAttachments from './NoteAttachments';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
-import { formatEventRange, eventFieldsToPayload, isoToDateTimeFields } from './noteEventUtils';
+import {
+  formatEventRange,
+  eventFieldsToPayload,
+  isoToDateTimeFields,
+  NOTE_TYPE_OPTIONS,
+} from './noteEventUtils';
 import { stripHashtagPrefixFromContent } from './noteBodyUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { useHoverInsight } from './HoverInsightContext';
@@ -161,6 +166,15 @@ export default function NoteCard({
     resetEditMetaFromNote();
     setEditing(false);
   };
+
+  const cycleEditNoteType = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const opts = NOTE_TYPE_OPTIONS;
+    const i = opts.findIndex((o) => o.value === editNoteType);
+    const idx = i < 0 ? 0 : i;
+    setEditNoteType(opts[(idx + 1) % opts.length].value);
+  }, [editNoteType]);
 
   const beginEdit = (ev) => {
     ev.stopPropagation();
@@ -345,9 +359,13 @@ export default function NoteCard({
     onOpenThread?.(ev);
   };
 
+  const editTypeLabel =
+    NOTE_TYPE_OPTIONS.find((o) => o.value === editNoteType)?.label ?? editNoteType;
+
   const cardClassNames = [
     cardClass,
-    editing ? 'note-card--editing' : 'note-card--has-type-icon',
+    'note-card--has-type-icon',
+    editing ? 'note-card--editing' : '',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
   ]
@@ -423,7 +441,19 @@ export default function NoteCard({
             }
       }
     >
-      {!editing && <NoteTypeIcon type={note.note_type || 'note'} className="note-card-type-icon" />}
+      {editing ? (
+        <button
+          type="button"
+          className="note-card-type-cycle-btn"
+          onClick={cycleEditNoteType}
+          aria-label={`Note type: ${editTypeLabel}. Click for next type.`}
+          title={`${editTypeLabel} — click for next type`}
+        >
+          <NoteTypeIcon type={editNoteType} className="note-card-type-icon note-card-type-icon--in-btn" />
+        </button>
+      ) : (
+        <NoteTypeIcon type={note.note_type || 'note'} className="note-card-type-icon" />
+      )}
       <div className="note-card-body">
         {editing ? (
           <form className="note-card-edit" onSubmit={handleSaveEdit} onClick={(e) => e.stopPropagation()}>
@@ -440,6 +470,7 @@ export default function NoteCard({
               idPrefix={`edit-${note.id}`}
               noteType={editNoteType}
               onNoteTypeChange={setEditNoteType}
+              hideTypeSelect
               startDate={editStartDate}
               onStartDateChange={setEditStartDate}
               startTime={editStartTime}
