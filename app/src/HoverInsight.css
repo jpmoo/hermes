@@ -213,8 +213,9 @@
   box-shadow: 0 0 0 1px var(--border);
 }
 
-/* Tag suggestion groups (uses stack sections) */
-.hover-insight-tag-groups {
+/* Tag suggestion groups + RAG collections (same stack sections; match top inset) */
+.hover-insight-tag-groups,
+.hover-insight-ragdoll-grouped {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -712,12 +713,6 @@
   line-height: 1.35;
   color: var(--text-muted);
   opacity: 0.95;
-}
-
-.hover-insight-ragdoll-grouped {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
 }
 
 .hover-insight-ragdoll-list {

@@ -26,6 +26,31 @@ const CONFIRM_UNLINK =
   'Remove the link between these two notes? The notes are not deleted—only the connection is removed.';
 
 const SIMILAR_MIN_LS_KEY = 'hermes.insightSimilarMinPct';
+const RAGDOLL_CONTEXT_LS_KEY = 'hermes.ragdollContextOptions';
+
+const defaultRagdollContext = Object.freeze({
+  includeParent: false,
+  includeSiblings: false,
+  includeChildren: false,
+  includeConnected: true,
+});
+
+function readStoredRagdollContext() {
+  try {
+    const raw = localStorage.getItem(RAGDOLL_CONTEXT_LS_KEY);
+    if (!raw) return { ...defaultRagdollContext };
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object') return { ...defaultRagdollContext };
+    return {
+      includeParent: Boolean(o.includeParent),
+      includeSiblings: Boolean(o.includeSiblings),
+      includeChildren: Boolean(o.includeChildren),
+      includeConnected: o.includeConnected !== false,
+    };
+  } catch {
+    return { ...defaultRagdollContext };
+  }
+}
 
 function readStoredSimilarMinPct() {
   try {
@@ -178,10 +203,44 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const [ragdollLoading, setRagdollLoading] = useState(false);
   const [ragdollDocs, setRagdollDocs] = useState([]);
   const [ragdollError, setRagdollError] = useState(null);
-  const [ragdollIncludeParent, setRagdollIncludeParent] = useState(false);
-  const [ragdollIncludeSiblings, setRagdollIncludeSiblings] = useState(false);
-  const [ragdollIncludeChildren, setRagdollIncludeChildren] = useState(false);
-  const [ragdollIncludeConnected, setRagdollIncludeConnected] = useState(true);
+  const [ragdollContext, setRagdollContext] = useState(readStoredRagdollContext);
+  const ragdollIncludeParent = ragdollContext.includeParent;
+  const ragdollIncludeSiblings = ragdollContext.includeSiblings;
+  const ragdollIncludeChildren = ragdollContext.includeChildren;
+  const ragdollIncludeConnected = ragdollContext.includeConnected;
+
+  const setRagdollIncludeParent = useCallback((next) => {
+    setRagdollContext((prev) => ({
+      ...prev,
+      includeParent: typeof next === 'function' ? next(prev.includeParent) : next,
+    }));
+  }, []);
+  const setRagdollIncludeSiblings = useCallback((next) => {
+    setRagdollContext((prev) => ({
+      ...prev,
+      includeSiblings: typeof next === 'function' ? next(prev.includeSiblings) : next,
+    }));
+  }, []);
+  const setRagdollIncludeChildren = useCallback((next) => {
+    setRagdollContext((prev) => ({
+      ...prev,
+      includeChildren: typeof next === 'function' ? next(prev.includeChildren) : next,
+    }));
+  }, []);
+  const setRagdollIncludeConnected = useCallback((next) => {
+    setRagdollContext((prev) => ({
+      ...prev,
+      includeConnected: typeof next === 'function' ? next(prev.includeConnected) : next,
+    }));
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RAGDOLL_CONTEXT_LS_KEY, JSON.stringify(ragdollContext));
+    } catch {
+      /* ignore */
+    }
+  }, [ragdollContext]);
 
   useEffect(() => {
     fetchRagdollConfig()
@@ -853,12 +912,7 @@ function HoverInsightPanels() {
               <p className="hover-insight-title hover-insight-similar-panel-heading">Similar notes</p>
               <div className="hover-insight-similar-panel-body">
                 {loading && <p className="hover-insight-muted">Thinking…</p>}
-                {!loading && similarNotes.length === 0 && (
-                  <p className="hover-insight-muted">
-                    No similar notes (needs embeddings, or nothing close enough yet).
-                  </p>
-                )}
-                {!loading && similarNotes.length > 0 && (
+                {!loading && (
                   <>
                     <div className="hover-insight-similar-slider-wrap">
                       <div className="hover-insight-similar-slider-label">
@@ -883,7 +937,11 @@ function HoverInsightPanels() {
                         <span>95%</span>
                       </div>
                     </div>
-                    {filteredSimilarNotes.length === 0 ? (
+                    {similarNotes.length === 0 ? (
+                      <p className="hover-insight-muted">
+                        No similar notes (needs embeddings, or nothing close enough yet).
+                      </p>
+                    ) : filteredSimilarNotes.length === 0 ? (
                       <p className="hover-insight-muted">No notes at or above this threshold.</p>
                     ) : (
                       <ul className="hover-insight-similar-list">
