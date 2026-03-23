@@ -12,7 +12,7 @@
   padding-top: var(--hi-insight-header-offset);
   --hi-insight-panel-height: calc(100vh - var(--hi-insight-header-offset) - 0.75rem);
   --hi-insight-panel-height: calc(100dvh - var(--hi-insight-header-offset) - 0.75rem);
-  --hi-insight-screen-edge: 5px;
+  --hi-insight-screen-edge: 10px;
 }
 
 .hover-insight-margin--left {
