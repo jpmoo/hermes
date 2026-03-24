@@ -36,6 +36,13 @@ html {
   --note-type-icon-organization: var(--accent-dim);
   --note-type-icon-person: color-mix(in srgb, var(--accent) 36%, var(--text-muted));
   --note-type-icon-event: color-mix(in srgb, #6b4c30 34%, var(--text-muted));
+  /* Card / outline row backgrounds by note type (notes stay default --bg-card) */
+  --note-type-bg-organization: color-mix(in srgb, #fff1a8 42%, var(--bg-card));
+  --note-type-bg-organization-hover: color-mix(in srgb, #ffe566 32%, var(--bg-card-hover));
+  --note-type-bg-person: color-mix(in srgb, #c9e4ff 38%, var(--bg-card));
+  --note-type-bg-person-hover: color-mix(in srgb, #a8d4ff 30%, var(--bg-card-hover));
+  --note-type-bg-event: color-mix(in srgb, #c4f0d4 40%, var(--bg-card));
+  --note-type-bg-event-hover: color-mix(in srgb, #9fe8bc 32%, var(--bg-card-hover));
 }
 
 .note-type-icon {

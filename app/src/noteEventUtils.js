@@ -55,15 +55,22 @@ export function eventFieldsToPayload(noteType, { startDate, startTime, endDate, 
     return { note_type: t, event_start_at: null, event_end_at: null };
   }
   const start = composeEventInstant(startDate, startTime, false);
-  const endDateResolved = (endDate?.trim() || startDate?.trim()) || '';
-  const end = composeEventInstant(endDateResolved, endTime, !endTime?.trim());
-  if (start === undefined || end === undefined) {
+  const endDateTrim = (endDate ?? '').trim();
+  const endTimeTrim = (endTime ?? '').trim();
+  let eventEnd = null;
+  if (endDateTrim) {
+    eventEnd = composeEventInstant(endDateTrim, endTimeTrim, !endTimeTrim);
+    if (eventEnd === undefined) {
+      return { error: 'Invalid event date or time' };
+    }
+  }
+  if (start === undefined) {
     return { error: 'Invalid event date or time' };
   }
   return {
     note_type: 'event',
     event_start_at: start,
-    event_end_at: end,
+    event_end_at: eventEnd,
   };
 }
 
@@ -80,12 +87,21 @@ export function formatEventRange(note) {
   const s = note.event_start_at;
   const e = note.event_end_at;
   if (!s && !e) return '';
+  if (!s) {
+    const eFields = isoToDateTimeFields(e, true);
+    return fmt(e, Boolean(eFields.time));
+  }
   const sFields = isoToDateTimeFields(s, false);
-  const eFields = isoToDateTimeFields(e, true);
   const sWithTime = Boolean(sFields.time);
-  const eWithTime = Boolean(eFields.time);
   const left = fmt(s, sWithTime);
+  if (!e) return left;
+
+  const eFields = isoToDateTimeFields(e, true);
+  const eWithTime = Boolean(eFields.time);
   const right = fmt(e, eWithTime);
-  if (left && right) return `${left} → ${right}`;
+  if (left && right) {
+    if (left === right) return left;
+    return `${left} → ${right}`;
+  }
   return left || right;
 }

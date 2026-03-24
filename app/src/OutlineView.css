@@ -38,14 +38,6 @@
   color: var(--accent);
 }
 
-.outline-view-toolbar-hint {
-  flex: 1 1 100%;
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
 .outline-drop-root {
   flex: 1 1 auto;
   min-width: 0;
@@ -115,6 +107,37 @@
 
 .outline-row:hover {
   background: var(--bg-card);
+}
+
+.outline-row.outline-row--type-organization {
+  background: var(--note-type-bg-organization);
+}
+.outline-row.outline-row--type-organization:hover {
+  background: var(--note-type-bg-organization-hover);
+}
+
+.outline-row.outline-row--type-person {
+  background: var(--note-type-bg-person);
+}
+.outline-row.outline-row--type-person:hover {
+  background: var(--note-type-bg-person-hover);
+}
+
+.outline-row.outline-row--type-event {
+  background: var(--note-type-bg-event);
+}
+.outline-row.outline-row--type-event:hover {
+  background: var(--note-type-bg-event-hover);
+}
+
+.outline-row.outline-row--type-organization.outline-row--drop-target {
+  background: color-mix(in srgb, var(--accent) 12%, var(--note-type-bg-organization));
+}
+.outline-row.outline-row--type-person.outline-row--drop-target {
+  background: color-mix(in srgb, var(--accent) 12%, var(--note-type-bg-person));
+}
+.outline-row.outline-row--type-event.outline-row--drop-target {
+  background: color-mix(in srgb, var(--accent) 12%, var(--note-type-bg-event));
 }
 
 /* Note text + star: opens Stream focused; chevron is separate (expand/collapse only). */

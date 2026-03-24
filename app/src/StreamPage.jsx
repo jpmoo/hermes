@@ -154,6 +154,10 @@ function buildFullThreadLevelDrops(treeRoots) {
   return m;
 }
 
+/**
+ * Thread UI is one level at a time: each visible “head” note plus its direct replies only.
+ * Deeper replies appear after focusing (click/double-click) that note. Root list has no nested thread.
+ */
 function StreamList({
   nodes,
   depth,
@@ -200,7 +204,7 @@ function StreamList({
               onNoteUpdate={onNoteUpdate}
               onNoteDelete={onNoteDelete}
             />
-            {n.children?.length > 0 && (
+            {n.children?.length > 0 && depth === 0 && (
               <ul className="stream-page-replies">
                 <StreamList
                   nodes={n.children}
@@ -586,7 +590,7 @@ export default function StreamPage() {
     function walk(nodes, depth) {
       for (const n of nodes) {
         if (depth > 0) m.set(n.id, i++ * 42);
-        walk(n.children || [], depth + 1);
+        if (depth < 1) walk(n.children || [], depth + 1);
       }
     }
     walk(displayTree, 0);

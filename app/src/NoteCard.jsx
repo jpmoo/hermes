@@ -295,9 +295,20 @@ export default function NoteCard({
         ? parseInt(rawConn, 10) || 0
         : Number(rawConn) || 0;
   const hasConnections = connectionCount > 0;
+  const displayNoteType = editing ? editNoteType : note.note_type || 'note';
+  const typeBgClass =
+    displayNoteType === 'organization'
+      ? 'note-card--type-organization'
+      : displayNoteType === 'person'
+        ? 'note-card--type-person'
+        : displayNoteType === 'event'
+          ? 'note-card--type-event'
+          : '';
+
   const cardClass = [
     showThreadline ? `note-card note-card--depth-${Math.min(depth, 3)}` : 'note-card note-card--leaf',
     hasConnections ? 'note-card--linked' : '',
+    typeBgClass,
   ]
     .filter(Boolean)
     .join(' ');

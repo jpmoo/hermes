@@ -173,12 +173,24 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
     </span>
   ) : null;
 
-  const rowClass =
+  const nt = node.note_type || 'note';
+  const typeRowClass =
+    nt === 'organization'
+      ? 'outline-row--type-organization'
+      : nt === 'person'
+        ? 'outline-row--type-person'
+        : nt === 'event'
+          ? 'outline-row--type-event'
+          : '';
+
+  const rowStateClass =
     dnd && dnd.draggingId === node.id
-      ? 'outline-row outline-row--dragging'
+      ? 'outline-row--dragging'
       : dnd && dnd.dropOverId === node.id && dnd.draggingId && dnd.draggingId !== node.id
-        ? 'outline-row outline-row--drop-target'
-        : 'outline-row';
+        ? 'outline-row--drop-target'
+        : '';
+
+  const rowClass = ['outline-row', typeRowClass, rowStateClass].filter(Boolean).join(' ');
 
   const mainClass =
     dnd && dnd.dropOverId === node.id && dnd.draggingId && dnd.draggingId !== node.id
@@ -543,7 +555,7 @@ export default function OutlineView() {
             >
               {draggingId
                 ? 'Release here to make this a top-level thread'
-                : 'Top-level: drag ⋮⋮ here to pull a note out of a thread'}
+                : 'Drag ⋮⋮ here to move note/thread to root level.'}
             </div>
             {hasAnyExpandable() ? (
               <>
@@ -555,9 +567,6 @@ export default function OutlineView() {
                 </button>
               </>
             ) : null}
-            <p className="outline-view-toolbar-hint">
-              Drag from the ⋮⋮ grip on the left. Drop on a row to nest under it.
-            </p>
           </div>
         )}
 

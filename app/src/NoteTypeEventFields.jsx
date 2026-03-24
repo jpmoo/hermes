@@ -68,6 +68,7 @@ export default function NoteTypeEventFields({
                 value={endDate}
                 onChange={(e) => onEndDateChange(e.target.value)}
                 disabled={disabled}
+                aria-label="End date (optional)"
               />
               <input
                 id={`${idPrefix}-end-time`}
@@ -79,6 +80,7 @@ export default function NoteTypeEventFields({
               />
             </div>
           </div>
+          <p className="note-type-event-fields-time-hint">Leave the end date blank for a one-day event.</p>
         </div>
       )}
     </div>
