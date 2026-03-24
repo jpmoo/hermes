@@ -216,6 +216,77 @@
   word-break: break-word;
 }
 
+.note-rich-markdown {
+  display: block;
+}
+
+.note-rich-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.note-rich-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.note-rich-markdown p {
+  margin: 0.35rem 0;
+}
+
+.note-rich-markdown h1,
+.note-rich-markdown h2,
+.note-rich-markdown h3,
+.note-rich-markdown h4,
+.note-rich-markdown h5,
+.note-rich-markdown h6 {
+  margin: 0.55rem 0 0.3rem;
+  line-height: 1.25;
+}
+
+.note-rich-markdown h1 { font-size: 1.2em; }
+.note-rich-markdown h2 { font-size: 1.1em; }
+.note-rich-markdown h3 { font-size: 1.02em; }
+.note-rich-markdown h4,
+.note-rich-markdown h5,
+.note-rich-markdown h6 { font-size: 0.96em; }
+
+.note-rich-markdown ul,
+.note-rich-markdown ol {
+  margin: 0.35rem 0 0.4rem 1.1rem;
+  padding: 0;
+}
+
+.note-rich-markdown li + li {
+  margin-top: 0.15rem;
+}
+
+.note-rich-markdown blockquote {
+  margin: 0.45rem 0;
+  padding: 0.1rem 0 0.1rem 0.6rem;
+  border-left: 2px solid var(--border);
+  color: var(--text-muted);
+}
+
+.note-rich-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg) 75%, var(--border));
+}
+
+.note-rich-markdown pre {
+  margin: 0.45rem 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  background: color-mix(in srgb, var(--bg) 82%, var(--border));
+}
+
+.note-rich-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
 .note-rich-mention {
   display: inline;
   margin: 0 0.1rem;

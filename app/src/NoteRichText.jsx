@@ -1,12 +1,8 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const UNSAFE_HREF = /^\s*(javascript|data|vbscript):/i;
-
-function trimTrailingPunct(url) {
-  let u = url;
-  while (/[.,;:!?)]+$/.test(u)) u = u.slice(0, -1);
-  return u;
-}
 
 /** Short visible label for http(s) / mailto; full URL stays on `href` and `title`. */
 export function formatUrlDisplayLabel(href) {
@@ -29,42 +25,6 @@ export function formatUrlDisplayLabel(href) {
   }
 }
 
-const BARE_URL_AT_START = /^([a-z][a-z0-9+.-]*:\/\/[^\s<]+|mailto:[^\s<]+)/i;
-
-function tryTagAt(s, pos, tagSet) {
-  if (!tagSet || s[pos] !== '#') return null;
-  const prevOk = pos === 0 || /[\s\n([{'"`]/.test(s[pos - 1]);
-  if (!prevOk) return null;
-  const m = s.slice(pos).match(/^#([a-z0-9-]+)(?![a-z0-9-])/);
-  if (!m || !tagSet.has(m[1])) return null;
-  return { name: m[1], len: m[0].length };
-}
-
-function tryParseMarkdownLink(s, pos) {
-  if (s[pos] !== '[') return null;
-  const closeBracket = s.indexOf(']', pos);
-  if (closeBracket <= pos || s[closeBracket + 1] !== '(') return null;
-  const closeParen = s.indexOf(')', closeBracket + 2);
-  if (closeParen <= closeBracket) return null;
-  const label = s.slice(pos + 1, closeBracket);
-  const url = s.slice(closeBracket + 2, closeParen);
-  return { label, url, end: closeParen + 1 };
-}
-
-function indexOfNextSpecial(s, pos) {
-  const candidates = [];
-  const b = s.indexOf('[', pos);
-  if (b >= 0) candidates.push(b);
-  const h = s.indexOf('#', pos);
-  if (h >= 0) candidates.push(h);
-  const sub = s.slice(pos);
-  const proto = sub.search(/[a-z][a-z0-9+.-]*:\/\//i);
-  if (proto >= 0) candidates.push(pos + proto);
-  const mail = sub.search(/mailto:/i);
-  if (mail >= 0) candidates.push(pos + mail);
-  return candidates.length ? Math.min(...candidates) : -1;
-}
-
 /**
  * Note body: markdown links [t](url), bare URLs, hermes-note:// mentions, #tags (when in tagNames).
  * @param {boolean} [stopClickPropagation=true] — when false (e.g. Outline rows), clicks bubble so a parent can open the row; parent should ignore targets inside `.note-rich-link` / `button.note-rich-mention`.
@@ -76,196 +36,62 @@ export default function NoteRichText({
   onNoteClick,
   stopClickPropagation = true,
 }) {
+  void tagNames;
   const s = text == null ? '' : String(text);
   if (!s) return <span className={className}>—</span>;
+  const textWithBareHermesLinks = s.replace(
+    /\bhermes-note:\/\/([0-9a-f-]{36})\b/gi,
+    (_m, id) => `[Linked note](hermes-note://${id})`
+  );
 
-  const tagSet = tagNames instanceof Set ? tagNames : tagNames?.length ? new Set(tagNames) : null;
-
-  const parts = [];
-  let pos = 0;
-  let last = 0;
-  let key = 0;
-
-  const pushText = (from, to) => {
-    if (to > from) {
-      parts.push(
-        <span key={`t-${key++}`} className="note-rich-plain" style={{ whiteSpace: 'pre-wrap' }}>
-          {s.slice(from, to)}
-        </span>
-      );
-    }
-  };
-
-  while (pos < s.length) {
-    const md = tryParseMarkdownLink(s, pos);
-    if (md) {
-      const hermes = md.url.match(/^hermes-note:\/\/([0-9a-f-]{36})$/i);
-      if (hermes) {
-        pushText(last, pos);
-        const id = hermes[1];
-        const mentionLabel = md.label?.trim() || 'Linked note';
-        parts.push(
-          <button
-            key={`n-${key++}`}
-            type="button"
-            className="note-rich-mention"
-            onClick={(e) => {
-              e.preventDefault();
-              if (stopClickPropagation) e.stopPropagation();
-              onNoteClick?.(id);
-            }}
-          >
-            {mentionLabel}
-          </button>
-        );
-        last = md.end;
-        pos = md.end;
-        continue;
-      }
-      if (/^https?:\/\//i.test(md.url) || /^mailto:/i.test(md.url)) {
-        const href = md.url;
-        const label = md.label?.trim();
-        pushText(last, pos);
-        if (!UNSAFE_HREF.test(href)) {
-          parts.push(
-            <a
-              key={`a-${key++}`}
-              href={href}
-              title={href}
-              className="note-rich-link"
-              {...(/^https?:\/\//i.test(href)
-                ? { target: '_blank', rel: 'noopener noreferrer' }
-                : {})}
-              onClick={(e) => {
-                if (stopClickPropagation) e.stopPropagation();
-              }}
-            >
-              {label || formatUrlDisplayLabel(href)}
-            </a>
-          );
-        } else {
-          pushText(pos, md.end);
-        }
-        last = md.end;
-        pos = md.end;
-        continue;
-      }
-      if (/^[a-z][a-z0-9+.-]*:/i.test(md.url) && !UNSAFE_HREF.test(md.url)) {
-        const href = md.url.trim();
-        const label = md.label?.trim();
-        pushText(last, pos);
-        parts.push(
-          <a
-            key={`a-${key++}`}
-            href={href}
-            title={href}
-            className="note-rich-link"
-            onClick={(e) => {
-              if (stopClickPropagation) e.stopPropagation();
-            }}
-          >
-            {label || formatUrlDisplayLabel(href)}
-          </a>
-        );
-        last = md.end;
-        pos = md.end;
-        continue;
-      }
-      pushText(last, pos);
-      pushText(pos, md.end);
-      last = md.end;
-      pos = md.end;
-      continue;
-    }
-
-    const tm = tryTagAt(s, pos, tagSet);
-    if (tm) {
-      pushText(last, pos);
-      parts.push(
-        <span key={`tag-${key++}`} className="note-rich-tag-pill">
-          #{tm.name}
-        </span>
-      );
-      last = pos + tm.len;
-      pos += tm.len;
-      continue;
-    }
-
-    const rest = s.slice(pos);
-    const um = rest.match(BARE_URL_AT_START);
-    if (um) {
-      const raw = um[1];
-      const url = trimTrailingPunct(raw);
-      pushText(last, pos);
-      if (url && !UNSAFE_HREF.test(url)) {
-        const hermesBare = url.match(/^hermes-note:\/\/([0-9a-f-]{36})$/i);
-        if (hermesBare) {
-          const id = hermesBare[1];
-          if (onNoteClick) {
-            parts.push(
+  return (
+    <ReactMarkdown
+      className={[className, 'note-rich-markdown'].filter(Boolean).join(' ')}
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: ({ href, children }) => {
+          const url = String(href || '').trim();
+          const hermes = url.match(/^hermes-note:\/\/([0-9a-f-]{36})$/i);
+          if (hermes) {
+            const id = hermes[1];
+            return (
               <button
-                key={`n-${key++}`}
                 type="button"
                 className="note-rich-mention"
-                title={url}
                 onClick={(e) => {
                   e.preventDefault();
                   if (stopClickPropagation) e.stopPropagation();
-                  onNoteClick(id);
+                  onNoteClick?.(id);
                 }}
               >
-                Linked note
+                {children}
               </button>
             );
-          } else {
-            parts.push(
-              <span key={`hn-${key++}`} className="note-rich-mention note-rich-mention--readonly" title={url}>
-                Linked note
-              </span>
-            );
           }
-        } else {
-          parts.push(
+          if (!url || UNSAFE_HREF.test(url)) {
+            return <span>{children}</span>;
+          }
+          const isHttp = /^https?:\/\//i.test(url);
+          return (
             <a
-              key={`a-${key++}`}
               href={url}
               title={url}
               className="note-rich-link"
-              {...(/^https?:\/\//i.test(url) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              {...(isHttp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
               onClick={(e) => {
                 if (stopClickPropagation) e.stopPropagation();
               }}
             >
-              {formatUrlDisplayLabel(url)}
+              {children}
             </a>
           );
-        }
-      } else {
-        pushText(pos, pos + raw.length);
-      }
-      last = pos + um[0].length;
-      pos += um[0].length;
-      continue;
-    }
-
-    const next = indexOfNextSpecial(s, pos);
-    if (next < 0) {
-      pushText(last, s.length);
-      last = s.length;
-      break;
-    }
-    if (next > pos) {
-      pushText(last, next);
-      last = next;
-      pos = next;
-      continue;
-    }
-    pushText(last, pos + 1);
-    last = pos + 1;
-    pos += 1;
-  }
-
-  pushText(last, s.length);
-
-  return <span className={className}>{parts}</span>;
+        },
+        p: ({ children }) => <p>{children}</p>,
+        code: ({ inline, children }) =>
+          inline ? <code>{children}</code> : <code className="note-rich-code-block">{children}</code>,
+      }}
+    >
+      {textWithBareHermesLinks}
+    </ReactMarkdown>
+  );
 }
