@@ -6,9 +6,11 @@ import {
   LayoutNavIcon,
   hasLayoutNavIcon,
   NavIconTheme,
+  NavIconSettings,
   NavIconSignOut,
 } from './icons/NavIcons.jsx';
 import NoteTypeFilterButtons from './NoteTypeFilterButtons';
+import SettingsModal from './SettingsModal';
 
 const THEME_STORAGE_KEY = 'hermes.theme';
 const THEME_META = {
@@ -121,6 +123,15 @@ export default function Layout({
             <button
               type="button"
               className="layout-logout"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <NavIconSettings className="layout-toolbar-icon" />
+            </button>
+            <button
+              type="button"
+              className="layout-logout"
               onClick={() => {
                 if (!window.confirm('Sign out of Hermes?')) return;
                 onLogout?.();
@@ -133,6 +144,7 @@ export default function Layout({
           </div>
         </div>
       </header>
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       <main className="layout-main">
         {children}
       </main>
