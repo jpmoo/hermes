@@ -374,7 +374,8 @@ export default function StreamPage() {
     () => filterRootsByVisibleNoteTypes(roots, visibleNoteTypes),
     [roots, visibleNoteTypes]
   );
-  const actualRootId = thread[0]?.id;
+  /** URL `thread` is the canonical root; do not use `thread[0]` (API orders by created_at, not tree root). */
+  const actualRootId = threadRootId;
   const displayTree = useMemo(() => {
     const fn = focusId && actualRootId ? findNode(tree, focusId) : null;
     if (fn && !noteIdEq(focusId, actualRootId)) {
