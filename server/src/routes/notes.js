@@ -240,7 +240,7 @@ router.get('/search-content', async (req, res) => {
     const raw = req.query.q?.trim();
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 40));
     const userId = req.userId;
-    /** @-mention menu: match first line only — line prefix or word-start after whitespace (not substring anywhere in body). */
+    /** @-mention menu: first line only, prefix match (same idea as tag # typeahead). */
     const firstLineOnly =
       req.query.firstLine === '1' ||
       req.query.firstLine === 'true' ||
@@ -250,20 +250,26 @@ router.get('/search-content', async (req, res) => {
     }
     const escaped = raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     const pattern = `%${escaped}%`;
-    const firstLineExpr = `NULLIF(trim(both from split_part(coalesce(n.content, ''), E'\\n', 1)), '')`;
+    /* Normalized first line: split on LF, strip CR, trim space/tab/NL, strip UTF-8 BOM if present */
+    const firstLineExpr = `NULLIF(
+      regexp_replace(
+        trim(both E' \\t\\n\\r' from replace(split_part(coalesce(n.content, ''), E'\\n', 1), E'\\r', '')),
+        '^' || chr(65279),
+        ''
+      ),
+      ''
+    )`;
     const whereClause = firstLineOnly
-      ? `n.user_id = $1 AND (${firstLineExpr} ILIKE $2 ESCAPE '\\' OR ${firstLineExpr} ILIKE $3 ESCAPE '\\')`
+      ? `n.user_id = $1 AND ${firstLineExpr} ILIKE $2 ESCAPE '\\'`
       : `n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'`;
-    const matchParams = firstLineOnly
-      ? [userId, `${escaped}%`, `% ${escaped}%`, limit]
-      : [userId, pattern, limit];
+    const matchParams = firstLineOnly ? [userId, `${escaped}%`, limit] : [userId, pattern, limit];
     const r = await pool.query(
       `WITH matches AS (
         SELECT n.id, ${SQL_NOTE_SORT_AT} AS sort_at
         FROM notes n
         WHERE ${whereClause}
         ORDER BY sort_at DESC NULLS LAST
-        LIMIT $${firstLineOnly ? '4' : '3'}
+        LIMIT $3
       )
       ${NOTE_LIST_FROM_MATCHES}`,
       matchParams

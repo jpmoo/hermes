@@ -17,6 +17,16 @@ import {
 } from './noteBodyUtils';
 import './MentionsTextarea.css';
 
+/** First line as shown in @-mention labels (prefix match must agree with this). */
+function noteTitleLineForMention(content) {
+  return (content || '')
+    .split(/\n/)[0]
+    .replace(/\r/g, '')
+    .replace(/^\uFEFF/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** WebKit on iPad often reports null or stale selectionStart; clamp using known text length. */
 function readTextareaCaret(el, text) {
   const len = text.length;
@@ -275,13 +285,17 @@ export default function MentionsTextarea({
       setLoading(true);
       searchTimer.current = setTimeout(async () => {
         try {
-          const list = await searchContent(qForSearch, 12, { firstLine: true });
-          const noteItems = list.map((n) => ({
+          const qNorm = qForSearch.trim().toLowerCase();
+          const list = await searchContent(qForSearch, 40, { firstLine: true });
+          const filtered = list.filter((n) =>
+            qNorm ? noteTitleLineForMention(n.content).toLowerCase().startsWith(qNorm) : true
+          );
+          const noteItems = filtered.slice(0, 12).map((n) => ({
             kind: 'note',
             key: n.id,
             id: n.id,
             label:
-              (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
+              noteTitleLineForMention(n.content).slice(0, 72) || 'Note',
             raw: n,
           }));
           const createItems =
