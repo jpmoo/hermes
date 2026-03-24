@@ -54,6 +54,12 @@ export default function NoteRichText({
     <div className={[className, 'note-rich-markdown'].filter(Boolean).join(' ')}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        urlTransform={(url) => {
+          const u = String(url || '').trim();
+          if (/^hermes-note:\/\/[0-9a-f-]{36}$/i.test(u)) return u;
+          if (/^hermes-tag:\/\/[a-z0-9-]+$/i.test(u)) return u;
+          return u;
+        }}
         components={{
         a: ({ href, children }) => {
           const url = String(href || '').trim();

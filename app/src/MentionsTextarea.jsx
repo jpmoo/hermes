@@ -242,23 +242,8 @@ export default function MentionsTextarea({
               name: t.name,
               label: t.name,
             }));
-            let noteItems = [];
-            try {
-              const list = await getMentionRecentNotes(12);
-              if (!cancelled) {
-                noteItems = list.map((n) => ({
-                  kind: 'note',
-                  key: `n-${n.id}`,
-                  id: n.id,
-                  label:
-                    (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
-                }));
-              }
-            } catch (e) {
-              console.error(e);
-            }
             if (cancelled) return;
-            setItems([...tagItems, ...noteItems]);
+            setItems(tagItems);
           } catch (e) {
             console.error(e);
             if (!cancelled) setItems([]);
@@ -297,14 +282,6 @@ export default function MentionsTextarea({
 
           searchTimer.current = setTimeout(async () => {
             try {
-              const list = await searchContent(q, 12);
-              const noteItems = list.map((n) => ({
-                kind: 'note',
-                key: `n-${n.id}`,
-                id: n.id,
-                label:
-                  (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
-              }));
               const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
               const createRow = showCreateRow
                 ? [
@@ -318,7 +295,7 @@ export default function MentionsTextarea({
                     },
                   ]
                 : [];
-              setItems([...tagItems, ...noteItems, ...createRow]);
+              setItems([...tagItems, ...createRow]);
             } catch (e) {
               console.error(e);
               const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;

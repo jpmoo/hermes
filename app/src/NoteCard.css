@@ -218,6 +218,7 @@
 
 .note-rich-markdown {
   display: block;
+  line-height: 1.25;
 }
 
 .note-rich-markdown > *:first-child {
@@ -230,7 +231,7 @@
 
 .note-rich-markdown p,
 .note-rich-markdown .note-rich-p {
-  margin: 0.08rem 0;
+  margin: 0 !important;
 }
 
 .note-rich-markdown h1,
@@ -254,37 +255,38 @@
 .note-rich-markdown ol,
 .note-rich-markdown .note-rich-ul,
 .note-rich-markdown .note-rich-ol {
-  margin: 0.06rem 0 0.08rem 1.05rem;
-  padding: 0;
+  margin: 0 !important;
+  margin-left: 1.05rem !important;
+  padding: 0 !important;
 }
 
 .note-rich-markdown li + li,
 .note-rich-markdown .note-rich-li + .note-rich-li {
-  margin-top: 0.01rem;
+  margin-top: 0 !important;
 }
 
 .note-rich-markdown p + ul,
 .note-rich-markdown p + ol {
-  margin-top: 0;
+  margin-top: 0 !important;
 }
 
 .note-rich-markdown li > p,
 .note-rich-markdown .note-rich-li > .note-rich-p {
-  margin: 0;
+  margin: 0 !important;
 }
 
 .note-rich-markdown li > ul,
 .note-rich-markdown li > ol {
-  margin-top: 0.02rem;
-  margin-bottom: 0.02rem;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 .note-rich-markdown ul > li,
 .note-rich-markdown ol > li,
 .note-rich-markdown .note-rich-ul > .note-rich-li,
 .note-rich-markdown .note-rich-ol > .note-rich-li {
-  margin: 0;
-  padding: 0;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .note-rich-markdown blockquote {
