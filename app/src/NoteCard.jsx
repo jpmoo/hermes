@@ -307,7 +307,9 @@ export default function NoteCard({
         ? 'note-card--type-person'
         : displayNoteType === 'event'
           ? 'note-card--type-event'
-          : '';
+          : displayNoteType === 'note'
+            ? 'note-card--type-note'
+            : '';
 
   const cardClass = [
     showThreadline ? `note-card note-card--depth-${Math.min(depth, 3)}` : 'note-card note-card--leaf',

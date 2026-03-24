@@ -109,6 +109,13 @@
   background: var(--bg-card);
 }
 
+.outline-row.outline-row--type-note {
+  background: var(--note-type-bg-note);
+}
+.outline-row.outline-row--type-note:hover {
+  background: var(--note-type-bg-note-hover);
+}
+
 .outline-row.outline-row--type-organization {
   background: var(--note-type-bg-organization);
 }
@@ -138,6 +145,10 @@
 }
 .outline-row.outline-row--type-event.outline-row--drop-target {
   background: color-mix(in srgb, var(--accent) 12%, var(--note-type-bg-event));
+}
+
+.outline-row.outline-row--type-note.outline-row--drop-target {
+  background: color-mix(in srgb, var(--accent) 12%, var(--note-type-bg-note));
 }
 
 /* Note text + star: opens Stream focused; chevron is separate (expand/collapse only). */

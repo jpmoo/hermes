@@ -61,6 +61,13 @@
   background: var(--bg-card-hover);
 }
 
+.note-card.note-card--type-note {
+  background: var(--note-type-bg-note);
+}
+.note-card.note-card--type-note:hover {
+  background: var(--note-type-bg-note-hover);
+}
+
 .note-card.note-card--type-organization {
   background: var(--note-type-bg-organization);
 }
@@ -94,6 +101,13 @@
 }
 
 /* Linked stream cards: keep type tint (same specificity as plain type modifiers) */
+.note-card.note-card--linked.note-card--type-note {
+  background: var(--note-type-bg-note);
+}
+.note-card.note-card--linked.note-card--type-note:hover {
+  background: var(--note-type-bg-note-hover);
+}
+
 .note-card.note-card--linked.note-card--type-organization {
   background: var(--note-type-bg-organization);
 }

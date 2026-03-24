@@ -8,6 +8,7 @@ import SearchView from './SearchView';
 import OrphanFilesView from './OrphanFilesView';
 import CalendarView from './CalendarView';
 import { NoteTypeFilterProvider } from './NoteTypeFilterContext';
+import { NoteTypeColorProvider } from './NoteTypeColorContext';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -94,9 +95,11 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter basename="/hermes">
-        <NoteTypeFilterProvider>
-          <AppRoutes />
-        </NoteTypeFilterProvider>
+        <NoteTypeColorProvider>
+          <NoteTypeFilterProvider>
+            <AppRoutes />
+          </NoteTypeFilterProvider>
+        </NoteTypeColorProvider>
       </BrowserRouter>
     </AuthProvider>
   );

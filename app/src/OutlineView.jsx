@@ -182,7 +182,9 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
         ? 'outline-row--type-person'
         : nt === 'event'
           ? 'outline-row--type-event'
-          : '';
+          : nt === 'note'
+            ? 'outline-row--type-note'
+            : '';
 
   const rowStateClass =
     dnd && dnd.draggingId === node.id

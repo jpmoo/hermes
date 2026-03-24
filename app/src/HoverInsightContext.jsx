@@ -1017,7 +1017,9 @@ function HoverInsightPanels() {
                                 ? 'hover-insight-similar-btn--type-person'
                                 : simType === 'event'
                                   ? 'hover-insight-similar-btn--type-event'
-                                  : '';
+                                  : simType === 'note'
+                                    ? 'hover-insight-similar-btn--type-note'
+                                    : '';
                           return (
                             <li key={sn.id}>
                               <div
@@ -1097,7 +1099,9 @@ function HoverInsightPanels() {
                   ? 'hover-insight-connection-card--type-person'
                   : connType === 'event'
                     ? 'hover-insight-connection-card--type-event'
-                    : '';
+                    : connType === 'note'
+                      ? 'hover-insight-connection-card--type-note'
+                      : '';
             return (
             <div
               key={pn.id}

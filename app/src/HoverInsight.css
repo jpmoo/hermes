@@ -463,6 +463,13 @@
   background: var(--note-type-bg-event-hover);
 }
 
+.hover-insight-similar-btn.hover-insight-similar-btn--type-note {
+  background: var(--note-type-bg-note);
+}
+.hover-insight-similar-btn.hover-insight-similar-btn--type-note:hover {
+  background: var(--note-type-bg-note-hover);
+}
+
 .hover-insight-similar-btn:focus-visible {
   outline: 2px solid var(--accent, #8a6d0a);
   outline-offset: 2px;
@@ -566,6 +573,13 @@
 }
 .hover-insight-connection-card.hover-insight-connection-card--type-event:hover {
   background: var(--note-type-bg-event-hover);
+}
+
+.hover-insight-connection-card.hover-insight-connection-card--type-note {
+  background: var(--note-type-bg-note);
+}
+.hover-insight-connection-card.hover-insight-connection-card--type-note:hover {
+  background: var(--note-type-bg-note-hover);
 }
 
 .hover-insight-connection-card-main {
