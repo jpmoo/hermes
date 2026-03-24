@@ -35,8 +35,8 @@ html {
   /* Note type icons (NoteTypeIcon): same value range as note/org — avoid bright accent on person/event */
   --note-type-icon-note: color-mix(in srgb, var(--accent) 42%, var(--text-muted));
   --note-type-icon-organization: var(--accent-dim);
-  --note-type-icon-person: color-mix(in srgb, var(--accent) 36%, var(--text-muted));
-  --note-type-icon-event: color-mix(in srgb, #6b4c30 34%, var(--text-muted));
+  --note-type-icon-person: color-mix(in srgb, #6fa9dc 52%, var(--text-muted));
+  --note-type-icon-event: color-mix(in srgb, #5f9b76 50%, var(--text-muted));
   /* Card / outline row backgrounds by note type (notes stay default --bg-card) */
   --note-type-bg-organization: color-mix(in srgb, #f7edc8 27%, var(--bg-card));
   --note-type-bg-organization-hover: color-mix(in srgb, #f0e6b8 22%, var(--bg-card-hover));

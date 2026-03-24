@@ -53,11 +53,6 @@
   right: auto;
 }
 
-/* One color for all types on the bubble (overrides per-type --note-type-icon-* from index.css) */
-.note-card .note-card-type-icon.note-type-icon {
-  color: var(--text-muted);
-}
-
 .note-card--has-type-icon .note-card-body {
   padding-right: 2.1rem;
 }
@@ -85,6 +80,17 @@
 }
 .note-card.note-card--type-event:hover {
   background: var(--note-type-bg-event-hover);
+}
+
+/* Ensure note-card corner type icons use semantic per-type tint in all themes */
+.note-card.note-card--type-organization .note-card-type-icon.note-type-icon {
+  color: var(--note-type-icon-organization) !important;
+}
+.note-card.note-card--type-person .note-card-type-icon.note-type-icon {
+  color: var(--note-type-icon-person) !important;
+}
+.note-card.note-card--type-event .note-card-type-icon.note-type-icon {
+  color: var(--note-type-icon-event) !important;
 }
 
 /* Linked stream cards: keep type tint (same specificity as plain type modifiers) */

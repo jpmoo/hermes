@@ -53,6 +53,7 @@ export default function Layout({
       /* ignore storage failures */
     }
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_META[theme]);
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', theme);
   }, [theme, location.pathname]);
 
   return (
