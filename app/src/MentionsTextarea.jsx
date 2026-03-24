@@ -9,9 +9,10 @@ import {
   addNoteTag,
 } from './api';
 import {
-  getActiveTrigger,
+  resolveMentionTrigger,
   replaceTriggerQuery,
   formatNoteMentionLink,
+  caretForTriggerReplace,
 } from './noteBodyUtils';
 import NoteTypeIcon from './NoteTypeIcon';
 import './MentionsTextarea.css';
@@ -108,6 +109,14 @@ export default function MentionsTextarea({
   const searchTimer = useRef(null);
   const tagsCache = useRef(null);
   const menuDomId = useId();
+  const refreshDelayTimer = useRef(null);
+
+  useEffect(
+    () => () => {
+      if (refreshDelayTimer.current) clearTimeout(refreshDelayTimer.current);
+    },
+    []
+  );
 
   const showComposeTypeChrome = Boolean(
     composeNoteType != null && composeNoteTypeOptions?.length && onComposeNoteTypeChange
@@ -138,20 +147,20 @@ export default function MentionsTextarea({
   const refreshMenu = useCallback(() => {
     const el = taRef.current;
     if (!el) return;
-    const pos = el.selectionStart ?? 0;
+    const rawPos = el.selectionStart ?? 0;
     /* Use live DOM value: onChange + rAF runs before React re-renders with new `value` prop */
     const text = el.value;
-    const trig = getActiveTrigger(text, pos);
+    const { trig, menuCaret } = resolveMentionTrigger(text, rawPos);
     if (!trig) {
       closeMenu();
       return;
     }
-    const coords = caretMenuPosition(el, pos);
+    const coords = caretMenuPosition(el, menuCaret);
     setMenu((prev) => {
       if (prev && prev.type === trig.type && prev.start === trig.start && prev.query === trig.query) {
-        return { ...prev, caret: pos, ...coords };
+        return { ...prev, caret: rawPos, ...coords };
       }
-      return { ...trig, caret: pos, ...coords };
+      return { ...trig, caret: rawPos, ...coords };
     });
   }, [closeMenu]);
 
@@ -167,7 +176,7 @@ export default function MentionsTextarea({
     const el = taRef.current;
     if (!el) return;
     const pos = el.selectionStart ?? 0;
-    const trig = getActiveTrigger(el.value, pos);
+    const { trig } = resolveMentionTrigger(el.value, pos);
     if (!trig || trig.start !== menu.start || trig.type !== menu.type) {
       closeMenu();
     }
@@ -366,7 +375,7 @@ export default function MentionsTextarea({
   const applyMention = async (item) => {
     const el = taRef.current;
     if (!menu || !el) return;
-    const caret = el.selectionStart ?? menu.caret;
+    const caret = caretForTriggerReplace(el, menu);
     if (item.kind === 'note-create') {
       if (!mentionCreateParentId) return;
       try {
@@ -502,6 +511,12 @@ export default function MentionsTextarea({
   const onChangeInner = (e) => {
     onChange(e.target.value);
     scheduleRefreshMenu();
+    /* WebKit may update selection after the input event; one delayed refresh catches leading #/@. */
+    if (refreshDelayTimer.current) clearTimeout(refreshDelayTimer.current);
+    refreshDelayTimer.current = setTimeout(() => {
+      refreshDelayTimer.current = null;
+      refreshMenu();
+    }, 40);
   };
 
   const onBeforeInputInner = (e) => {

@@ -75,6 +75,47 @@ export function getActiveTrigger(text, caretPos) {
   return { type, start, query };
 }
 
+/**
+ * WebKit (iPad/iPhone) often reports selectionStart 0 while the user just typed a leading #/@
+ * (or a single #query token). Recover trigger + a caret position for menu placement.
+ * @returns {{ trig: ReturnType<typeof getActiveTrigger>, menuCaret: number }}
+ */
+export function resolveMentionTrigger(text, rawCaret) {
+  const s = normalizeTriggerSource(text == null ? '' : String(text));
+  const pos = Math.min(Math.max(0, rawCaret), s.length);
+  let trig = getActiveTrigger(s, pos);
+  let menuCaret = pos;
+
+  if (!trig && pos === 0 && s.length > 0 && (s[0] === '#' || s[0] === '@')) {
+    if (s.length === 1) {
+      trig = getActiveTrigger(s, 1);
+      if (trig) menuCaret = 1;
+    } else if (/^[#@][a-zA-Z0-9._-]*$/.test(s)) {
+      trig = getActiveTrigger(s, s.length);
+      if (trig) menuCaret = s.length;
+    } else if (s.length === 2) {
+      trig = getActiveTrigger(s, 1);
+      if (trig) menuCaret = 1;
+    }
+  }
+
+  return { trig, menuCaret };
+}
+
+/** End index of @query or #query (exclusive upper bound for slice) — for broken selectionStart. */
+export function triggerReplaceEnd(menuLike) {
+  const q = menuLike?.query ?? '';
+  const st = menuLike?.start ?? 0;
+  return st + 1 + q.length;
+}
+
+/** Use when WebKit leaves selection before the typed trigger; never shrink past user’s real caret. */
+export function caretForTriggerReplace(el, menuLike) {
+  const end = triggerReplaceEnd(menuLike);
+  const raw = el.selectionStart ?? end;
+  return raw < end ? end : raw;
+}
+
 export function replaceTriggerQuery(text, triggerStart, caretPos, insertion) {
   const s = String(text);
   const before = s.slice(0, triggerStart);
