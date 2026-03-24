@@ -65,6 +65,9 @@
   flex: 1;
   min-width: 0;
   position: relative;
+  z-index: 1;
+  /* Avoid iOS treating the flex sibling (type button) as overlapping the text tap target. */
+  isolation: isolate;
 }
 
 .mentions-menu {

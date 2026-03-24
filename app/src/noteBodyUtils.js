@@ -86,6 +86,19 @@ export function resolveMentionTrigger(text, rawCaret) {
   let trig = getActiveTrigger(s, pos);
   let menuCaret = pos;
 
+  /*
+   * WebKit (iPad/iPhone) often leaves selectionStart *before* the @ or # that just inserted
+   * (caret index i points at s[i]). getActiveTrigger(s, i) then sees no trigger; compose box
+   * hit this more than inline edit due to sticky/footer focus timing.
+   */
+  if (!trig && pos < s.length && (s[pos] === '@' || s[pos] === '#')) {
+    const t2 = getActiveTrigger(s, pos + 1);
+    if (t2 && t2.start === pos) {
+      trig = t2;
+      menuCaret = pos + 1;
+    }
+  }
+
   if (!trig && pos === 0 && s.length > 0 && (s[0] === '#' || s[0] === '@')) {
     if (s.length === 1) {
       trig = getActiveTrigger(s, 1);

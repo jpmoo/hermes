@@ -186,18 +186,29 @@ export default function MentionsTextarea({
 
   useEffect(() => {
     if (!menu) return undefined;
-    const onDoc = (e) => {
-      if (
-        menuRef.current?.contains(e.target) ||
-        taRef.current?.contains(e.target) ||
-        wrapRef.current?.contains(e.target)
-      ) {
-        return;
-      }
-      closeMenu();
+    let onDoc = null;
+    let raf2 = 0;
+    /* Defer so iPad keyboard / the same gesture doesn’t deliver a capture pointerdown that closes immediately. */
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        onDoc = (e) => {
+          if (
+            menuRef.current?.contains(e.target) ||
+            taRef.current?.contains(e.target) ||
+            wrapRef.current?.contains(e.target)
+          ) {
+            return;
+          }
+          closeMenu();
+        };
+        document.addEventListener('pointerdown', onDoc, true);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      if (onDoc) document.removeEventListener('pointerdown', onDoc, true);
     };
-    document.addEventListener('pointerdown', onDoc, true);
-    return () => document.removeEventListener('pointerdown', onDoc, true);
   }, [menu, closeMenu]);
 
   useEffect(() => {

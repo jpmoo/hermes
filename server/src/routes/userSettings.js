@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
+import {
+  similarNotesMinCharsEnvDefault,
+  sanitizeSimilarNotesMinChars,
+} from '../config/similarNotes.js';
 
 const router = Router();
 
@@ -32,7 +36,12 @@ router.get('/settings', requireAuth, async (req, res) => {
     const row = r.rows[0];
     const raw = row?.settings_json && typeof row.settings_json === 'object' ? row.settings_json : {};
     const noteTypeColors = sanitizeNoteTypeColors(raw.noteTypeColors);
-    res.json({ noteTypeColors });
+    const similarStored = sanitizeSimilarNotesMinChars(raw.similarNotesMinChars);
+    res.json({
+      noteTypeColors,
+      similarNotesMinChars: similarStored === undefined ? null : similarStored,
+      similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load settings' });
@@ -41,7 +50,7 @@ router.get('/settings', requireAuth, async (req, res) => {
 
 router.patch('/settings', requireAuth, async (req, res) => {
   try {
-    const { noteTypeColors } = req.body ?? {};
+    const { noteTypeColors, similarNotesMinChars } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
       ? { ...r.rows[0].settings_json }
@@ -57,12 +66,29 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (similarNotesMinChars !== undefined) {
+      if (similarNotesMinChars === null) {
+        delete cur.similarNotesMinChars;
+      } else {
+        const n = sanitizeSimilarNotesMinChars(similarNotesMinChars);
+        if (n === undefined) {
+          return res.status(400).json({ error: 'similarNotesMinChars must be 0–500 or null' });
+        }
+        cur.similarNotesMinChars = n;
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
     ]);
     const outColors = sanitizeNoteTypeColors(cur.noteTypeColors);
-    res.json({ noteTypeColors: outColors });
+    const outSimilar = sanitizeSimilarNotesMinChars(cur.similarNotesMinChars);
+    res.json({
+      noteTypeColors: outColors,
+      similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
+      similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to save settings' });

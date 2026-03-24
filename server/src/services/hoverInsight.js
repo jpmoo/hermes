@@ -1,5 +1,22 @@
 import pool from '../db/pool.js';
 import { generate } from './ollama.js';
+import {
+  similarNotesMinCharsEnvDefault,
+  sanitizeSimilarNotesMinChars,
+} from '../config/similarNotes.js';
+
+async function resolveSimilarNotesMinChars(userId) {
+  const fallback = similarNotesMinCharsEnvDefault();
+  try {
+    const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [userId]);
+    const raw = r.rows[0]?.settings_json?.similarNotesMinChars;
+    const n = sanitizeSimilarNotesMinChars(raw);
+    if (n !== undefined) return n;
+  } catch (e) {
+    console.error('resolveSimilarNotesMinChars:', e.message || e);
+  }
+  return fallback;
+}
 
 function normalizeTagName(s) {
   return (s || '').toString().trim().toLowerCase().replace(/\s+/g, '-');
@@ -137,14 +154,19 @@ export async function getLinkedNotesWithTags(anchorNoteId, userId) {
  * (2) Ollama — up to 6 new hyphenated tags; (3) connected — approved tags on linked peers not on hovered note.
  * Similar notes: cosine nearest neighbors (embeddings), excluding self, connection peers, parent,
  * siblings (same parent), and immediate children (already surfaced as thread neighbors).
+ * Skipped when note body is shorter than per-user (or env) minimum (unreliable embeddings on stubs).
  */
 export async function getHoverInsight(noteId, userId, _opts = {}) {
+  const similarBodyMin = await resolveSimilarNotesMinChars(userId);
   const noteR = await pool.query(
     `SELECT id, parent_id, content FROM notes WHERE id = $1 AND user_id = $2`,
     [noteId, userId]
   );
   if (noteR.rows.length === 0) return null;
   const { id, parent_id: parentId, content } = noteR.rows[0];
+  const trimmedNoteBody = (content || '').trim();
+  const similarNotesSkippedShortNote =
+    similarBodyMin > 0 && trimmedNoteBody.length < similarBodyMin;
 
   let parentBlock = '';
   if (parentId) {
@@ -340,6 +362,9 @@ JSON array only, no markdown:`;
   /** Vector similar notes: exclude linked peers + full thread neighborhood (not capped like Ollama context). */
   let similarNotes = [];
   try {
+    if (similarNotesSkippedShortNote) {
+      similarNotes = [];
+    } else {
     const linkedPeerIds = persistedLinks.map((p) => p.id);
     let threadNeighborIds = [];
     try {
@@ -397,6 +422,7 @@ JSON array only, no markdown:`;
         threadPath: await getNoteThreadPathDisplay(row.id, userId, { excludeLeaf: true }),
       }))
     );
+    }
   } catch (err) {
     console.error('hover similar notes:', err.message || err);
     similarNotes = [];
@@ -426,6 +452,8 @@ JSON array only, no markdown:`;
   return {
     tagSuggestions,
     similarNotes,
+    similarNotesMinChars: similarBodyMin,
+    similarNotesSkippedShortNote,
     persistedLinks: persistedLinksWithTags,
   };
 }

@@ -5,7 +5,17 @@ import { useNoteTypeColors } from './NoteTypeColorContext';
 import './SettingsModal.css';
 
 export default function SettingsModal({ onClose }) {
-  const { colors, setTypeColor, resetAllTypeColors } = useNoteTypeColors();
+  const {
+    colors,
+    setTypeColor,
+    resetAllTypeColors,
+    similarNotesMinChars,
+    similarNotesMinDefault,
+    setSimilarNotesMinChars,
+  } = useNoteTypeColors();
+
+  const effectiveSimilarMin =
+    similarNotesMinChars != null ? similarNotesMinChars : similarNotesMinDefault;
 
   useEffect(() => {
     const onKey = (e) => {
@@ -70,6 +80,55 @@ export default function SettingsModal({ onClose }) {
             <button type="button" className="settings-modal-linkish" onClick={resetAllTypeColors}>
               Reset all to app defaults
             </button>
+          </p>
+        </section>
+
+        <section className="settings-modal-section" aria-labelledby="settings-similar-notes-heading">
+          <h3 id="settings-similar-notes-heading" className="settings-modal-section-title">
+            Similar notes (hover)
+          </h3>
+          <p className="settings-modal-section-lead">
+            Vector similar-note suggestions are hidden when the hovered note body is shorter than this many
+            characters (after trimming), so tiny stubs do not surface misleading matches. Use{' '}
+            <strong>0</strong> to always show similar notes. Leave the field empty to follow the server default
+            ({similarNotesMinDefault}); your account can override it here.
+          </p>
+          <div className="settings-modal-similar-notes-row">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-similar-min-chars">
+              Min characters
+            </label>
+            <input
+              id="settings-similar-min-chars"
+              className="settings-modal-similar-notes-input"
+              type="number"
+              min={0}
+              max={500}
+              step={1}
+              placeholder={`Default (${similarNotesMinDefault})`}
+              value={similarNotesMinChars == null ? '' : String(similarNotesMinChars)}
+              aria-describedby="settings-similar-min-hint"
+              onChange={(e) => {
+                const t = e.target.value.trim();
+                if (t === '') {
+                  setSimilarNotesMinChars(null);
+                  return;
+                }
+                const n = parseInt(t, 10);
+                if (!Number.isFinite(n)) return;
+                setSimilarNotesMinChars(Math.min(500, Math.max(0, n)));
+              }}
+            />
+            <button
+              type="button"
+              className="settings-modal-type-color-reset"
+              disabled={similarNotesMinChars == null}
+              onClick={() => setSimilarNotesMinChars(null)}
+            >
+              Use default
+            </button>
+          </div>
+          <p id="settings-similar-min-hint" className="settings-modal-similar-notes-hint">
+            Effective threshold: <strong>{effectiveSimilarMin}</strong> characters.
           </p>
         </section>
 

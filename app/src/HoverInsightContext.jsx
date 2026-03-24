@@ -109,11 +109,17 @@ function normalizeHoverInsightPayload(data) {
         note_type: s.note_type || s.noteType || 'note',
       }))
     : [];
+  const skippedShort =
+    data.similarNotesSkippedShortNote === true || data.similar_notes_skipped_short_note === true;
+  const minChars = data.similarNotesMinChars ?? data.similar_notes_min_chars;
+
   return {
     ...data,
     tagSuggestions: Array.isArray(tags) ? tags : [],
     similarNotes: similarNorm,
     persistedLinks: Array.isArray(persisted) ? persisted : [],
+    similarNotesSkippedShortNote: skippedShort,
+    similarNotesMinChars: typeof minChars === 'number' && Number.isFinite(minChars) ? minChars : undefined,
   };
 }
 
@@ -995,7 +1001,11 @@ function HoverInsightPanels() {
                     </div>
                     {similarNotes.length === 0 ? (
                       <p className="hover-insight-muted">
-                        No similar notes (needs embeddings, or nothing close enough yet).
+                        {insight?.similarNotesSkippedShortNote
+                          ? `Similar notes are hidden for very short notes — add at least ${
+                              insight.similarNotesMinChars ?? 48
+                            } characters of text to this one (embeddings need a bit of context).`
+                          : 'No similar notes (needs embeddings, or nothing close enough yet).'}
                       </p>
                     ) : filteredSimilarNotes.length === 0 ? (
                       <p className="hover-insight-muted">

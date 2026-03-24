@@ -130,6 +130,43 @@
   filter: brightness(1.08);
 }
 
+.settings-modal-similar-notes-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.settings-modal-similar-notes-label {
+  flex: 1 1 6rem;
+  min-width: 6rem;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.settings-modal-similar-notes-input {
+  width: 5.5rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.settings-modal-similar-notes-input::placeholder {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.settings-modal-similar-notes-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 .settings-modal-actions {
   display: flex;
   justify-content: flex-end;
