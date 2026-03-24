@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { getTags, searchByTags, searchSemantic, searchContent } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
+import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 import { filterNotesByVisibleNoteTypes } from './noteTypeFilter';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './SearchView.css';
@@ -150,7 +151,6 @@ export default function SearchView() {
   return (
     <Layout
       title="Search"
-      noteTypeFilterEnabled
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },
@@ -166,78 +166,97 @@ export default function SearchView() {
           </p>
         )}
 
-        <div className="search-view-tags-block">
-          <p className="search-view-tags-label">Filter by tags (optional)</p>
-          <div className="search-view-tags-row">
-            {allTags.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={`search-view-tag-chip ${selectedTagIds.includes(t.id) ? 'search-view-tag-chip--on' : ''}`}
-                onClick={() => toggleTag(t)}
-              >
-                {t.name}
-              </button>
-            ))}
+        <div className="search-view-query">
+          <p className="search-view-query-lead">
+            Narrow by note type, tags, and/or text. Tags update results as you select them; use Search
+            for text (alone or together with tags).
+          </p>
+
+          <div className="search-view-query-section">
+            <p className="search-view-section-label" id="search-section-types">
+              Note types
+            </p>
+            <NoteTypeFilterButtons mode="search" />
           </div>
-          {hasTags && (
-            <div className="search-view-tags-mode" role="radiogroup" aria-label="Tag match mode">
-              <label>
-                <input type="radio" checked={tagMode === 'and'} onChange={() => setTagMode('and')} />
-                Match all tags (AND)
+
+          <div className="search-view-query-section">
+            <p className="search-view-section-label" id="search-section-tags">
+              Tags <span className="search-view-section-optional">(optional)</span>
+            </p>
+            <div className="search-view-tags-row">
+              {allTags.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`search-view-tag-chip ${selectedTagIds.includes(t.id) ? 'search-view-tag-chip--on' : ''}`}
+                  onClick={() => toggleTag(t)}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+            {hasTags && (
+              <div className="search-view-tags-mode" role="radiogroup" aria-label="Tag match mode">
+                <label>
+                  <input type="radio" checked={tagMode === 'and'} onChange={() => setTagMode('and')} />
+                  Match all tags (AND)
+                </label>
+                <label>
+                  <input type="radio" checked={tagMode === 'or'} onChange={() => setTagMode('or')} />
+                  Match any tag (OR)
+                </label>
+              </div>
+            )}
+          </div>
+
+          <form className="search-view-query-section search-view-form" onSubmit={handleSearch}>
+            <p className="search-view-section-label" id="search-section-text">
+              Text <span className="search-view-section-optional">(optional if tags are selected)</span>
+            </p>
+            <div className="search-view-field-row">
+              <input
+                type="search"
+                placeholder="Search notes…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="search-view-input"
+                aria-labelledby="search-section-text"
+              />
+              <button type="submit" disabled={loading || (!hasQ && !hasTags)}>
+                Search
+              </button>
+            </div>
+            <div className="search-view-modes" role="radiogroup" aria-label="How to match text">
+              <label className="search-view-mode">
+                <input
+                  type="radio"
+                  name="searchMode"
+                  value="keyword"
+                  checked={searchMode === 'keyword'}
+                  onChange={() => setSearchMode('keyword')}
+                />
+                <span className="search-view-mode-label">Keyword</span>
+                <span className="search-view-mode-hint">Exact text in note body</span>
               </label>
-              <label>
-                <input type="radio" checked={tagMode === 'or'} onChange={() => setTagMode('or')} />
-                Match any tag (OR)
+              <label className="search-view-mode">
+                <input
+                  type="radio"
+                  name="searchMode"
+                  value="semantic"
+                  checked={searchMode === 'semantic'}
+                  onChange={() => setSearchMode('semantic')}
+                />
+                <span className="search-view-mode-label">Semantic</span>
+                <span className="search-view-mode-hint">Meaning &amp; similarity (Ollama)</span>
               </label>
             </div>
-          )}
+          </form>
         </div>
-
-        <form className="search-view-form" onSubmit={handleSearch}>
-          <div className="search-view-field-row">
-            <input
-              type="search"
-              placeholder="Search notes… (optional if tags are selected)"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="search-view-input"
-              aria-label="Search query"
-            />
-            <button type="submit" disabled={loading || (!hasQ && !hasTags)}>
-              Search
-            </button>
-          </div>
-          <div className="search-view-modes" role="radiogroup" aria-label="Search type">
-            <label className="search-view-mode">
-              <input
-                type="radio"
-                name="searchMode"
-                value="keyword"
-                checked={searchMode === 'keyword'}
-                onChange={() => setSearchMode('keyword')}
-              />
-              <span className="search-view-mode-label">Keyword</span>
-              <span className="search-view-mode-hint">Exact text in note body</span>
-            </label>
-            <label className="search-view-mode">
-              <input
-                type="radio"
-                name="searchMode"
-                value="semantic"
-                checked={searchMode === 'semantic'}
-                onChange={() => setSearchMode('semantic')}
-              />
-              <span className="search-view-mode-label">Semantic</span>
-              <span className="search-view-mode-hint">Meaning &amp; similarity (Ollama)</span>
-            </label>
-          </div>
-        </form>
 
         {emptyHint && (
           <p className="search-view-empty search-view-empty--hint">
-            Select one or more tags, enter a search query, or both. Tag selection updates results
-            automatically; use Search to run text search (including together with tags).
+            Choose note types above, add tags, and/or enter text, then run Search. Tags alone update
+            the list as you click them.
           </p>
         )}
 
@@ -245,8 +264,7 @@ export default function SearchView() {
 
         {!loading && results.length > 0 && filteredResults.length === 0 && (
           <p className="search-view-empty">
-            No notes match the current type filters. Use the note-type buttons in the header to show
-            more kinds.
+            No notes match the current note-type filters. Turn on more types in the query panel above.
           </p>
         )}
 

@@ -8,19 +8,7 @@ import {
   NavIconTheme,
   NavIconSignOut,
 } from './icons/NavIcons.jsx';
-import NoteTypeIcon from './NoteTypeIcon';
-import { NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
-import { useNoteTypeFilter } from './NoteTypeFilterContext';
-
-const TYPE_FILTER_LABELS = {
-  note: 'Notes',
-  event: 'Events',
-  person: 'People',
-  organization: 'Organizations',
-};
-
-/** Pages where header type toggles apply (shown in tooltips when filters are disabled elsewhere). */
-const NOTE_TYPE_FILTER_VIEWS = 'Stream, Outline, and Search';
+import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 
 const THEME_STORAGE_KEY = 'hermes.theme';
 const THEME_META = {
@@ -37,7 +25,6 @@ export default function Layout({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { visibleNoteTypes, toggleNoteType } = useNoteTypeFilter();
   const [theme, setTheme] = useState(() => {
     try {
       const v = localStorage.getItem(THEME_STORAGE_KEY);
@@ -118,39 +105,7 @@ export default function Layout({
               )}
             </nav>
             <div className="layout-filters-cluster">
-              <div className="layout-type-filters" role="group" aria-label="Filter notes by type">
-                {NOTE_TYPE_HEADER_ORDER.map((t) => {
-                  const on = visibleNoteTypes.has(t);
-                  const label = TYPE_FILTER_LABELS[t] ?? t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      disabled={!noteTypeFilterEnabled}
-                      className={`layout-toolbar-btn ${on ? 'layout-toolbar-btn--active' : ''}`}
-                      onClick={() => noteTypeFilterEnabled && toggleNoteType(t)}
-                      aria-pressed={noteTypeFilterEnabled ? on : undefined}
-                      aria-disabled={!noteTypeFilterEnabled}
-                      aria-label={
-                        !noteTypeFilterEnabled
-                          ? `${label} filter (available on ${NOTE_TYPE_FILTER_VIEWS})`
-                          : on
-                            ? `${label} visible — hide from ${NOTE_TYPE_FILTER_VIEWS}`
-                            : `${label} hidden — show in ${NOTE_TYPE_FILTER_VIEWS}`
-                      }
-                      title={
-                        !noteTypeFilterEnabled
-                          ? `Type filters apply on ${NOTE_TYPE_FILTER_VIEWS}`
-                          : on
-                            ? `${label} visible — click to hide from ${NOTE_TYPE_FILTER_VIEWS}`
-                            : `${label} hidden — click to show`
-                      }
-                    >
-                      <NoteTypeIcon type={t} className="layout-toolbar-icon" />
-                    </button>
-                  );
-                })}
-              </div>
+              <NoteTypeFilterButtons mode="header" disabled={!noteTypeFilterEnabled} />
             </div>
           </div>
           <div className="layout-header-end">
