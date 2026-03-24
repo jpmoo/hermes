@@ -203,6 +203,7 @@ export default function NoteCard({
     e.stopPropagation();
     const t = tags.find((x) => x.id === tagId);
     if (!t) return;
+    if (!window.confirm(`Remove the “${t.name}” tag from this note?`)) return;
     try {
       const nextContent = stripHashtagPrefixFromContent(note.content || '', t.name);
       if (nextContent !== (note.content || '')) {
@@ -317,13 +318,6 @@ export default function NoteCard({
     .join(' ');
 
   const handleDeleteAttachment = async (att) => {
-    if (
-      !window.confirm(
-        `Remove “${att.filename}” from this note?\n\nThe file will be permanently deleted from the server.`
-      )
-    ) {
-      return;
-    }
     try {
       await deleteNoteFile(att.id);
       onNoteUpdate?.();

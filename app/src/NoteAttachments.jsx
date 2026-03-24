@@ -87,6 +87,14 @@ function AttachmentItem({ att, onDeleted }) {
           className="note-attachment-remove"
           onClick={(e) => {
             e.stopPropagation();
+            const name = att.filename || 'this file';
+            if (
+              !window.confirm(
+                `Remove “${name}” from this note?\n\nThe file will be permanently deleted from the server.`
+              )
+            ) {
+              return;
+            }
             onDeleted(att);
           }}
           aria-label={`Remove ${att.filename}`}
