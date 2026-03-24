@@ -564,6 +564,7 @@ export default function OutlineView() {
   return (
     <Layout
       title="Outline"
+      noteTypeFilterEnabled
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },

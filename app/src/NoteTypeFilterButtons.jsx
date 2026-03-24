@@ -2,6 +2,7 @@ import React from 'react';
 import NoteTypeIcon from './NoteTypeIcon';
 import { NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
+import { useSearchNoteTypeFilter } from './SearchNoteTypeFilterContext';
 
 const TYPE_FILTER_LABELS = {
   note: 'Notes',
@@ -13,17 +14,7 @@ const TYPE_FILTER_LABELS = {
 const SCOPE_STREAM_OUTLINE = 'Stream and Outline';
 const SCOPE_SEARCH = 'search results';
 
-/**
- * @param {{ mode: 'header' | 'search', disabled?: boolean }} props
- * - header: Stream/Outline toolbar (Layout); use disabled on Search/Calendar.
- * - search: Search query panel only.
- */
-export default function NoteTypeFilterButtons({ mode, disabled = false }) {
-  const { visibleNoteTypes, toggleNoteType } = useNoteTypeFilter();
-  const isSearch = mode === 'search';
-  const effectivelyDisabled = mode === 'header' && disabled;
-  const scope = isSearch ? SCOPE_SEARCH : SCOPE_STREAM_OUTLINE;
-
+function renderTypeButtons({ visibleNoteTypes, toggleNoteType, effectivelyDisabled, scope, isSearch }) {
   return (
     <div
       className={`layout-type-filters ${isSearch ? 'note-type-filter-buttons--search' : ''}`}
@@ -67,4 +58,36 @@ export default function NoteTypeFilterButtons({ mode, disabled = false }) {
       })}
     </div>
   );
+}
+
+function NoteTypeFilterButtonsHeader({ disabled = false }) {
+  const { visibleNoteTypes, toggleNoteType } = useNoteTypeFilter();
+  return renderTypeButtons({
+    visibleNoteTypes,
+    toggleNoteType,
+    effectivelyDisabled: disabled,
+    scope: SCOPE_STREAM_OUTLINE,
+    isSearch: false,
+  });
+}
+
+function NoteTypeFilterButtonsSearchPanel() {
+  const { visibleNoteTypes, toggleNoteType } = useSearchNoteTypeFilter();
+  return renderTypeButtons({
+    visibleNoteTypes,
+    toggleNoteType,
+    effectivelyDisabled: false,
+    scope: SCOPE_SEARCH,
+    isSearch: true,
+  });
+}
+
+/**
+ * @param {{ mode: 'header' | 'search', disabled?: boolean }} props
+ */
+export default function NoteTypeFilterButtons({ mode, disabled = false }) {
+  if (mode === 'search') {
+    return <NoteTypeFilterButtonsSearchPanel />;
+  }
+  return <NoteTypeFilterButtonsHeader disabled={disabled} />;
 }

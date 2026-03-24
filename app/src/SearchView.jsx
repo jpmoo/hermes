@@ -6,10 +6,10 @@ import Layout from './Layout';
 import NoteCard from './NoteCard';
 import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 import { filterNotesByVisibleNoteTypes } from './noteTypeFilter';
-import { useNoteTypeFilter } from './NoteTypeFilterContext';
+import { SearchNoteTypeFilterProvider, useSearchNoteTypeFilter } from './SearchNoteTypeFilterContext';
 import './SearchView.css';
 
-export default function SearchView() {
+function SearchViewInner() {
   const [allTags, setAllTags] = useState([]);
   const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [tagMode, setTagMode] = useState('and');
@@ -22,9 +22,8 @@ export default function SearchView() {
   const qRef = useRef(q);
   qRef.current = q;
 
-  const { logout } = useAuth();
   const navigate = useNavigate();
-  const { visibleNoteTypes } = useNoteTypeFilter();
+  const { visibleNoteTypes } = useSearchNoteTypeFilter();
 
   const filteredResults = useMemo(
     () => filterNotesByVisibleNoteTypes(results, visibleNoteTypes),
@@ -141,18 +140,7 @@ export default function SearchView() {
   const hasQ = q.trim().length > 0;
 
   return (
-    <Layout
-      title="Search"
-      noteTypeFilterEnabled={false}
-      onLogout={logout}
-      viewLinks={[
-        { to: '/', label: 'Stream' },
-        { to: '/outline', label: 'Outline' },
-        { to: '/calendar', label: 'Calendar' },
-        { to: '/search', label: 'Search' },
-      ]}
-    >
-      <div className="search-view">
+    <div className="search-view">
         {searchError && (
           <p className="search-view-error" role="alert">
             {searchError}
@@ -305,6 +293,26 @@ export default function SearchView() {
           </p>
         )}
       </div>
+  );
+}
+
+export default function SearchView() {
+  const { logout } = useAuth();
+  return (
+    <Layout
+      title="Search"
+      noteTypeFilterEnabled={false}
+      onLogout={logout}
+      viewLinks={[
+        { to: '/', label: 'Stream' },
+        { to: '/outline', label: 'Outline' },
+        { to: '/calendar', label: 'Calendar' },
+        { to: '/search', label: 'Search' },
+      ]}
+    >
+      <SearchNoteTypeFilterProvider>
+        <SearchViewInner />
+      </SearchNoteTypeFilterProvider>
     </Layout>
   );
 }
