@@ -140,6 +140,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
           tagNames={tagNames}
           className="outline-content-rich-inner"
           onNoteClick={onOpenLinkedNote}
+          stopClickPropagation={false}
         />
       </span>
       {node.starred && <span className="outline-star">★</span>}
@@ -202,6 +203,14 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
       e.preventDefault();
       e.stopPropagation();
       return;
+    }
+    /* Let clicks bubble from rich text; http/mailto links keep native behavior without opening Stream. */
+    if (e.target.closest?.('button.note-rich-mention')) return;
+    const linkEl = e.target.closest?.('a.note-rich-link');
+    if (linkEl) {
+      const href = linkEl.getAttribute('href')?.trim() || '';
+      if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) return;
+      e.preventDefault();
     }
     openInStream();
   };

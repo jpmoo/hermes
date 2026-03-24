@@ -67,8 +67,15 @@ function indexOfNextSpecial(s, pos) {
 
 /**
  * Note body: markdown links [t](url), bare URLs, hermes-note:// mentions, #tags (when in tagNames).
+ * @param {boolean} [stopClickPropagation=true] — when false (e.g. Outline rows), clicks bubble so a parent can open the row; parent should ignore targets inside `.note-rich-link` / `button.note-rich-mention`.
  */
-export default function NoteRichText({ text, tagNames = null, className, onNoteClick }) {
+export default function NoteRichText({
+  text,
+  tagNames = null,
+  className,
+  onNoteClick,
+  stopClickPropagation = true,
+}) {
   const s = text == null ? '' : String(text);
   if (!s) return <span className={className}>—</span>;
 
@@ -104,7 +111,7 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
             className="note-rich-mention"
             onClick={(e) => {
               e.preventDefault();
-              e.stopPropagation();
+              if (stopClickPropagation) e.stopPropagation();
               onNoteClick?.(id);
             }}
           >
@@ -129,7 +136,9 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
               {...(/^https?:\/\//i.test(href)
                 ? { target: '_blank', rel: 'noopener noreferrer' }
                 : {})}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                if (stopClickPropagation) e.stopPropagation();
+              }}
             >
               {label || formatUrlDisplayLabel(href)}
             </a>
@@ -151,7 +160,9 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
             href={href}
             title={href}
             className="note-rich-link"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              if (stopClickPropagation) e.stopPropagation();
+            }}
           >
             {label || formatUrlDisplayLabel(href)}
           </a>
@@ -199,7 +210,7 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
                 title={url}
                 onClick={(e) => {
                   e.preventDefault();
-                  e.stopPropagation();
+                  if (stopClickPropagation) e.stopPropagation();
                   onNoteClick(id);
                 }}
               >
@@ -221,7 +232,9 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
               title={url}
               className="note-rich-link"
               {...(/^https?:\/\//i.test(url) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                if (stopClickPropagation) e.stopPropagation();
+              }}
             >
               {formatUrlDisplayLabel(url)}
             </a>
