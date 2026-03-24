@@ -218,7 +218,7 @@
 
 .note-rich-markdown {
   display: block;
-  line-height: 1.25;
+  line-height: 1.12;
 }
 
 .note-rich-markdown > *:first-child {
@@ -232,6 +232,7 @@
 .note-rich-markdown p,
 .note-rich-markdown .note-rich-p {
   margin: 0 !important;
+  line-height: 1.12 !important;
 }
 
 .note-rich-markdown h1,
@@ -287,6 +288,7 @@
 .note-rich-markdown .note-rich-ol > .note-rich-li {
   margin: 0 !important;
   padding: 0 !important;
+  line-height: 1.12 !important;
 }
 
 .note-rich-markdown blockquote {
