@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearStreamNavMemory, getLastStreamSearch } from './streamNavMemory';
 import './Layout.css';
 import {
   LayoutNavIcon,
   hasLayoutNavIcon,
+  NavIconTheme,
   NavIconSignOut,
 } from './icons/NavIcons.jsx';
 import NoteTypeIcon from './NoteTypeIcon';
@@ -18,7 +19,11 @@ const TYPE_FILTER_LABELS = {
   organization: 'Organizations',
 };
 
-const LAYOUT_THEME_COLOR = '#f4f3f0';
+const THEME_STORAGE_KEY = 'hermes.theme';
+const THEME_META = {
+  light: '#f4f3f0',
+  dark: '#15181c',
+};
 
 export default function Layout({
   title,
@@ -30,10 +35,25 @@ export default function Layout({
   const location = useLocation();
   const navigate = useNavigate();
   const { visibleNoteTypes, toggleNoteType } = useNoteTypeFilter();
+  const [theme, setTheme] = useState(() => {
+    try {
+      const v = localStorage.getItem(THEME_STORAGE_KEY);
+      return v === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
 
   useEffect(() => {
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', LAYOUT_THEME_COLOR);
-  }, [location.pathname]);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      /* ignore storage failures */
+    }
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_META[theme]);
+  }, [theme, location.pathname]);
 
   return (
     <div className="layout">
@@ -130,6 +150,15 @@ export default function Layout({
             </div>
           </div>
           <div className="layout-header-end">
+            <button
+              type="button"
+              className="layout-logout"
+              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              <NavIconTheme className="layout-toolbar-icon" />
+            </button>
             <button
               type="button"
               className="layout-logout"

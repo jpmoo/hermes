@@ -4,6 +4,7 @@ html {
 }
 
 :root {
+  --color-scheme: light;
   --bg: #f4f3f0;
   --bg-card: #ffffff;
   --bg-card-hover: #eceae6;
@@ -45,6 +46,40 @@ html {
   --note-type-bg-event-hover: color-mix(in srgb, #dcefe6 22%, var(--bg-card-hover));
 }
 
+html[data-theme='dark'] {
+  --color-scheme: dark;
+  --bg: #15181c;
+  --bg-card: #1c2128;
+  --bg-card-hover: #262c35;
+  --border: #37404d;
+  --text: #e5e8ee;
+  --text-muted: #a4adba;
+  --accent: #d0ac46;
+  --accent-dim: #bea25b;
+  --star: #d5b14d;
+  --on-accent: #15181c;
+  --status-warning-bg: rgba(189, 148, 45, 0.18);
+  --status-warning-border: rgba(189, 148, 45, 0.4);
+  --status-warning-text: #f3dfaa;
+  --status-danger-bg: rgba(181, 77, 77, 0.16);
+  --status-danger-border: rgba(181, 77, 77, 0.42);
+  --status-danger-text: #ffb5b5;
+  --status-danger-hover: #ff9f9f;
+  --status-danger-btn-bg: #9f3f3f;
+  --status-danger-btn-hover: #8b3636;
+  --on-danger-btn: #fff;
+  --note-type-icon-note: color-mix(in srgb, var(--accent) 56%, var(--text-muted));
+  --note-type-icon-organization: color-mix(in srgb, #e4c774 62%, var(--text-muted));
+  --note-type-icon-person: color-mix(in srgb, #9ec8ee 58%, var(--text-muted));
+  --note-type-icon-event: color-mix(in srgb, #9ad7b3 56%, var(--text-muted));
+  --note-type-bg-organization: color-mix(in srgb, #7f6a31 24%, var(--bg-card));
+  --note-type-bg-organization-hover: color-mix(in srgb, #8b7437 29%, var(--bg-card-hover));
+  --note-type-bg-person: color-mix(in srgb, #3d648c 27%, var(--bg-card));
+  --note-type-bg-person-hover: color-mix(in srgb, #46709c 31%, var(--bg-card-hover));
+  --note-type-bg-event: color-mix(in srgb, #3d7557 25%, var(--bg-card));
+  --note-type-bg-event-hover: color-mix(in srgb, #46815f 30%, var(--bg-card-hover));
+}
+
 .note-type-icon {
   flex-shrink: 0;
 }
@@ -79,14 +114,14 @@ body {
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  color-scheme: light;
+  color-scheme: var(--color-scheme);
 }
 
 #root {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  color-scheme: light;
+  color-scheme: var(--color-scheme);
 }
 
 button {
