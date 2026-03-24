@@ -228,7 +228,8 @@
   margin-bottom: 0;
 }
 
-.note-rich-markdown p {
+.note-rich-markdown p,
+.note-rich-markdown .note-rich-p {
   margin: 0.08rem 0;
 }
 
@@ -250,12 +251,15 @@
 .note-rich-markdown h6 { font-size: 0.96em; }
 
 .note-rich-markdown ul,
-.note-rich-markdown ol {
+.note-rich-markdown ol,
+.note-rich-markdown .note-rich-ul,
+.note-rich-markdown .note-rich-ol {
   margin: 0.06rem 0 0.08rem 1.05rem;
   padding: 0;
 }
 
-.note-rich-markdown li + li {
+.note-rich-markdown li + li,
+.note-rich-markdown .note-rich-li + .note-rich-li {
   margin-top: 0.01rem;
 }
 
@@ -264,7 +268,8 @@
   margin-top: 0;
 }
 
-.note-rich-markdown li > p {
+.note-rich-markdown li > p,
+.note-rich-markdown .note-rich-li > .note-rich-p {
   margin: 0;
 }
 
@@ -275,7 +280,9 @@
 }
 
 .note-rich-markdown ul > li,
-.note-rich-markdown ol > li {
+.note-rich-markdown ol > li,
+.note-rich-markdown .note-rich-ul > .note-rich-li,
+.note-rich-markdown .note-rich-ol > .note-rich-li {
   margin: 0;
   padding: 0;
 }

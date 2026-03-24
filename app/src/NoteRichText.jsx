@@ -36,19 +36,25 @@ export default function NoteRichText({
   onNoteClick,
   stopClickPropagation = true,
 }) {
-  void tagNames;
+  const tagSet = tagNames instanceof Set ? tagNames : tagNames?.length ? new Set(tagNames) : null;
   const s = text == null ? '' : String(text);
   if (!s) return <span className={className}>—</span>;
   const textWithBareHermesLinks = s.replace(
     /\bhermes-note:\/\/([0-9a-f-]{36})\b/gi,
     (_m, id) => `[Linked note](hermes-note://${id})`
   );
+  const markdownInput = tagSet
+    ? textWithBareHermesLinks.replace(
+        /(^|[\s\n([{'"`])#([a-z0-9-]+)(?![a-z0-9-])/gi,
+        (m, pre, name) => (tagSet.has(name) ? `${pre}[#${name}](hermes-tag://${name})` : m)
+      )
+    : textWithBareHermesLinks;
 
   return (
-    <ReactMarkdown
-      className={[className, 'note-rich-markdown'].filter(Boolean).join(' ')}
-      remarkPlugins={[remarkGfm]}
-      components={{
+    <div className={[className, 'note-rich-markdown'].filter(Boolean).join(' ')}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
         a: ({ href, children }) => {
           const url = String(href || '').trim();
           const hermes = url.match(/^hermes-note:\/\/([0-9a-f-]{36})$/i);
@@ -68,6 +74,10 @@ export default function NoteRichText({
               </button>
             );
           }
+          const tag = url.match(/^hermes-tag:\/\/([a-z0-9-]+)$/i);
+          if (tag) {
+            return <span className="note-rich-tag-pill">#{tag[1]}</span>;
+          }
           if (!url || UNSAFE_HREF.test(url)) {
             return <span>{children}</span>;
           }
@@ -86,12 +96,16 @@ export default function NoteRichText({
             </a>
           );
         },
-        p: ({ children }) => <p>{children}</p>,
+        p: ({ children }) => <p className="note-rich-p">{children}</p>,
+        ul: ({ children }) => <ul className="note-rich-ul">{children}</ul>,
+        ol: ({ children }) => <ol className="note-rich-ol">{children}</ol>,
+        li: ({ children }) => <li className="note-rich-li">{children}</li>,
         code: ({ inline, children }) =>
           inline ? <code>{children}</code> : <code className="note-rich-code-block">{children}</code>,
-      }}
-    >
-      {textWithBareHermesLinks}
-    </ReactMarkdown>
+        }}
+      >
+        {markdownInput}
+      </ReactMarkdown>
+    </div>
   );
 }
