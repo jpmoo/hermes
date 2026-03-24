@@ -263,8 +263,14 @@ export async function searchSemantic(q, limit = 20) {
   return Array.isArray(data) ? data : [];
 }
 
-export async function searchContent(q, limit = 40) {
-  const r = await fetch(`${API}/notes/search-content?q=${encodeURIComponent(q)}&limit=${limit}`, { headers: headers() });
+/**
+ * @param {{ firstLine?: boolean }} [options] — if true, only the first line of each note is matched
+ *   (starts with query, or a word on that line starts with query). Used for @-mention typeahead.
+ */
+export async function searchContent(q, limit = 40, options = {}) {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  if (options.firstLine) params.set('firstLine', '1');
+  const r = await fetch(`${API}/notes/search-content?${params}`, { headers: headers() });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Text search failed');
   return Array.isArray(data) ? data : [];

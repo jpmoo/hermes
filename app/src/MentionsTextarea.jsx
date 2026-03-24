@@ -275,7 +275,7 @@ export default function MentionsTextarea({
       setLoading(true);
       searchTimer.current = setTimeout(async () => {
         try {
-          const list = await searchContent(qForSearch, 12);
+          const list = await searchContent(qForSearch, 12, { firstLine: true });
           const noteItems = list.map((n) => ({
             kind: 'note',
             key: n.id,
@@ -369,7 +369,7 @@ export default function MentionsTextarea({
           if (!tagsCache.current) tagsCache.current = await getTags();
           const all = Array.isArray(tagsCache.current) ? tagsCache.current : [];
           const tagItems = all
-            .filter((t) => !qLower || (t.name && t.name.toLowerCase().includes(qLower)))
+            .filter((t) => !qLower || (t.name && t.name.toLowerCase().startsWith(qLower)))
             .slice(0, 24)
             .map((t) => ({
               kind: 'tag',

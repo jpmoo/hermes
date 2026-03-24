@@ -240,21 +240,33 @@ router.get('/search-content', async (req, res) => {
     const raw = req.query.q?.trim();
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 40));
     const userId = req.userId;
+    /** @-mention menu: match first line only — line prefix or word-start after whitespace (not substring anywhere in body). */
+    const firstLineOnly =
+      req.query.firstLine === '1' ||
+      req.query.firstLine === 'true' ||
+      req.query.firstLine === 'yes';
     if (!raw) {
       return res.status(400).json({ error: 'Query parameter q required' });
     }
     const escaped = raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     const pattern = `%${escaped}%`;
+    const firstLineExpr = `NULLIF(trim(both from split_part(coalesce(n.content, ''), E'\\n', 1)), '')`;
+    const whereClause = firstLineOnly
+      ? `n.user_id = $1 AND (${firstLineExpr} ILIKE $2 ESCAPE '\\' OR ${firstLineExpr} ILIKE $3 ESCAPE '\\')`
+      : `n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'`;
+    const matchParams = firstLineOnly
+      ? [userId, `${escaped}%`, `% ${escaped}%`, limit]
+      : [userId, pattern, limit];
     const r = await pool.query(
       `WITH matches AS (
         SELECT n.id, ${SQL_NOTE_SORT_AT} AS sort_at
         FROM notes n
-        WHERE n.user_id = $1 AND n.content ILIKE $2 ESCAPE '\\'
+        WHERE ${whereClause}
         ORDER BY sort_at DESC NULLS LAST
-        LIMIT $3
+        LIMIT $${firstLineOnly ? '4' : '3'}
       )
       ${NOTE_LIST_FROM_MATCHES}`,
-      [userId, pattern, limit]
+      matchParams
     );
     const notes = r.rows;
     if (notes.length > 0) {
