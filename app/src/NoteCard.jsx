@@ -41,6 +41,7 @@ export default function NoteCard({
   parentTagsForInherit,
   /** Stream: single-click insight; double-click drills focus (nested rows use immediate focus, no animation) */
   hoverInsightEnabled = false,
+  hideStar = false,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
@@ -633,14 +634,16 @@ export default function NoteCard({
                 </div>
               </>
             )}
-            <button
-              type="button"
-              className={`note-card-star ${note.starred ? 'note-card-star--on' : ''}`}
-              onClick={handleStar}
-              aria-label={note.starred ? 'Unstar' : 'Star'}
-            >
-              ★
-            </button>
+            {!hideStar && (
+              <button
+                type="button"
+                className={`note-card-star ${note.starred ? 'note-card-star--on' : ''}`}
+                onClick={handleStar}
+                aria-label={note.starred ? 'Unstar' : 'Star'}
+              >
+                ★
+              </button>
+            )}
           </div>
         </div>
       </div>

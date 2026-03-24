@@ -17,19 +17,70 @@ import NoteTypeIcon from './NoteTypeIcon';
 import './MentionsTextarea.css';
 
 function caretMenuPosition(textarea, caretPos) {
-  const textBefore = textarea.value.slice(0, caretPos);
-  const lines = textBefore.split('\n');
-  const line = lines.length - 1;
-  const col = lines[line].length;
   const cs = getComputedStyle(textarea);
+  const div = document.createElement('div');
+  const props = [
+    'boxSizing',
+    'width',
+    'height',
+    'overflowX',
+    'overflowY',
+    'borderTopWidth',
+    'borderRightWidth',
+    'borderBottomWidth',
+    'borderLeftWidth',
+    'paddingTop',
+    'paddingRight',
+    'paddingBottom',
+    'paddingLeft',
+    'fontStyle',
+    'fontVariant',
+    'fontWeight',
+    'fontStretch',
+    'fontSize',
+    'fontFamily',
+    'lineHeight',
+    'letterSpacing',
+    'textTransform',
+    'textIndent',
+    'textDecoration',
+    'textAlign',
+    'whiteSpace',
+    'wordSpacing',
+    'wordBreak',
+    'overflowWrap',
+    'tabSize',
+  ];
+  props.forEach((p) => {
+    div.style[p] = cs[p];
+  });
+  div.style.position = 'fixed';
+  div.style.left = '-9999px';
+  div.style.top = '0';
+  div.style.visibility = 'hidden';
+  div.style.whiteSpace = 'pre-wrap';
+  div.style.wordWrap = 'break-word';
+
+  const text = textarea.value.slice(0, caretPos);
+  div.textContent = text;
+  const span = document.createElement('span');
+  span.textContent = textarea.value.slice(caretPos) || '.';
+  div.appendChild(span);
+  document.body.appendChild(div);
+
+  const taRect = textarea.getBoundingClientRect();
+  const spanRect = span.getBoundingClientRect();
   const lh = parseFloat(cs.lineHeight) || 20;
-  const pl = parseFloat(cs.paddingLeft) || 0;
-  const pt = parseFloat(cs.paddingTop) || 0;
-  const cw = 7.2;
-  const r = textarea.getBoundingClientRect();
-  /* position:fixed is viewport-relative; do not add scroll offsets (getBoundingClientRect is already viewport) */
-  const top = r.top + pt + (line + 1) * lh;
-  const left = r.left + pl + col * cw;
+  const borderLeft = parseFloat(cs.borderLeftWidth) || 0;
+  const borderTop = parseFloat(cs.borderTopWidth) || 0;
+  const leftRaw = taRect.left + (spanRect.left - div.getBoundingClientRect().left) - textarea.scrollLeft + borderLeft;
+  const topRaw = taRect.top + (spanRect.top - div.getBoundingClientRect().top) - textarea.scrollTop + lh + borderTop;
+  document.body.removeChild(div);
+
+  const menuWidth = 280;
+  const pad = 10;
+  const left = Math.max(pad, Math.min(leftRaw, window.innerWidth - menuWidth - pad));
+  const top = Math.max(pad, Math.min(topRaw, window.innerHeight - 48));
   return { top, left };
 }
 

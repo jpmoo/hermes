@@ -5,7 +5,6 @@ import './Layout.css';
 import {
   LayoutNavIcon,
   hasLayoutNavIcon,
-  NavIconStar,
   NavIconSignOut,
 } from './icons/NavIcons.jsx';
 import NoteTypeIcon from './NoteTypeIcon';
@@ -23,9 +22,6 @@ const LAYOUT_THEME_COLOR = '#f4f3f0';
 
 export default function Layout({
   title,
-  starredOnly = false,
-  onStarredOnlyChange,
-  starFilterEnabled = false,
   noteTypeFilterEnabled = false,
   onLogout,
   viewLinks,
@@ -131,30 +127,6 @@ export default function Layout({
                   );
                 })}
               </div>
-              <div className="layout-filters-cluster-star-gap" aria-hidden />
-              <button
-                type="button"
-                className={`layout-toolbar-btn ${starFilterEnabled && starredOnly ? 'layout-toolbar-btn--active' : ''}`}
-                disabled={!starFilterEnabled}
-                onClick={() => starFilterEnabled && onStarredOnlyChange?.(!starredOnly)}
-                aria-pressed={starFilterEnabled ? starredOnly : undefined}
-                aria-label={
-                  !starFilterEnabled
-                    ? 'Starred filter (available on Stream)'
-                    : starredOnly
-                      ? 'Show all notes'
-                      : 'Show starred only'
-                }
-                title={
-                  !starFilterEnabled
-                    ? 'Starred filter is available on Stream'
-                    : starredOnly
-                      ? 'Starred only — click to show all notes'
-                      : 'All notes — click to show starred only'
-                }
-              >
-                <NavIconStar className="layout-toolbar-icon" />
-              </button>
             </div>
           </div>
           <div className="layout-header-end">

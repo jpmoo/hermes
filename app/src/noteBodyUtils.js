@@ -59,7 +59,7 @@ export function getActiveTrigger(text, caretPos) {
    * Match the most recent trigger at the caret edge.
    * Allows punctuation boundary chars before @/# without requiring whitespace.
    */
-  const m = before.match(/(?:^|[\s\n([{'"`])([@#])([a-zA-Z0-9._-]*)$/);
+  const m = before.match(/(?:^|[^a-zA-Z0-9_])([@#])([a-zA-Z0-9._-]*)$/);
   if (!m) return null;
   const type = m[1];
   const query = m[2] || '';

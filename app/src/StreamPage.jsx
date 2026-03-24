@@ -11,7 +11,7 @@ import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync'
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
-import { sortNoteTreeByThreadOrder } from './noteThreadSort';
+import { sortNoteTreeByThreadOrder, noteThreadSortKeyMs } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './StreamPage.css';
 
@@ -168,6 +168,26 @@ function buildFullThreadLevelDrops(treeRoots) {
   return m;
 }
 
+function sortStarredPinned(nodes) {
+  if (!nodes?.length) return nodes || [];
+  const starred = [];
+  const rest = [];
+  for (const n of nodes) {
+    const withKids = {
+      ...n,
+      children: sortStarredPinned(n.children || []),
+    };
+    if (withKids.starred) starred.push(withKids);
+    else rest.push(withKids);
+  }
+  starred.sort((a, b) => {
+    const d = noteThreadSortKeyMs(b) - noteThreadSortKeyMs(a);
+    if (d !== 0) return d;
+    return String(a.id).localeCompare(String(b.id));
+  });
+  return [...starred, ...rest];
+}
+
 /**
  * Thread UI is one level at a time: each visible “head” note plus its direct replies only.
  * Deeper replies appear after focusing (click/double-click) that note. Root list has no nested thread.
@@ -210,6 +230,7 @@ function StreamList({
             <NoteCard
               note={n}
               depth={depth}
+              hideStar={depth === 0}
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
               parentTagsForInherit={parentTagsForInherit}
@@ -258,7 +279,6 @@ export default function StreamPage() {
   const [loadingThread, setLoadingThread] = useState(!!threadRootId);
   const [loadError, setLoadError] = useState(null);
 
-  const [starredOnly, setStarredOnly] = useState(false);
   const [newRootContent, setNewRootContent] = useState('');
   const [replyContent, setReplyContent] = useState('');
   const [pendingRootFiles, setPendingRootFiles] = useState([]);
@@ -291,14 +311,14 @@ export default function StreamPage() {
 
   const loadRoots = useCallback(() => {
     setLoadError(null);
-    return getRoots(starredOnly)
+    return getRoots(false)
       .then(setRoots)
       .catch((err) => {
         setRoots([]);
         setLoadError(err.message || 'Could not load notes.');
       })
       .finally(() => setLoadingRoots(false));
-  }, [starredOnly]);
+  }, []);
 
   const loadThread = useCallback(
     (soft = false) => {
@@ -307,7 +327,7 @@ export default function StreamPage() {
         setLoadingThread(true);
         setThread([]);
       }
-      return getThread(threadRootId, starredOnly)
+      return getThread(threadRootId, false)
         .then((rows) => {
           setThread(rows);
           if (rows.length === 0) setSearchParams({});
@@ -320,7 +340,7 @@ export default function StreamPage() {
           if (!soft) setLoadingThread(false);
         });
     },
-    [threadRootId, starredOnly, setSearchParams]
+    [threadRootId, setSearchParams]
   );
 
   const resetComposeMeta = useCallback(() => {
@@ -351,13 +371,13 @@ export default function StreamPage() {
         el.classList.remove('stream-page-root-fading', 'stream-page-root-item--picked');
       });
     }
-  }, [threadRootId, starredOnly, loadRoots]);
+  }, [threadRootId, loadRoots]);
 
   useEffect(() => {
     if (threadRootId) {
       loadThread(false);
     }
-  }, [threadRootId, starredOnly, loadThread]);
+  }, [threadRootId, loadThread]);
 
   useEffect(() => {
     focusFromUrlApplied.current = '';
@@ -370,6 +390,7 @@ export default function StreamPage() {
     () => sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes)),
     [treeFull, visibleNoteTypes]
   );
+  const pinnedTree = useMemo(() => sortStarredPinned(tree), [tree]);
   const filteredRoots = useMemo(
     () => filterRootsByVisibleNoteTypes(roots, visibleNoteTypes),
     [roots, visibleNoteTypes]
@@ -377,22 +398,22 @@ export default function StreamPage() {
   /** URL `thread` is the canonical root; do not use `thread[0]` (API orders by created_at, not tree root). */
   const actualRootId = threadRootId;
   const displayTree = useMemo(() => {
-    const fn = focusId && actualRootId ? findNode(tree, focusId) : null;
+    const fn = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
     if (fn && !noteIdEq(focusId, actualRootId)) {
       return [{ ...fn, children: fn.children || [] }];
     }
-    return tree;
-  }, [tree, focusId, actualRootId]);
-  const focusedNode = focusId && actualRootId ? findNode(tree, focusId) : null;
+    return pinnedTree;
+  }, [pinnedTree, focusId, actualRootId]);
+  const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
 
   useEffect(() => {
     if (!threadReady || !focusParam || !thread.length) return;
     const key = `${threadRootId}|${focusParam}`;
     if (focusFromUrlApplied.current === key) return;
-    if (!findNode(tree, focusParam)) return;
+    if (!findNode(pinnedTree, focusParam)) return;
     focusFromUrlApplied.current = key;
     setFocusId(focusParam);
-  }, [threadReady, threadRootId, focusParam, thread, tree]);
+  }, [threadReady, threadRootId, focusParam, thread, pinnedTree]);
 
   useEffect(() => {
     if (!focusId || !thread.length || !threadRootId) return;
@@ -407,11 +428,11 @@ export default function StreamPage() {
 
   useEffect(() => {
     if (!threadRootId || !focusId || !tree.length) return;
-    if (findNode(tree, focusId)) return;
+    if (findNode(pinnedTree, focusId)) return;
     focusFromUrlApplied.current = '';
     setFocusId(null);
     setSearchParams({ thread: threadRootId });
-  }, [threadRootId, focusId, tree, setSearchParams]);
+  }, [threadRootId, focusId, pinnedTree, setSearchParams]);
 
   useEffect(() => {
     if (!threadRootId || !thread.length || loadingThread) return;
@@ -876,10 +897,7 @@ export default function StreamPage() {
   return (
     <Layout
       title={layoutTitle}
-      starFilterEnabled
       noteTypeFilterEnabled
-      starredOnly={starredOnly}
-      onStarredOnlyChange={setStarredOnly}
       onLogout={logout}
       viewLinks={navLinks}
     >
@@ -898,6 +916,7 @@ export default function StreamPage() {
             <NoteCard
               note={floatOpen.note}
               depth={0}
+              hideStar
               hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
               onOpenThread={() => {}}
               onStarredChange={() => {}}
@@ -965,9 +984,7 @@ export default function StreamPage() {
               {loadingRoots ? (
                 <p className="stream-page-muted">Loading…</p>
               ) : roots.length === 0 && !loadError ? (
-                <p className="stream-page-muted">
-                  {starredOnly ? 'No starred threads yet.' : 'No threads yet. Start one below.'}
-                </p>
+                <p className="stream-page-muted">No threads yet. Start one below.</p>
               ) : filteredRoots.length === 0 && roots.length > 0 ? (
                 <p className="stream-page-muted">No threads match the current type filters.</p>
               ) : roots.length > 0 ? (
