@@ -279,43 +279,21 @@ export default function MentionsTextarea({
           const normalized = rawTag.toLowerCase().replace(/\s+/g, '-');
           const validNewTag = /^[a-z0-9-]+$/.test(normalized) && normalized.length > 0;
           const exactTagExists = all.some((t) => (t.name || '').toLowerCase() === normalized);
-
-          searchTimer.current = setTimeout(async () => {
-            try {
-              const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
-              const createRow = showCreateRow
-                ? [
-                    {
-                      kind: 'tag',
-                      key: '__create__',
-                      createNew: true,
-                      createName: rawTag,
-                      name: normalized,
-                      label: `Create tag #${normalized}`,
-                    },
-                  ]
-                : [];
-              setItems([...tagItems, ...createRow]);
-            } catch (e) {
-              console.error(e);
-              const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
-              const createRow = showCreateRow
-                ? [
-                    {
-                      kind: 'tag',
-                      key: '__create__',
-                      createNew: true,
-                      createName: rawTag,
-                      name: normalized,
-                      label: `Create tag #${normalized}`,
-                    },
-                  ]
-                : [];
-              setItems([...tagItems, ...createRow]);
-            } finally {
-              setLoading(false);
-            }
-          }, 180);
+          const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
+          const createRow = showCreateRow
+            ? [
+                {
+                  kind: 'tag',
+                  key: '__create__',
+                  createNew: true,
+                  createName: rawTag,
+                  name: normalized,
+                  label: `Create tag #${normalized}`,
+                },
+              ]
+            : [];
+          setItems([...tagItems, ...createRow]);
+          setLoading(false);
         } catch (e) {
           console.error(e);
           setItems([]);

@@ -39,9 +39,13 @@ export default function NoteRichText({
   const tagSet = tagNames instanceof Set ? tagNames : tagNames?.length ? new Set(tagNames) : null;
   const s = text == null ? '' : String(text);
   if (!s) return <span className={className}>—</span>;
+  /*
+   * Convert only bare hermes-note links to markdown links.
+   * Skip urls already inside markdown link targets: [label](hermes-note://...).
+   */
   const textWithBareHermesLinks = s.replace(
-    /\bhermes-note:\/\/([0-9a-f-]{36})\b/gi,
-    (_m, id) => `[Linked note](hermes-note://${id})`
+    /(^|[^\w)\]])(hermes-note:\/\/([0-9a-f-]{36}))/gi,
+    (_m, pre, _url, id) => `${pre}[Linked note](hermes-note://${id})`
   );
   const markdownInput = tagSet
     ? textWithBareHermesLinks.replace(
