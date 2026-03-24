@@ -51,8 +51,16 @@ export function stripHashtagPrefixFromContent(content, tagName) {
 /**
  * @returns {{ type: '@' | '#', start: number, query: string } | null}
  */
+/** Map fullwidth / variant punctuation to ASCII so mobile keyboards still open @/# menus. */
+function normalizeTriggerSource(s) {
+  return String(s ?? '')
+    .replace(/\uFF03/g, '#')
+    .replace(/\uFE5F/g, '#')
+    .replace(/\uFF20/g, '@');
+}
+
 export function getActiveTrigger(text, caretPos) {
-  const s = text == null ? '' : String(text);
+  const s = normalizeTriggerSource(text == null ? '' : String(text));
   const pos = Math.min(Math.max(0, caretPos), s.length);
   const before = s.slice(0, pos);
   /*

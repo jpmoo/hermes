@@ -452,10 +452,17 @@ export default function MentionsTextarea({
     });
   };
 
+  const scheduleRefreshMenu = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(refreshMenu);
+    });
+  }, [refreshMenu]);
+
   const onKeyDown = (e) => {
     if (!menu) {
+      /* iOS Safari often omits key for symbols; onChange + scheduleRefreshMenu handles insertion. */
       if (e.key === '@' || e.key === '#') {
-        requestAnimationFrame(refreshMenu);
+        scheduleRefreshMenu();
       }
       return;
     }
@@ -494,11 +501,22 @@ export default function MentionsTextarea({
 
   const onChangeInner = (e) => {
     onChange(e.target.value);
-    requestAnimationFrame(refreshMenu);
+    scheduleRefreshMenu();
   };
 
-  const onClickInner = () => requestAnimationFrame(refreshMenu);
-  const onSelectInner = () => requestAnimationFrame(refreshMenu);
+  const onBeforeInputInner = (e) => {
+    const d = e.nativeEvent?.data;
+    if (d === '#' || d === '@') {
+      scheduleRefreshMenu();
+    }
+  };
+
+  const onCompositionEndInner = () => {
+    scheduleRefreshMenu();
+  };
+
+  const onClickInner = () => scheduleRefreshMenu();
+  const onSelectInner = () => scheduleRefreshMenu();
 
   const textareaEl = (
     <textarea
@@ -510,6 +528,8 @@ export default function MentionsTextarea({
       disabled={disabled}
       autoFocus={autoFocus}
       onChange={onChangeInner}
+      onBeforeInput={onBeforeInputInner}
+      onCompositionEnd={onCompositionEndInner}
       onKeyDown={onKeyDown}
       onClick={onClickInner}
       onSelect={onSelectInner}

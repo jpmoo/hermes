@@ -190,3 +190,6 @@ DROP TRIGGER IF EXISTS notes_activity_trigger ON notes;
 CREATE TRIGGER notes_activity_trigger
   AFTER INSERT OR UPDATE ON notes
   FOR EACH ROW EXECUTE PROCEDURE notes_activity_propagate();
+
+-- User preferences (e.g. note-type colors); see migrations/008_user_settings_json.sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS settings_json JSONB NOT NULL DEFAULT '{}'::jsonb;

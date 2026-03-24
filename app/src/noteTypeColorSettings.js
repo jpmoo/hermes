@@ -12,6 +12,17 @@ export const NOTE_TYPE_COLOR_DEFAULTS = {
 
 const STORAGE_KEY = 'hermes.noteTypeColors';
 
+/** Parse API / storage object into a clean map of type → hex. */
+export function parseNoteTypeColorsObject(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  const out = {};
+  for (const k of NOTE_TYPE_COLOR_KEYS) {
+    const h = normalizeNoteTypeHex(obj[k]);
+    if (h) out[k] = h;
+  }
+  return out;
+}
+
 export function normalizeNoteTypeHex(input) {
   if (input == null || typeof input !== 'string') return null;
   const s = input.trim();

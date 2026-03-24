@@ -37,7 +37,8 @@ export default function SettingsModal({ onClose }) {
           </h3>
           <p className="settings-modal-section-lead">
             These colors tint type icons and card backgrounds across Stream, Outline, Search, and hover panels.
-            They follow light and dark theme surfaces automatically.
+            They follow light and dark theme surfaces automatically. Choices are saved to your account so they
+            apply on every device after you sign in.
           </p>
           <ul className="settings-modal-type-colors">
             {NOTE_TYPE_OPTIONS.map(({ value, label }) => {

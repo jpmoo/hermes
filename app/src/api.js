@@ -334,4 +334,22 @@ export async function deleteOrphanAttachment(id) {
   if (!r.ok) throw new Error('Failed to delete');
 }
 
+export async function fetchUserSettings() {
+  const r = await fetch(`${API}/user/settings`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load settings');
+  return data;
+}
+
+export async function patchUserSettings(patch) {
+  const r = await fetch(`${API}/user/settings`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify(patch ?? {}),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to save settings');
+  return data;
+}
+
 export { getToken };
