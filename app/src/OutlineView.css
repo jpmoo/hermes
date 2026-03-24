@@ -99,7 +99,7 @@
 
 .outline-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
   border-radius: 6px;
@@ -120,7 +120,7 @@
 /* Note text + star: opens Stream focused; chevron is separate (expand/collapse only). */
 .outline-row-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.35rem;
   flex: 1;
   min-width: 0;
@@ -194,14 +194,14 @@
   flex-shrink: 0;
   width: 1rem;
   height: 1rem;
-  margin-top: 0.05rem;
+  margin-top: 0.2rem;
 }
 
 .outline-content {
   flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .outline-content--rich {
@@ -210,14 +210,10 @@
 
 .outline-content-rich-inner {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
 }
 
-.outline-content-rich-inner .note-rich-plain {
-  white-space: nowrap !important;
-}
+/* Let NoteRichText spans use pre-wrap; do not force single-line ellipsis here. */
 
 .outline-content-rich-inner .note-rich-link {
   color: var(--accent, #8a6d0a);
@@ -267,6 +263,9 @@
 }
 
 .outline-star {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 0.15rem;
   color: var(--star);
   font-size: 0.85rem;
 }
