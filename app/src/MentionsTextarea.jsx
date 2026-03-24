@@ -18,6 +18,16 @@ import {
 import NoteTypeIcon from './NoteTypeIcon';
 import './MentionsTextarea.css';
 
+/** WebKit on iPad often reports null or stale selectionStart; clamp using known text length. */
+function readTextareaCaret(el, text) {
+  const len = text.length;
+  const raw = el.selectionStart;
+  if (raw == null || typeof raw !== 'number' || !Number.isFinite(raw)) {
+    return len;
+  }
+  return Math.min(Math.max(0, Math.round(raw)), len);
+}
+
 function caretMenuPosition(textarea, caretPos) {
   const cs = getComputedStyle(textarea);
   const div = document.createElement('div');
@@ -149,9 +159,9 @@ export default function MentionsTextarea({
   const refreshMenu = useCallback(() => {
     const el = taRef.current;
     if (!el) return;
-    const rawPos = el.selectionStart ?? 0;
     /* Use live DOM value: onChange + rAF runs before React re-renders with new `value` prop */
     const text = el.value;
+    const rawPos = readTextareaCaret(el, text);
     const { trig, menuCaret } = resolveMentionTrigger(text, rawPos);
     if (!trig) {
       closeMenu();
@@ -173,15 +183,29 @@ export default function MentionsTextarea({
     setHighlight(0);
   }, [menuQueryKey]);
 
+  /* After value commits, WebKit may update selection on the next frame; validate then using canonical `value`. */
   useEffect(() => {
-    if (!menu) return;
-    const el = taRef.current;
-    if (!el) return;
-    const pos = el.selectionStart ?? 0;
-    const { trig } = resolveMentionTrigger(el.value, pos);
-    if (!trig || trig.start !== menu.start || trig.type !== menu.type) {
-      closeMenu();
-    }
+    if (!menu) return undefined;
+    let cancelled = false;
+    let innerRaf = 0;
+    const outerRaf = requestAnimationFrame(() => {
+      innerRaf = requestAnimationFrame(() => {
+        if (cancelled) return;
+        const el = taRef.current;
+        if (!el) return;
+        const text = value;
+        const pos = readTextareaCaret(el, text);
+        const { trig } = resolveMentionTrigger(text, pos);
+        if (!trig || trig.start !== menu.start || trig.type !== menu.type) {
+          closeMenu();
+        }
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(outerRaf);
+      cancelAnimationFrame(innerRaf);
+    };
   }, [value, menu, closeMenu]);
 
   useEffect(() => {
@@ -535,7 +559,7 @@ export default function MentionsTextarea({
     refreshDelayTimer.current = setTimeout(() => {
       refreshDelayTimer.current = null;
       refreshMenu();
-    }, 40);
+    }, 100);
   };
 
   const onBeforeInputInner = (e) => {
@@ -561,6 +585,11 @@ export default function MentionsTextarea({
       placeholder={placeholder}
       disabled={disabled}
       autoFocus={autoFocus}
+      autoComplete="off"
+      autoCapitalize="off"
+      autoCorrect="off"
+      spellCheck={false}
+      enterKeyHint="enter"
       onChange={onChangeInner}
       onBeforeInput={onBeforeInputInner}
       onCompositionEnd={onCompositionEndInner}

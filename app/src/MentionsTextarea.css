@@ -2,6 +2,10 @@
   position: relative;
 }
 
+.mentions-textarea-wrap textarea {
+  touch-action: manipulation;
+}
+
 .mentions-textarea-wrap--with-type {
   display: flex;
   align-items: flex-start;

@@ -430,6 +430,11 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     const onPointerDown = (e) => {
       const t = e.target;
       if (t.closest?.('[data-insight-ui]')) return;
+      /* Don’t clear while editing a card (mentions @/#, compose, search, etc.). */
+      if (t.closest?.('.note-card--editing')) return;
+      if (t.closest?.('textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select')) {
+        return;
+      }
       if (t.closest?.('.note-card--insight-selected')) return;
       /* Replies sit in sibling <li>s, not inside the selected root <article>; clearing here broke double-click drill. */
       if (t.closest?.('.stream-page-list')) return;
