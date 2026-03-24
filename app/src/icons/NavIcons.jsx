@@ -5,7 +5,15 @@ const common = { width: 20, height: 20, 'aria-hidden': true, focusable: false };
 
 export function NavIconStream(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" {...common} {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="0.24"
+      strokeLinejoin="round"
+      {...common}
+      {...props}
+    >
       <path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -24,23 +32,25 @@ export function NavIconStream(props) {
 
 export function NavIconOutline(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" {...common} {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="0.24"
+      strokeLinejoin="round"
+      {...common}
+      {...props}
+    >
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M6.83871 3.53846C6.12608 3.53846 5.54839 4.11246 5.54839 4.82051V19.1795C5.54839 19.8875 6.12608 20.4615 6.83871 20.4615H17.1613C17.8739 20.4615 18.4516 19.8875 18.4516 19.1795V9.14049C18.4516 8.80672 18.3206 8.48611 18.0864 8.2468L13.8594 3.92682C13.6164 3.67854 13.2827 3.53846 12.9342 3.53846H6.83871ZM4 4.82051C4 3.26279 5.27093 2 6.83871 2H12.9342C13.701 2 14.4351 2.30817 14.9696 2.85439L19.1966 7.17437C19.7118 7.70085 20 8.4062 20 9.14049V19.1795C20 20.7372 18.7291 22 17.1613 22H6.83871C5.27093 22 4 20.7372 4 19.1795V4.82051Z"
+        d="M10.4304 7.35351C10.7308 7.0531 11.2179 7.0531 11.5183 7.35351L14.8956 10.7308C15.5966 11.4318 15.5966 12.5682 14.8956 13.2692L11.5183 16.6465C11.2179 16.9469 10.7308 16.9469 10.4304 16.6465C10.13 16.3461 10.13 15.859 10.4304 15.5586L13.8078 12.1813C13.9079 12.0812 13.9079 11.9188 13.8078 11.8187L10.4304 8.44136C10.13 8.14096 10.13 7.65391 10.4304 7.35351Z"
         fill="currentColor"
       />
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M8.12903 15.0769C8.12903 15.5018 8.47565 15.8462 8.90323 15.8462H15.0968C15.5243 15.8462 15.871 15.5018 15.871 15.0769C15.871 14.6521 15.5243 14.3077 15.0968 14.3077H8.90323C8.47565 14.3077 8.12903 14.6521 8.12903 15.0769Z"
-        fill="currentColor"
-      />
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M8.12903 10.9744C8.12903 11.3992 8.47565 11.7436 8.90323 11.7436H12C12.4276 11.7436 12.7742 11.3992 12.7742 10.9744C12.7742 10.5495 12.4276 10.2051 12 10.2051H8.90323C8.47565 10.2051 8.12903 10.5495 8.12903 10.9744Z"
+        d="M12 3.53846C9.83082 3.53846 6.86615 3.73753 5.01495 3.88095C4.40616 3.92811 3.92811 4.40616 3.88095 5.01495C3.73753 6.86615 3.53846 9.83082 3.53846 12C3.53846 14.1692 3.73753 17.1338 3.88095 18.985C3.92811 19.5938 4.40616 20.0719 5.01495 20.1191C6.86615 20.2625 9.83082 20.4615 12 20.4615C14.1692 20.4615 17.1338 20.2625 18.985 20.1191C19.5938 20.0719 20.0719 19.5938 20.1191 18.985C20.2625 17.1338 20.4615 14.1692 20.4615 12C20.4615 9.83082 20.2625 6.86615 20.1191 5.01495C20.0719 4.40616 19.5938 3.92811 18.985 3.88095C17.1338 3.73753 14.1692 3.53846 12 3.53846ZM4.89612 2.34708C6.74819 2.2036 9.76547 2 12 2C14.2345 2 17.2518 2.2036 19.1039 2.34708C20.4686 2.45281 21.5472 3.53141 21.6529 4.89612C21.7964 6.74819 22 9.76547 22 12C22 14.2345 21.7964 17.2518 21.6529 19.1039C21.5472 20.4686 20.4686 21.5472 19.1039 21.6529C17.2518 21.7964 14.2345 22 12 22C9.76547 22 6.74819 21.7964 4.89612 21.6529C3.53141 21.5472 2.45281 20.4686 2.34708 19.1039C2.2036 17.2518 2 14.2345 2 12C2 9.76547 2.2036 6.74819 2.34708 4.89612C2.45281 3.53141 3.53141 2.45281 4.89612 2.34708Z"
         fill="currentColor"
       />
     </svg>
@@ -49,7 +59,15 @@ export function NavIconOutline(props) {
 
 export function NavIconTag(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" {...common} {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="0.24"
+      strokeLinejoin="round"
+      {...common}
+      {...props}
+    >
       <path
         d="M9.86873 17.1282C9.86873 17.6947 9.41314 18.1538 8.85114 18.1538C8.28914 18.1538 7.83355 17.6947 7.83355 17.1282C7.83355 16.5618 8.28914 16.1026 8.85114 16.1026C9.41314 16.1026 9.86873 16.5618 9.86873 17.1282Z"
         fill="currentColor"
@@ -66,7 +84,15 @@ export function NavIconTag(props) {
 
 export function NavIconSearch(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" {...common} {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="0.24"
+      strokeLinejoin="round"
+      {...common}
+      {...props}
+    >
       <path
         fillRule="evenodd"
         clipRule="evenodd"
@@ -98,7 +124,15 @@ export function NavIconStar(props) {
 /** Sign out (assets/signout.svg) */
 export function NavIconSignOut(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" {...common} {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="0.24"
+      strokeLinejoin="round"
+      {...common}
+      {...props}
+    >
       <path
         fillRule="evenodd"
         clipRule="evenodd"
