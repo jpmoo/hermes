@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getRoots, getThread, getNoteThreadRoot, updateNote } from './api';
 import Layout from './Layout';
-import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from './outlineExpansionStorage';
 import NoteTypeIcon from './NoteTypeIcon';
 import NoteRichText from './NoteRichText';
@@ -574,9 +573,6 @@ export default function OutlineView() {
       ]}
     >
       <div className="outline-view">
-        <div className="outline-view-type-bar">
-          <NoteTypeFilterButtons mode="streamOutline" />
-        </div>
         {!loading && tree.length > 0 && (
           <div className="outline-view-toolbar">
             <div

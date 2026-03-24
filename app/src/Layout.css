@@ -174,12 +174,6 @@
   flex-shrink: 0;
 }
 
-/* Stream / Outline in-page type row */
-.note-type-filter-buttons--stream-outline {
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
 .layout-logout {
   display: inline-flex;
   align-items: center;

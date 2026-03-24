@@ -166,7 +166,7 @@ export default function CalendarView() {
   ];
 
   return (
-    <Layout title="Calendar" onLogout={logout} viewLinks={viewLinks}>
+    <Layout title="Calendar" noteTypeFilterEnabled={false} onLogout={logout} viewLinks={viewLinks}>
       <div className="calendar-view">
         <div className="calendar-view-toolbar">
           <h1 className="calendar-view-title">{monthTitle}</h1>

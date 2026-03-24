@@ -143,6 +143,7 @@ export default function SearchView() {
   return (
     <Layout
       title="Search"
+      noteTypeFilterEnabled={false}
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },

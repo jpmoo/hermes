@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api';
 import Layout from './Layout';
-import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
@@ -876,7 +875,7 @@ export default function StreamPage() {
   ];
 
   return (
-    <Layout title={layoutTitle} onLogout={logout} viewLinks={navLinks}>
+    <Layout title={layoutTitle} noteTypeFilterEnabled onLogout={logout} viewLinks={navLinks}>
       <HoverInsightProvider onNoteUpdated={refreshAll} onGoToNote={onHoverInsightGoToNote}>
       <div className="stream-page">
         {floatOpen && (
@@ -902,9 +901,6 @@ export default function StreamPage() {
           </div>
         )}
         <div className="stream-page-scroll">
-          <div className="stream-page-type-bar">
-            <NoteTypeFilterButtons mode="streamOutline" />
-          </div>
           {threadRootId ? (
             <>
               <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
