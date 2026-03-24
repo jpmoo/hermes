@@ -27,6 +27,7 @@ export default function Layout({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     try {
       const v = localStorage.getItem(THEME_STORAGE_KEY);
