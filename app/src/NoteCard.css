@@ -229,7 +229,7 @@
 }
 
 .note-rich-markdown p {
-  margin: 0.2rem 0;
+  margin: 0.08rem 0;
 }
 
 .note-rich-markdown h1,
@@ -251,17 +251,33 @@
 
 .note-rich-markdown ul,
 .note-rich-markdown ol {
-  margin: 0.2rem 0 0.2rem 1.1rem;
+  margin: 0.06rem 0 0.08rem 1.05rem;
   padding: 0;
 }
 
 .note-rich-markdown li + li {
-  margin-top: 0.05rem;
+  margin-top: 0.01rem;
 }
 
 .note-rich-markdown p + ul,
 .note-rich-markdown p + ol {
-  margin-top: 0.05rem;
+  margin-top: 0;
+}
+
+.note-rich-markdown li > p {
+  margin: 0;
+}
+
+.note-rich-markdown li > ul,
+.note-rich-markdown li > ol {
+  margin-top: 0.02rem;
+  margin-bottom: 0.02rem;
+}
+
+.note-rich-markdown ul > li,
+.note-rich-markdown ol > li {
+  margin: 0;
+  padding: 0;
 }
 
 .note-rich-markdown blockquote {
