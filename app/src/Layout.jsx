@@ -20,7 +20,7 @@ const TYPE_FILTER_LABELS = {
 };
 
 /** Pages where header type toggles apply (shown in tooltips when filters are disabled elsewhere). */
-const NOTE_TYPE_FILTER_VIEWS = 'Stream, Outline, Search, and Tags';
+const NOTE_TYPE_FILTER_VIEWS = 'Stream, Outline, and Search';
 
 const THEME_STORAGE_KEY = 'hermes.theme';
 const THEME_META = {

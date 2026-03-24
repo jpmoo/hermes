@@ -10,13 +10,71 @@
 }
 
 .search-view {
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 1rem 1rem 3rem;
   box-sizing: border-box;
   background: var(--bg);
   color: var(--text);
   color-scheme: light;
+}
+
+.search-view-tags-block {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-view-tags-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.search-view-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.search-view-tag-chip {
+  padding: 0.35rem 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.search-view-tag-chip:hover {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+
+.search-view-tag-chip--on {
+  background: var(--accent-dim);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.search-view-tags-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.search-view-tags-mode label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.search-view-empty--hint {
+  line-height: 1.45;
 }
 
 .search-view-form {

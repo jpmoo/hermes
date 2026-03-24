@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './AuthContext';
 import Login from './Login';
 import StreamPage from './StreamPage';
 import OutlineView from './OutlineView';
-import TagView from './TagView';
 import SearchView from './SearchView';
 import OrphanFilesView from './OrphanFilesView';
 import CalendarView from './CalendarView';
@@ -66,7 +65,7 @@ function AppRoutes() {
         path="/tags"
         element={
           <PrivateRoute>
-            <TagView />
+            <Navigate to="/search" replace />
           </PrivateRoute>
         }
       />

@@ -162,7 +162,6 @@ export default function CalendarView() {
     { to: '/', label: 'Stream' },
     { to: '/outline', label: 'Outline' },
     { to: '/calendar', label: 'Calendar' },
-    { to: '/tags', label: 'Tags' },
     { to: '/search', label: 'Search' },
   ];
 
