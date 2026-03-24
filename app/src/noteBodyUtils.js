@@ -55,37 +55,23 @@ export function getActiveTrigger(text, caretPos) {
   const s = text == null ? '' : String(text);
   const pos = Math.min(Math.max(0, caretPos), s.length);
   const before = s.slice(0, pos);
-  const candidates = [];
 
-  const at = before.lastIndexOf('@');
-  if (at >= 0) {
-    const prev = at > 0 ? s[at - 1] : ' ';
-    if (at === 0 || /[\s\n([{'"`]/.test(prev)) {
-      const after = before.slice(at + 1);
-      /*
-       * @ mention token ends at a real space. Users can type `_` to represent spaces
-       * while still keeping the token contiguous (e.g. @john_doe -> "john doe").
-       */
-      if (!after.includes('\n') && !after.includes(']') && /^[a-zA-Z0-9\-_.]*$/.test(after)) {
-        candidates.push({ type: '@', start: at, query: after });
-      }
-    }
-  }
+  // Scan backwards within current token only; whitespace/newline ends token.
+  let i = before.length - 1;
+  while (i >= 0 && !/[\s\n]/.test(before[i])) i -= 1;
+  const tokenStart = i + 1;
+  const token = before.slice(tokenStart);
+  if (token.length < 1) return null;
 
-  const hash = before.lastIndexOf('#');
-  if (hash >= 0) {
-    const prev = hash > 0 ? s[hash - 1] : ' ';
-    if (hash === 0 || /[\s\n([{'"`]/.test(prev)) {
-      const after = before.slice(hash + 1);
-      /* Same token rules as @ so you can type multi-word text to match note titles */
-      if (!after.includes('\n') && !after.includes(']') && /^[a-zA-Z0-9\s\-_.]*$/.test(after)) {
-        candidates.push({ type: '#', start: hash, query: after });
-      }
-    }
-  }
+  const m = token.match(/^([@#])([a-zA-Z0-9._-]*)$/);
+  if (!m) return null;
 
-  if (candidates.length === 0) return null;
-  return candidates.reduce((a, b) => (a.start >= b.start ? a : b));
+  const sig = m[1];
+  const query = m[2] || '';
+  const prev = tokenStart > 0 ? s[tokenStart - 1] : ' ';
+  if (!(tokenStart === 0 || /[\s\n([{'"`]/.test(prev))) return null;
+
+  return { type: sig, start: tokenStart, query };
 }
 
 export function replaceTriggerQuery(text, triggerStart, caretPos, insertion) {

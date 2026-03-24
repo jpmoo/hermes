@@ -501,7 +501,7 @@ export default function MentionsTextarea({
             zIndex: 10000,
           }}
           role="listbox"
-          aria-label={menu.type === '@' ? 'Notes' : 'Tags and notes'}
+          aria-label={menu.type === '@' ? 'Notes' : 'Tags'}
         >
           {menu.type === '@' && menu.query.trim().length < 1 && loading && (
             <div className="mentions-menu-hint">Loading recent notes…</div>
@@ -510,7 +510,7 @@ export default function MentionsTextarea({
             <div className="mentions-menu-hint">Searching…</div>
           )}
           {menu.type === '#' && loading && (
-            <div className="mentions-menu-hint">Loading tags and notes…</div>
+            <div className="mentions-menu-hint">Loading tags…</div>
           )}
           {!loading &&
             items.map((it, i) => (

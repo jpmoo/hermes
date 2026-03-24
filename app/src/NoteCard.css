@@ -256,8 +256,8 @@
 .note-rich-markdown .note-rich-ul,
 .note-rich-markdown .note-rich-ol {
   margin: 0 !important;
-  margin-left: 5px !important;
-  padding: 0 !important;
+  margin-left: 0 !important;
+  padding-left: 16px !important;
 }
 
 .note-rich-markdown li + li,
