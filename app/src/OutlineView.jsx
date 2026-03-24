@@ -146,15 +146,32 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
     </>
   );
 
-  const dragProps = dnd
+  const rowDropProps = dnd
     ? {
-        draggable: true,
-        onDragStart: (e) => dnd.onDragStart(node.id, e),
-        onDragEnd: dnd.onDragEnd,
         onDragOver: (e) => dnd.onDragOverRow(node.id, e),
         onDrop: (e) => dnd.onDropOnRow(node.id, e),
       }
     : {};
+
+  const dragHandle = dnd ? (
+    <span
+      className="outline-drag-handle"
+      draggable
+      onDragStart={(e) => {
+        e.stopPropagation();
+        dnd.onDragStart(node.id, e);
+      }}
+      onDragEnd={dnd.onDragEnd}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      role="button"
+      tabIndex={0}
+      aria-label="Drag to move this note"
+      title="Drag to move (nest under another row, or drop on top strip for top-level)"
+    >
+      ⋮⋮
+    </span>
+  ) : null;
 
   const rowClass =
     dnd && dnd.draggingId === node.id
@@ -180,7 +197,8 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
   return (
     <div className="outline-node">
       {showToggle ? (
-        <div className={rowClass} style={rowPad}>
+        <div className={rowClass} style={rowPad} {...rowDropProps}>
+          {dragHandle}
           <button
             type="button"
             className="outline-toggle"
@@ -195,27 +213,26 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
             className={mainClass}
             role="button"
             tabIndex={0}
-            aria-label="Open this note in Stream (focused). Drag to move under another note."
-            title="Open in Stream · drag to reparent"
+            aria-label="Open this note in Stream (focused)"
+            title="Open in Stream"
             onClick={handleMainClick}
             onKeyDown={streamKeyDown}
-            {...dragProps}
           >
             {rowMain}
           </div>
         </div>
       ) : (
-        <div className={rowClass} style={rowPad}>
+        <div className={rowClass} style={rowPad} {...rowDropProps}>
+          {dragHandle}
           <span className="outline-spacer" aria-hidden />
           <div
             className={mainClass}
             role="button"
             tabIndex={0}
-            aria-label="Open this note in Stream (focused). Drag to move under another note."
-            title="Open in Stream · drag to reparent"
+            aria-label="Open this note in Stream (focused)"
+            title="Open in Stream"
             onClick={handleMainClick}
             onKeyDown={streamKeyDown}
-            {...dragProps}
           >
             {rowMain}
           </div>
@@ -432,7 +449,6 @@ export default function OutlineView() {
 
   const onDragStart = useCallback((noteId, e) => {
     draggingIdRef.current = noteId;
-    setDraggingId(noteId);
     e.dataTransfer.setData('text/plain', noteId);
     e.dataTransfer.effectAllowed = 'move';
     try {
@@ -440,6 +456,10 @@ export default function OutlineView() {
     } catch {
       /* some browsers restrict custom types */
     }
+    /* Defer React state so the first paint doesn’t cancel native drag (esp. with nested links). */
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setDraggingId(noteId));
+    });
   }, []);
 
   const onDragEnd = useCallback(() => {
@@ -449,7 +469,6 @@ export default function OutlineView() {
   const onDragOverRow = useCallback((targetId, e) => {
     if (!draggingIdRef.current || draggingIdRef.current === targetId) return;
     e.preventDefault();
-    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     setDropOverId(targetId);
   }, []);
@@ -457,7 +476,6 @@ export default function OutlineView() {
   const onDropOnRow = useCallback(
     (targetId, e) => {
       e.preventDefault();
-      e.stopPropagation();
       const dragged =
         e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('application/x-hermes-note-id');
       finishDragUi();
@@ -514,16 +532,19 @@ export default function OutlineView() {
       <div className="outline-view">
         {!loading && tree.length > 0 && (
           <div className="outline-view-toolbar">
-            {draggingId ? (
-              <div
-                className={`outline-drop-root ${dropOverId === '__root__' ? 'outline-drop-root--active' : ''}`}
-                onDragEnter={onDragOverRoot}
-                onDragOver={onDragOverRoot}
-                onDrop={onDropRoot}
-              >
-                Drop here for top-level note
-              </div>
-            ) : null}
+            <div
+              className={`outline-drop-root ${dropOverId === '__root__' ? 'outline-drop-root--active' : ''} ${draggingId ? 'outline-drop-root--dragging' : ''}`}
+              onDragEnter={onDragOverRoot}
+              onDragOver={onDragOverRoot}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setDropOverId((id) => (id === '__root__' ? null : id));
+              }}
+              onDrop={onDropRoot}
+            >
+              {draggingId
+                ? 'Release here to make this a top-level thread'
+                : 'Top-level: drag ⋮⋮ here to pull a note out of a thread'}
+            </div>
             {hasAnyExpandable() ? (
               <>
                 <button type="button" className="outline-view-tool-btn" onClick={handleExpandAll}>
@@ -534,11 +555,9 @@ export default function OutlineView() {
                 </button>
               </>
             ) : null}
-            {!draggingId ? (
-              <p className="outline-view-toolbar-hint">
-                Drag a note onto another to nest it under that note.
-              </p>
-            ) : null}
+            <p className="outline-view-toolbar-hint">
+              Drag from the ⋮⋮ grip on the left. Drop on a row to nest under it.
+            </p>
           </div>
         )}
 
