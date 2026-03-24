@@ -96,6 +96,7 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
       if (hermes) {
         pushText(last, pos);
         const id = hermes[1];
+        const mentionLabel = md.label?.trim() || 'Linked note';
         parts.push(
           <button
             key={`n-${key++}`}
@@ -107,7 +108,7 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
               onNoteClick?.(id);
             }}
           >
-            {md.label || 'Note'}
+            {mentionLabel}
           </button>
         );
         last = md.end;
@@ -140,6 +141,25 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
         pos = md.end;
         continue;
       }
+      if (/^[a-z][a-z0-9+.-]*:/i.test(md.url) && !UNSAFE_HREF.test(md.url)) {
+        const href = md.url.trim();
+        const label = md.label?.trim();
+        pushText(last, pos);
+        parts.push(
+          <a
+            key={`a-${key++}`}
+            href={href}
+            title={href}
+            className="note-rich-link"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {label || formatUrlDisplayLabel(href)}
+          </a>
+        );
+        last = md.end;
+        pos = md.end;
+        continue;
+      }
       pushText(last, pos);
       pushText(pos, md.end);
       last = md.end;
@@ -167,18 +187,46 @@ export default function NoteRichText({ text, tagNames = null, className, onNoteC
       const url = trimTrailingPunct(raw);
       pushText(last, pos);
       if (url && !UNSAFE_HREF.test(url)) {
-        parts.push(
-          <a
-            key={`a-${key++}`}
-            href={url}
-            title={url}
-            className="note-rich-link"
-            {...(/^https?:\/\//i.test(url) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {formatUrlDisplayLabel(url)}
-          </a>
-        );
+        const hermesBare = url.match(/^hermes-note:\/\/([0-9a-f-]{36})$/i);
+        if (hermesBare) {
+          const id = hermesBare[1];
+          if (onNoteClick) {
+            parts.push(
+              <button
+                key={`n-${key++}`}
+                type="button"
+                className="note-rich-mention"
+                title={url}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onNoteClick(id);
+                }}
+              >
+                Linked note
+              </button>
+            );
+          } else {
+            parts.push(
+              <span key={`hn-${key++}`} className="note-rich-mention note-rich-mention--readonly" title={url}>
+                Linked note
+              </span>
+            );
+          }
+        } else {
+          parts.push(
+            <a
+              key={`a-${key++}`}
+              href={url}
+              title={url}
+              className="note-rich-link"
+              {...(/^https?:\/\//i.test(url) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {formatUrlDisplayLabel(url)}
+            </a>
+          );
+        }
       } else {
         pushText(pos, pos + raw.length);
       }

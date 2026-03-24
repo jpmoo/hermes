@@ -193,6 +193,11 @@
   color: var(--text, #eee);
 }
 
+.note-rich-mention--readonly {
+  cursor: default;
+  text-decoration: none;
+}
+
 .note-rich-tag-pill {
   display: inline;
   margin: 0 0.1rem;

@@ -796,6 +796,7 @@ router.patch('/:id', async (req, res) => {
       note_type: noteTypeBody,
       event_start_at: eventStartBody,
       event_end_at: eventEndBody,
+      parent_id: parentIdBody,
     } = req.body;
     const userId = req.userId;
     const has = (k) => Object.prototype.hasOwnProperty.call(req.body, k);
@@ -807,6 +808,39 @@ router.patch('/:id', async (req, res) => {
     if (content !== undefined) { updates.push(`content = $${i++}`); values.push(content); }
     if (starred !== undefined) { updates.push(`starred = $${i++}`); values.push(!!starred); }
     if (externalAnchor !== undefined) { updates.push(`external_anchor = $${i++}`); values.push(externalAnchor); }
+
+    if (has('parent_id')) {
+      const own = await pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
+      if (own.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+      let newParentId = parentIdBody;
+      if (newParentId === '') newParentId = null;
+      if (newParentId != null) {
+        if (typeof newParentId !== 'string') {
+          return res.status(400).json({ error: 'parent_id must be a UUID or null' });
+        }
+        const p = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [newParentId, userId]);
+        if (p.rows.length === 0) {
+          return res.status(400).json({ error: 'Parent note not found' });
+        }
+        if (newParentId === id) {
+          return res.status(400).json({ error: 'A note cannot be its own parent' });
+        }
+        const cycle = await pool.query(
+          `WITH RECURSIVE sub AS (
+             SELECT id FROM notes WHERE id = $1::uuid AND user_id = $2::uuid
+             UNION ALL
+             SELECT n.id FROM notes n INNER JOIN sub ON n.parent_id = sub.id WHERE n.user_id = $2::uuid
+           )
+           SELECT 1 FROM sub WHERE id = $3::uuid LIMIT 1`,
+          [id, userId, newParentId]
+        );
+        if (cycle.rows.length > 0) {
+          return res.status(400).json({ error: 'Cannot move a note under itself or its descendants' });
+        }
+      }
+      updates.push(`parent_id = $${i++}`);
+      values.push(newParentId);
+    }
 
     if (touchMeta) {
       const cur = await pool.query(`SELECT ${NOTE_RETURNING} FROM notes WHERE id = $1 AND user_id = $2`, [id, userId]);

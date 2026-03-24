@@ -10,10 +10,11 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getRoots, getThread } from './api';
+import { getRoots, getThread, getNoteThreadRoot, updateNote } from './api';
 import Layout from './Layout';
 import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from './outlineExpansionStorage';
 import NoteTypeIcon from './NoteTypeIcon';
+import NoteRichText from './NoteRichText';
 import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
@@ -23,6 +24,8 @@ const OutlineExpandContext = createContext({
   expandAllTick: 0,
   collapseAllTick: 0,
 });
+
+const OutlineDndContext = createContext(null);
 
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
@@ -49,8 +52,9 @@ function collectNoteIds(nodes) {
   return ids;
 }
 
-function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThread, isMultiRoot }) {
+function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLinkedNote, onLoadThread, isMultiRoot }) {
   const { expandAllTick, collapseAllTick } = useContext(OutlineExpandContext);
+  const dnd = useContext(OutlineDndContext);
   const rc = node.reply_count ?? 0;
   const cc = node.children?.length ?? 0;
   const [open, setOpen] = useState(() => {
@@ -123,20 +127,60 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
 
   const rowPad = { paddingLeft: `${depth * 1.25 + 0.5}rem` };
 
+  const tagNames = Array.isArray(node.tags) ? node.tags.map((t) => t?.name ?? t) : [];
+
   const rowMain = (
     <>
       <NoteTypeIcon type={node.note_type || 'note'} className="outline-type-icon" />
-      <span className={`outline-content ${node.starred ? 'outline-content--starred' : ''}`}>
-        {node.content || '—'}
+      <span
+        className={`outline-content outline-content--rich ${node.starred ? 'outline-content--starred' : ''}`}
+      >
+        <NoteRichText
+          text={node.content}
+          tagNames={tagNames}
+          className="outline-content-rich-inner"
+          onNoteClick={onOpenLinkedNote}
+        />
       </span>
       {node.starred && <span className="outline-star">★</span>}
     </>
   );
 
+  const dragProps = dnd
+    ? {
+        draggable: true,
+        onDragStart: (e) => dnd.onDragStart(node.id, e),
+        onDragEnd: dnd.onDragEnd,
+        onDragOver: (e) => dnd.onDragOverRow(node.id, e),
+        onDrop: (e) => dnd.onDropOnRow(node.id, e),
+      }
+    : {};
+
+  const rowClass =
+    dnd && dnd.draggingId === node.id
+      ? 'outline-row outline-row--dragging'
+      : dnd && dnd.dropOverId === node.id && dnd.draggingId && dnd.draggingId !== node.id
+        ? 'outline-row outline-row--drop-target'
+        : 'outline-row';
+
+  const mainClass =
+    dnd && dnd.dropOverId === node.id && dnd.draggingId && dnd.draggingId !== node.id
+      ? 'outline-row-main outline-row-main--drop-target'
+      : 'outline-row-main';
+
+  const handleMainClick = (e) => {
+    if (dnd?.suppressClickRef?.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    openInStream();
+  };
+
   return (
     <div className="outline-node">
       {showToggle ? (
-        <div className="outline-row" style={rowPad}>
+        <div className={rowClass} style={rowPad}>
           <button
             type="button"
             className="outline-toggle"
@@ -148,30 +192,33 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
             {loading ? '…' : open ? '▼' : '▶'}
           </button>
           <div
-            className="outline-row-main"
+            className={mainClass}
             role="button"
             tabIndex={0}
-            aria-label="Open this note in Stream (focused)"
-            title="Open in Stream (focused on this note)"
-            onClick={openInStream}
+            aria-label="Open this note in Stream (focused). Drag to move under another note."
+            title="Open in Stream · drag to reparent"
+            onClick={handleMainClick}
             onKeyDown={streamKeyDown}
+            {...dragProps}
           >
             {rowMain}
           </div>
         </div>
       ) : (
-        <div
-          className="outline-row"
-          style={rowPad}
-          role="button"
-          tabIndex={0}
-          aria-label="Open this note in Stream (focused)"
-          title="Open in Stream (focused on this note)"
-          onClick={openInStream}
-          onKeyDown={streamKeyDown}
-        >
+        <div className={rowClass} style={rowPad}>
           <span className="outline-spacer" aria-hidden />
-          {rowMain}
+          <div
+            className={mainClass}
+            role="button"
+            tabIndex={0}
+            aria-label="Open this note in Stream (focused). Drag to move under another note."
+            title="Open in Stream · drag to reparent"
+            onClick={handleMainClick}
+            onKeyDown={streamKeyDown}
+            {...dragProps}
+          >
+            {rowMain}
+          </div>
         </div>
       )}
       {hasSubtree && open && (
@@ -183,6 +230,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onLoadThre
               depth={depth + 1}
               streamThreadRootId={streamThreadRootId}
               onGoToStream={onGoToStream}
+              onOpenLinkedNote={onOpenLinkedNote}
               onLoadThread={null}
               isMultiRoot={isMultiRoot}
             />
@@ -216,18 +264,21 @@ export default function OutlineView() {
     getRoots(false).then(setRoots).finally(() => setLoading(false));
   }, []);
 
-  const loadThreadForRoot = useCallback(async (id) => {
-    if (rootThreadsRef.current[id]) return;
+  const loadThreadForRoot = useCallback(async (id, force = false) => {
+    if (!force && rootThreadsRef.current[id]) return;
     if (loadRootInflight.current.has(id)) {
-      await loadRootInflight.current.get(id);
-      return;
+      if (!force) {
+        await loadRootInflight.current.get(id);
+        return;
+      }
+      loadRootInflight.current.delete(id);
     }
     const p = getThread(id, false)
       .then((flat) => {
         const rootsSorted = sortNoteTreeByThreadOrder(buildTree(flat));
         const built = rootsSorted[0];
         if (built) {
-          setRootThreads((prev) => (prev[id] ? prev : { ...prev, [id]: built }));
+          setRootThreads((prev) => ({ ...prev, [id]: built }));
         }
       })
       .finally(() => {
@@ -322,6 +373,132 @@ export default function OutlineView() {
     setCollapseAllTick((t) => t + 1);
   };
 
+  const openLinkedNote = useCallback(
+    async (linkedId) => {
+      try {
+        const root = await getNoteThreadRoot(linkedId);
+        const q = new URLSearchParams();
+        q.set('thread', root);
+        q.set('focus', linkedId);
+        navigate({ pathname: '/', search: q.toString() });
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [navigate]
+  );
+
+  const draggingIdRef = useRef(null);
+  const suppressClickRef = useRef(false);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dropOverId, setDropOverId] = useState(null);
+
+  const finishDragUi = useCallback(() => {
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 250);
+    draggingIdRef.current = null;
+    setDraggingId(null);
+    setDropOverId(null);
+  }, []);
+
+  const refreshOutlineData = useCallback(async () => {
+    loadRootInflight.current.clear();
+    rootThreadsRef.current = {};
+    setRootThreads({});
+    const nr = await getRoots(false);
+    setRoots(nr);
+    const map = readOutlineExpansion();
+    await Promise.all(
+      nr
+        .filter((r) => (r.reply_count ?? 0) > 0 && map[r.id] === true)
+        .map((r) => loadThreadForRoot(r.id, true))
+    );
+  }, [loadThreadForRoot]);
+
+  const performReparent = useCallback(
+    async (draggedId, newParentId) => {
+      try {
+        await updateNote(draggedId, { parent_id: newParentId });
+        await refreshOutlineData();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Could not move note');
+      }
+    },
+    [refreshOutlineData]
+  );
+
+  const onDragStart = useCallback((noteId, e) => {
+    draggingIdRef.current = noteId;
+    setDraggingId(noteId);
+    e.dataTransfer.setData('text/plain', noteId);
+    e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('application/x-hermes-note-id', noteId);
+    } catch {
+      /* some browsers restrict custom types */
+    }
+  }, []);
+
+  const onDragEnd = useCallback(() => {
+    finishDragUi();
+  }, [finishDragUi]);
+
+  const onDragOverRow = useCallback((targetId, e) => {
+    if (!draggingIdRef.current || draggingIdRef.current === targetId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    setDropOverId(targetId);
+  }, []);
+
+  const onDropOnRow = useCallback(
+    (targetId, e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dragged =
+        e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('application/x-hermes-note-id');
+      finishDragUi();
+      if (!dragged || dragged === targetId) return;
+      void performReparent(dragged, targetId);
+    },
+    [finishDragUi, performReparent]
+  );
+
+  const onDragOverRoot = useCallback((e) => {
+    if (!draggingIdRef.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDropOverId('__root__');
+  }, []);
+
+  const onDropRoot = useCallback(
+    (e) => {
+      e.preventDefault();
+      const dragged =
+        e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('application/x-hermes-note-id');
+      finishDragUi();
+      if (!dragged) return;
+      void performReparent(dragged, null);
+    },
+    [finishDragUi, performReparent]
+  );
+
+  const outlineDndValue = useMemo(
+    () => ({
+      draggingId,
+      dropOverId,
+      suppressClickRef,
+      onDragStart,
+      onDragEnd,
+      onDragOverRow,
+      onDropOnRow,
+    }),
+    [draggingId, dropOverId, onDragStart, onDragEnd, onDragOverRow, onDropOnRow]
+  );
+
   return (
     <Layout
       title="Outline"
@@ -335,14 +512,33 @@ export default function OutlineView() {
       ]}
     >
       <div className="outline-view">
-        {!loading && tree.length > 0 && hasAnyExpandable() && (
+        {!loading && tree.length > 0 && (
           <div className="outline-view-toolbar">
-            <button type="button" className="outline-view-tool-btn" onClick={handleExpandAll}>
-              Expand all
-            </button>
-            <button type="button" className="outline-view-tool-btn" onClick={handleCollapseAll}>
-              Collapse all
-            </button>
+            {draggingId ? (
+              <div
+                className={`outline-drop-root ${dropOverId === '__root__' ? 'outline-drop-root--active' : ''}`}
+                onDragEnter={onDragOverRoot}
+                onDragOver={onDragOverRoot}
+                onDrop={onDropRoot}
+              >
+                Drop here for top-level note
+              </div>
+            ) : null}
+            {hasAnyExpandable() ? (
+              <>
+                <button type="button" className="outline-view-tool-btn" onClick={handleExpandAll}>
+                  Expand all
+                </button>
+                <button type="button" className="outline-view-tool-btn" onClick={handleCollapseAll}>
+                  Collapse all
+                </button>
+              </>
+            ) : null}
+            {!draggingId ? (
+              <p className="outline-view-toolbar-hint">
+                Drag a note onto another to nest it under that note.
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -354,24 +550,27 @@ export default function OutlineView() {
           <p className="outline-view-empty">No notes.</p>
         ) : (
           <OutlineExpandContext.Provider value={{ expandAllTick, collapseAllTick }}>
-            <div className="outline-tree">
-              {tree.map((node) => (
-                <OutlineNode
-                  key={node.id}
-                  node={node}
-                  depth={0}
-                  isMultiRoot
-                  streamThreadRootId={node.id}
-                  onLoadThread={loadThreadForRoot}
-                  onGoToStream={(threadRoot, noteId) => {
-                    const q = new URLSearchParams();
-                    q.set('thread', threadRoot);
-                    if (noteId) q.set('focus', noteId);
-                    navigate({ pathname: '/', search: q.toString() });
-                  }}
-                />
-              ))}
-            </div>
+            <OutlineDndContext.Provider value={outlineDndValue}>
+              <div className="outline-tree">
+                {tree.map((node) => (
+                  <OutlineNode
+                    key={node.id}
+                    node={node}
+                    depth={0}
+                    isMultiRoot
+                    streamThreadRootId={node.id}
+                    onLoadThread={loadThreadForRoot}
+                    onOpenLinkedNote={openLinkedNote}
+                    onGoToStream={(threadRoot, noteId) => {
+                      const q = new URLSearchParams();
+                      q.set('thread', threadRoot);
+                      if (noteId) q.set('focus', noteId);
+                      navigate({ pathname: '/', search: q.toString() });
+                    }}
+                  />
+                ))}
+              </div>
+            </OutlineDndContext.Provider>
           </OutlineExpandContext.Provider>
         )}
       </div>

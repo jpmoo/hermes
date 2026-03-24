@@ -38,6 +38,46 @@
   color: var(--accent);
 }
 
+.outline-view-toolbar-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.outline-drop-root {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  text-align: center;
+}
+
+.outline-drop-root--active {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+}
+
+.outline-row--dragging {
+  opacity: 0.55;
+}
+
+.outline-row--drop-target {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+  outline: 1px dashed var(--accent-dim);
+  outline-offset: -1px;
+}
+
+.outline-row-main--drop-target {
+  border-radius: 4px;
+}
+
 .outline-view-loading,
 .outline-view-empty {
   color: var(--text-muted);
@@ -85,6 +125,14 @@
   margin: -0.1rem -0.15rem;
 }
 
+.outline-row-main[draggable='true'] {
+  cursor: grab;
+}
+
+.outline-row-main[draggable='true']:active {
+  cursor: grabbing;
+}
+
 .outline-toggle {
   min-width: 1.75rem;
   height: 1.75rem;
@@ -130,8 +178,66 @@
   text-overflow: ellipsis;
 }
 
+.outline-content--rich {
+  min-width: 0;
+}
+
+.outline-content-rich-inner {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-content-rich-inner .note-rich-plain {
+  white-space: nowrap !important;
+}
+
+.outline-content-rich-inner .note-rich-link {
+  color: var(--accent, #8a6d0a);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+.outline-content-rich-inner .note-rich-mention {
+  display: inline;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.35rem;
+  font: inherit;
+  color: var(--accent, #8a6d0a);
+  background: color-mix(in srgb, var(--accent, #8a6d0a) 12%, transparent);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.outline-content-rich-inner .note-rich-mention--readonly {
+  cursor: default;
+  text-decoration: none;
+}
+
+.outline-content-rich-inner .note-rich-tag-pill {
+  display: inline;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.92em;
+  color: var(--text-muted, #5c5a54);
+  background: var(--bg-card, #fff);
+  border-radius: 4px;
+  border: 1px solid var(--border, #d8d6d0);
+}
+
 .outline-content--starred {
   color: var(--star);
+}
+
+.outline-content--starred .outline-content-rich-inner .note-rich-link,
+.outline-content--starred .outline-content-rich-inner .note-rich-mention {
+  color: var(--star);
+  background: color-mix(in srgb, var(--star) 14%, transparent);
 }
 
 .outline-star {
