@@ -32,6 +32,17 @@
   cursor: pointer;
 }
 
+.note-attachment-icon {
+  width: 1.05em;
+  height: 1.05em;
+  flex-shrink: 0;
+}
+
+.note-attachment-filename {
+  text-align: left;
+  word-break: break-all;
+}
+
 .note-attachment-size {
   color: var(--text-muted);
   font-size: 0.75rem;

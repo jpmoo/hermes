@@ -20,13 +20,23 @@ import {
 } from './api';
 import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
+import NoteTypeIcon from './NoteTypeIcon';
+import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
   'Remove the link between these two notes? The notes are not deleted—only the connection is removed.';
 
 const SIMILAR_MIN_LS_KEY = 'hermes.insightSimilarMinPct';
+const SIMILAR_TYPES_LS_KEY = 'hermes.insightSimilarVisibleTypes';
 const RAGDOLL_CONTEXT_LS_KEY = 'hermes.ragdollContextOptions';
+
+const SIMILAR_TYPE_FILTER_LABELS = {
+  note: 'Notes',
+  event: 'Events',
+  person: 'People',
+  organization: 'Organizations',
+};
 
 const defaultRagdollContext = Object.freeze({
   includeParent: false,
@@ -63,6 +73,23 @@ function readStoredSimilarMinPct() {
   }
 }
 
+function readStoredSimilarVisibleTypes() {
+  try {
+    const raw = localStorage.getItem(SIMILAR_TYPES_LS_KEY);
+    if (!raw) return new Set(ALL_NOTE_TYPES);
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr) || arr.length === 0) return new Set(ALL_NOTE_TYPES);
+    const next = new Set();
+    for (const t of arr) {
+      if (typeof t === 'string' && ALL_NOTE_TYPES.has(t)) next.add(t);
+    }
+    if (next.size === 0) return new Set(ALL_NOTE_TYPES);
+    return next;
+  } catch {
+    return new Set(ALL_NOTE_TYPES);
+  }
+}
+
 /** Ensure arrays exist (API / parse edge cases). Accept camelCase or snake_case keys. */
 function normalizeHoverInsightPayload(data) {
   if (!data || typeof data !== 'object') {
@@ -79,6 +106,7 @@ function normalizeHoverInsightPayload(data) {
     ? similar.map((s) => ({
         ...s,
         threadPath: s.threadPath ?? s.thread_path ?? '',
+        note_type: s.note_type || s.noteType || 'note',
       }))
     : [];
   return {
@@ -669,6 +697,21 @@ function HoverInsightPanels() {
 
   const [layoutRev, setLayoutRev] = useState(0);
   const [similarMinPct, setSimilarMinPct] = useState(readStoredSimilarMinPct);
+  const [similarVisibleTypes, setSimilarVisibleTypes] = useState(readStoredSimilarVisibleTypes);
+
+  const toggleSimilarVisibleNoteType = useCallback((type) => {
+    if (!ALL_NOTE_TYPES.has(type)) return;
+    setSimilarVisibleTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        if (next.size <= 1) return prev;
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     try {
@@ -677,6 +720,14 @@ function HoverInsightPanels() {
       /* ignore */
     }
   }, [similarMinPct]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIMILAR_TYPES_LS_KEY, JSON.stringify([...similarVisibleTypes].sort()));
+    } catch {
+      /* ignore */
+    }
+  }, [similarVisibleTypes]);
 
   useEffect(() => {
     if (!hover?.note) return undefined;
@@ -699,12 +750,17 @@ function HoverInsightPanels() {
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
   const similarNotes = insight?.similarNotes || [];
   const similarMin = similarMinPct / 100;
+  const similarNotesAfterSimilarity = useMemo(
+    () =>
+      similarNotes.filter((sn) => sn.similarity == null || Number(sn.similarity) >= similarMin),
+    [similarNotes, similarMin]
+  );
   const filteredSimilarNotes = useMemo(() => {
-    const filtered = similarNotes.filter(
-      (sn) => sn.similarity == null || Number(sn.similarity) >= similarMin
+    const filtered = similarNotesAfterSimilarity.filter((sn) =>
+      similarVisibleTypes.has(sn.note_type || 'note')
     );
     return sortBySimilarityDesc(filtered);
-  }, [similarNotes, similarMin]);
+  }, [similarNotesAfterSimilarity, similarVisibleTypes]);
   const { neighbor: neighborTags, connected: connectedTags, novel: novelTags } = useMemo(
     () => partitionTagSuggestions(tags),
     [tags]
@@ -879,6 +935,37 @@ function HoverInsightPanels() {
           >
             <div className={`hover-insight-panel hover-insight-panel--right ${loading ? 'hover-insight-panel--loading' : ''}`}>
               <p className="hover-insight-title hover-insight-similar-panel-heading">Similar notes</p>
+              <div
+                className="hover-insight-similar-type-filters"
+                role="group"
+                aria-label="Filter similar notes by type"
+              >
+                {NOTE_TYPE_HEADER_ORDER.map((t) => {
+                  const on = similarVisibleTypes.has(t);
+                  const label = SIMILAR_TYPE_FILTER_LABELS[t] ?? t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`hover-insight-similar-type-btn ${on ? 'hover-insight-similar-type-btn--on' : ''}`}
+                      aria-pressed={on}
+                      aria-label={
+                        on
+                          ? `${label} visible in similar notes — click to hide`
+                          : `${label} hidden from similar notes — click to show`
+                      }
+                      title={
+                        on
+                          ? `${label} shown — click to hide from similar notes`
+                          : `${label} hidden — click to show in similar notes`
+                      }
+                      onClick={() => toggleSimilarVisibleNoteType(t)}
+                    >
+                      <NoteTypeIcon type={t} className="hover-insight-similar-type-icon" />
+                    </button>
+                  );
+                })}
+              </div>
               <div className="hover-insight-similar-panel-body">
                 {loading && <p className="hover-insight-muted">Thinking…</p>}
                 {!loading && (
@@ -911,7 +998,11 @@ function HoverInsightPanels() {
                         No similar notes (needs embeddings, or nothing close enough yet).
                       </p>
                     ) : filteredSimilarNotes.length === 0 ? (
-                      <p className="hover-insight-muted">No notes at or above this threshold.</p>
+                      <p className="hover-insight-muted">
+                        {similarNotesAfterSimilarity.length === 0
+                          ? 'No notes at or above this similarity threshold.'
+                          : 'No similar notes match the selected types.'}
+                      </p>
                     ) : (
                       <ul className="hover-insight-similar-list">
                         {filteredSimilarNotes.map((sn) => {

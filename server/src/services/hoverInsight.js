@@ -371,7 +371,7 @@ JSON array only, no markdown:`;
          FROM notes c
          JOIN roots r ON r.id = c.parent_id
        )
-       SELECT n.id, n.content, 1 - (n.embedding <=> an.embedding) AS similarity, rt.root_id AS thread_root_id
+       SELECT n.id, n.content, n.note_type, 1 - (n.embedding <=> an.embedding) AS similarity, rt.root_id AS thread_root_id
        FROM notes an
        CROSS JOIN notes n
        JOIN roots rt ON rt.id = n.id
@@ -391,6 +391,7 @@ JSON array only, no markdown:`;
       simR.rows.map(async (row) => ({
         id: row.id,
         content: row.content,
+        note_type: row.note_type || 'note',
         similarity: row.similarity != null ? Number(row.similarity) : null,
         threadRootId: row.thread_root_id,
         threadPath: await getNoteThreadPathDisplay(row.id, userId, { excludeLeaf: true }),

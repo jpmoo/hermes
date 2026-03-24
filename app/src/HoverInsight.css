@@ -110,6 +110,51 @@
   flex-shrink: 0;
 }
 
+/* Mini note-type filter (persists in localStorage; independent of Stream header filters) */
+.hover-insight-similar-type-filters {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem;
+  margin: 0 0 0.45rem;
+}
+
+.hover-insight-similar-type-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.65rem;
+  min-height: 1.65rem;
+  padding: 0.2rem;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 0;
+  transition: color 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+}
+
+.hover-insight-similar-type-btn:hover {
+  color: var(--text);
+}
+
+.hover-insight-similar-type-btn--on {
+  color: var(--accent);
+  background: rgba(201, 162, 39, 0.12);
+}
+
+.hover-insight-similar-type-btn:not(.hover-insight-similar-type-btn--on) {
+  opacity: 0.48;
+}
+
+.hover-insight-similar-type-icon {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
 .hover-insight-similar-panel-body {
   flex: 1 1 auto;
   min-height: 0;
