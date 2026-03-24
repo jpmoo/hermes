@@ -213,7 +213,7 @@ function StreamList({
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
               parentTagsForInherit={parentTagsForInherit}
-              onOpenThread={(ev) => onFocusNote(n.id, ev)}
+              onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
               onStarredChange={onStarredChange}
               onNoteUpdate={onNoteUpdate}
               onNoteDelete={onNoteDelete}
@@ -725,7 +725,7 @@ export default function StreamPage() {
   );
 
   const onFocusNote = useCallback(
-    (id, e) => {
+    (id, e, streamDepth = 0) => {
       if (!threadRootId) return;
       if (noteIdEq(id, actualRootId)) {
         focusFromUrlApplied.current = '';
@@ -735,6 +735,20 @@ export default function StreamPage() {
           setFocusId(null);
           setSearchParams({ thread: threadRootId });
         }
+        return;
+      }
+      /*
+       * Visible replies are nested under the list head in the DOM; drill animation + li matching
+       * is brittle. Depth ≥ 1 rows use immediate focus (NoteCard double-click / Enter), not beginDrillFocus.
+       */
+      if (streamDepth > 0) {
+        if (floatTimerRef.current) {
+          clearTimeout(floatTimerRef.current);
+          floatTimerRef.current = null;
+        }
+        setFloatOpen(null);
+        if (threadListRef.current) clearDrillDimming(threadListRef.current);
+        applyFocusImmediate(id);
         return;
       }
       const canAnimate = Boolean(e?.currentTarget && threadListRef.current && !loadingThread);

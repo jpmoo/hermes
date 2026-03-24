@@ -39,7 +39,7 @@ export default function NoteCard({
   hasReplies,
   /** When set, parent’s tags for inherit (stream). Omit to load parent tags via API when note has parent_id. */
   parentTagsForInherit,
-  /** Stream: single-click tag/connection panels; double-click opens thread (any depth) */
+  /** Stream: single-click insight; double-click drills focus (nested rows use immediate focus, no animation) */
   hoverInsightEnabled = false,
 }) {
   const navigate = useNavigate();
@@ -385,9 +385,13 @@ export default function NoteCard({
 
   const streamTitle =
     hoverInsightEnabled && !editing
-      ? `Click: tag & connection suggestions · Double-click: open thread${
-          hasConnections ? ` · ${connectionCount} linked note${connectionCount === 1 ? '' : 's'}` : ''
-        }`
+      ? depth > 0
+        ? `Click: tag & connection suggestions · Double-click to focus this note here${
+            hasConnections ? ` · ${connectionCount} linked note${connectionCount === 1 ? '' : 's'}` : ''
+          }`
+        : `Click: tag & connection suggestions · Double-click a reply to focus it here${
+            hasConnections ? ` · ${connectionCount} linked note${connectionCount === 1 ? '' : 's'}` : ''
+          }`
       : undefined;
 
   /**
