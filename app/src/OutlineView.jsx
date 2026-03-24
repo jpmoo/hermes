@@ -198,7 +198,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
       : 'outline-row-main';
 
   const handleMainClick = (e) => {
-    if (dnd?.suppressClickRef?.current) {
+    if (dnd?.consumePostDragRowClick?.()) {
       e.preventDefault();
       e.stopPropagation();
       return;
@@ -419,18 +419,40 @@ export default function OutlineView() {
   );
 
   const draggingIdRef = useRef(null);
-  const suppressClickRef = useRef(false);
+  /**
+   * After drag-end/drop, some browsers emit a stray click. We used to block *all* row clicks for 250ms,
+   * which also swallowed a genuine double-click (both clicks suppressed) — common right after moving a row.
+   * Only ignore the next row-main click once; optional timer clears the flag if no click arrives.
+   */
+  const suppressNextRowClickRef = useRef(false);
+  const suppressNextRowClickTimerRef = useRef(null);
   const [draggingId, setDraggingId] = useState(null);
   const [dropOverId, setDropOverId] = useState(null);
 
   const finishDragUi = useCallback(() => {
-    suppressClickRef.current = true;
-    window.setTimeout(() => {
-      suppressClickRef.current = false;
-    }, 250);
+    if (suppressNextRowClickTimerRef.current) {
+      clearTimeout(suppressNextRowClickTimerRef.current);
+      suppressNextRowClickTimerRef.current = null;
+    }
+    suppressNextRowClickRef.current = true;
+    suppressNextRowClickTimerRef.current = window.setTimeout(() => {
+      suppressNextRowClickTimerRef.current = null;
+      suppressNextRowClickRef.current = false;
+    }, 400);
     draggingIdRef.current = null;
     setDraggingId(null);
     setDropOverId(null);
+  }, []);
+
+  /** First row-main click after drag/drop: swallow stray activation; clear timer so later clicks work. */
+  const consumePostDragRowClick = useCallback(() => {
+    if (!suppressNextRowClickRef.current) return false;
+    suppressNextRowClickRef.current = false;
+    if (suppressNextRowClickTimerRef.current) {
+      clearTimeout(suppressNextRowClickTimerRef.current);
+      suppressNextRowClickTimerRef.current = null;
+    }
+    return true;
   }, []);
 
   const refreshOutlineData = useCallback(async () => {
@@ -521,13 +543,13 @@ export default function OutlineView() {
     () => ({
       draggingId,
       dropOverId,
-      suppressClickRef,
+      consumePostDragRowClick,
       onDragStart,
       onDragEnd,
       onDragOverRow,
       onDropOnRow,
     }),
-    [draggingId, dropOverId, onDragStart, onDragEnd, onDragOverRow, onDropOnRow]
+    [draggingId, dropOverId, consumePostDragRowClick, onDragStart, onDragEnd, onDragOverRow, onDropOnRow]
   );
 
   return (
