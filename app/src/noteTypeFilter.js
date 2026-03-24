@@ -27,3 +27,8 @@ export function filterTreeByVisibleNoteTypes(nodes, visibleTypes) {
 export function filterRootsByVisibleNoteTypes(roots, visibleTypes) {
   return (roots || []).filter((r) => visibleTypes.has(r.note_type || 'note'));
 }
+
+/** Flat list (search, tag results, etc.). */
+export function filterNotesByVisibleNoteTypes(notes, visibleTypes) {
+  return (notes || []).filter((n) => visibleTypes.has(n.note_type || 'note'));
+}

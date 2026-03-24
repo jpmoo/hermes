@@ -16,7 +16,7 @@ import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from
 import NoteTypeIcon from './NoteTypeIcon';
 import NoteRichText from './NoteRichText';
 import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
-import { sortNoteTreeByThreadOrder, noteThreadSortKeyMs } from './noteThreadSort';
+import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './OutlineView.css';
 
@@ -50,26 +50,6 @@ function collectNoteIds(nodes) {
     if (n.children?.length) ids.push(...collectNoteIds(n.children));
   }
   return ids;
-}
-
-function sortStarredPinned(nodes) {
-  if (!nodes?.length) return nodes || [];
-  const starred = [];
-  const rest = [];
-  for (const n of nodes) {
-    const withKids = {
-      ...n,
-      children: sortStarredPinned(n.children || []),
-    };
-    if (withKids.starred) starred.push(withKids);
-    else rest.push(withKids);
-  }
-  starred.sort((a, b) => {
-    const d = noteThreadSortKeyMs(b) - noteThreadSortKeyMs(a);
-    if (d !== 0) return d;
-    return String(a.id).localeCompare(String(b.id));
-  });
-  return [...starred, ...rest];
 }
 
 function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLinkedNote, onLoadThread, isMultiRoot }) {

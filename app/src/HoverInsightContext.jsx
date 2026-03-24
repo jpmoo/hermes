@@ -1009,12 +1009,21 @@ function HoverInsightPanels() {
                           const raw = sn.content != null ? String(sn.content).trim() : '';
                           const path = sn.threadPath || sn.thread_path || '';
                           const tagNames = Array.isArray(sn.tags) ? sn.tags.map((t) => t.name || t) : [];
+                          const simType = sn.note_type || 'note';
+                          const simTypeClass =
+                            simType === 'organization'
+                              ? 'hover-insight-similar-btn--type-organization'
+                              : simType === 'person'
+                                ? 'hover-insight-similar-btn--type-person'
+                                : simType === 'event'
+                                  ? 'hover-insight-similar-btn--type-event'
+                                  : '';
                           return (
                             <li key={sn.id}>
                               <div
                                 role="button"
                                 tabIndex={0}
-                                className="hover-insight-similar-btn"
+                                className={['hover-insight-similar-btn', simTypeClass].filter(Boolean).join(' ')}
                                 title="Add as connected note to the selected card"
                                 onClick={() => connectSimilarNote(sn.id)}
                                 onKeyDown={(e) => {

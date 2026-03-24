@@ -111,12 +111,19 @@ CREATE INDEX IF NOT EXISTS idx_note_connections_anchor ON note_connections(ancho
 CREATE INDEX IF NOT EXISTS idx_note_connections_linked ON note_connections(linked_note_id);
 CREATE INDEX IF NOT EXISTS idx_note_connections_user ON note_connections(user_id);
 
+-- Two rows per scrub transaction: skip activity propagation for the content UPDATE and for the
+-- timestamp-restore UPDATE (connection/tag unlink body cleanup).
+CREATE TABLE IF NOT EXISTS note_propagate_suppress (
+  id BIGSERIAL PRIMARY KEY,
+  note_id UUID NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_note_propagate_suppress_note_id ON note_propagate_suppress (note_id);
+
 -- Trigger: bump updated_at only on real edits (not when ancestors get last_activity_at from replies)
 CREATE OR REPLACE FUNCTION notes_updated()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.content IS DISTINCT FROM OLD.content
-     OR NEW.starred IS DISTINCT FROM OLD.starred
      OR NEW.external_anchor IS DISTINCT FROM OLD.external_anchor
      OR NEW.parent_id IS DISTINCT FROM OLD.parent_id
      OR NEW.note_type IS DISTINCT FROM OLD.note_type
@@ -125,7 +132,12 @@ BEGIN
     NEW.updated_at = now();
     NEW.last_activity_at = now();
   ELSE
-    NEW.updated_at = OLD.updated_at;
+    IF NEW.updated_at IS DISTINCT FROM OLD.updated_at
+       OR NEW.last_activity_at IS DISTINCT FROM OLD.last_activity_at THEN
+      NULL;
+    ELSE
+      NEW.updated_at := OLD.updated_at;
+    END IF;
   END IF;
   RETURN NEW;
 END;
@@ -136,12 +148,35 @@ CREATE TRIGGER notes_updated_trigger
   BEFORE UPDATE ON notes
   FOR EACH ROW EXECUTE PROCEDURE notes_updated();
 
--- Bubble last_activity_at up to root for root-feed ordering
+-- Bubble last_activity_at up to thread ancestors when a note changes in a user-visible way.
 CREATE OR REPLACE FUNCTION notes_activity_propagate()
 RETURNS TRIGGER AS $$
 DECLARE
   pid UUID;
+  suppressed_id UUID;
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.content IS NOT DISTINCT FROM OLD.content
+       AND NEW.parent_id IS NOT DISTINCT FROM OLD.parent_id
+       AND NEW.external_anchor IS NOT DISTINCT FROM OLD.external_anchor
+       AND NEW.note_type IS NOT DISTINCT FROM OLD.note_type
+       AND NEW.event_start_at IS NOT DISTINCT FROM OLD.event_start_at
+       AND NEW.event_end_at IS NOT DISTINCT FROM OLD.event_end_at
+       AND NEW.starred IS NOT DISTINCT FROM OLD.starred
+       AND NEW.updated_at IS NOT DISTINCT FROM OLD.updated_at
+       AND NEW.last_activity_at IS NOT DISTINCT FROM OLD.last_activity_at
+       AND NEW.embedding IS DISTINCT FROM OLD.embedding THEN
+      RETURN NEW;
+    END IF;
+
+    DELETE FROM note_propagate_suppress
+    WHERE id = (SELECT id FROM note_propagate_suppress WHERE note_id = NEW.id ORDER BY id LIMIT 1)
+    RETURNING note_id INTO suppressed_id;
+    IF suppressed_id IS NOT NULL THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+
   pid := NEW.parent_id;
   WHILE pid IS NOT NULL LOOP
     UPDATE notes SET last_activity_at = now() WHERE id = pid;

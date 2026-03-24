@@ -620,7 +620,7 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
     const tagId = req.params.tagId;
     const userId = req.userId;
     const noteRow = await pool.query(
-      'SELECT id, content FROM notes WHERE id = $1 AND user_id = $2',
+      'SELECT id, content, updated_at, last_activity_at FROM notes WHERE id = $1 AND user_id = $2',
       [noteId, userId]
     );
     if (noteRow.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
@@ -638,11 +638,26 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
     const current = String(noteRow.rows[0].content ?? '');
     const next = stripHashtagPrefixFromContent(current, tagRow.rows[0].name);
     if (next !== current) {
-      await pool.query('UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [
-        next,
-        noteId,
-        userId,
-      ]);
+      const row = noteRow.rows[0];
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          'INSERT INTO note_propagate_suppress (note_id) VALUES ($1::uuid), ($1::uuid)',
+          [noteId]
+        );
+        await client.query('UPDATE notes SET content = $1 WHERE id = $2 AND user_id = $3', [next, noteId, userId]);
+        await client.query(
+          'UPDATE notes SET updated_at = $1::timestamptz, last_activity_at = $2::timestamptz WHERE id = $3 AND user_id = $4',
+          [row.updated_at, row.last_activity_at, noteId, userId]
+        );
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
     }
     res.status(204).send();
   } catch (err) {
@@ -755,32 +770,41 @@ router.delete('/:id/connections/:linkedNoteId', async (req, res) => {
      * hermes-note mentions from both note bodies so text and graph stay in sync.
      */
     const notes = await pool.query(
-      `SELECT id, content FROM notes WHERE user_id = $1 AND id = ANY($2::uuid[])`,
+      `SELECT id, content, updated_at, last_activity_at FROM notes WHERE user_id = $1 AND id = ANY($2::uuid[])`,
       [req.userId, [a, b]]
     );
     const byId = new Map(notes.rows.map((n) => [String(n.id).toLowerCase(), n]));
     const na = byId.get(String(a).toLowerCase());
     const nb = byId.get(String(b).toLowerCase());
-    if (na) {
-      const next = stripMentionLinksToNote(na.content, b);
-      if (next !== String(na.content ?? '')) {
-        await pool.query('UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [
+    async function scrubContentPreservingEditTime(note, linkedNoteId) {
+      const next = stripMentionLinksToNote(note.content, linkedNoteId);
+      if (next === String(note.content ?? '')) return;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          'INSERT INTO note_propagate_suppress (note_id) VALUES ($1::uuid), ($1::uuid)',
+          [note.id]
+        );
+        await client.query('UPDATE notes SET content = $1 WHERE id = $2 AND user_id = $3', [
           next,
-          a,
+          note.id,
           req.userId,
         ]);
+        await client.query(
+          'UPDATE notes SET updated_at = $1::timestamptz, last_activity_at = $2::timestamptz WHERE id = $3 AND user_id = $4',
+          [note.updated_at, note.last_activity_at, note.id, req.userId]
+        );
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
       }
     }
-    if (nb) {
-      const next = stripMentionLinksToNote(nb.content, a);
-      if (next !== String(nb.content ?? '')) {
-        await pool.query('UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [
-          next,
-          b,
-          req.userId,
-        ]);
-      }
-    }
+    if (na) await scrubContentPreservingEditTime(na, b);
+    if (nb) await scrubContentPreservingEditTime(nb, a);
 
     res.status(204).send();
   } catch (err) {

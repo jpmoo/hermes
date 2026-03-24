@@ -19,6 +19,9 @@ const TYPE_FILTER_LABELS = {
   organization: 'Organizations',
 };
 
+/** Pages where header type toggles apply (shown in tooltips when filters are disabled elsewhere). */
+const NOTE_TYPE_FILTER_VIEWS = 'Stream, Outline, Search, and Tags';
+
 const THEME_STORAGE_KEY = 'hermes.theme';
 const THEME_META = {
   light: '#f4f3f0',
@@ -130,16 +133,16 @@ export default function Layout({
                       aria-disabled={!noteTypeFilterEnabled}
                       aria-label={
                         !noteTypeFilterEnabled
-                          ? `${label} filter (available on Stream and Outline)`
+                          ? `${label} filter (available on ${NOTE_TYPE_FILTER_VIEWS})`
                           : on
-                            ? `${label} visible — hide from Stream and Outline`
-                            : `${label} hidden — show in Stream and Outline`
+                            ? `${label} visible — hide from ${NOTE_TYPE_FILTER_VIEWS}`
+                            : `${label} hidden — show in ${NOTE_TYPE_FILTER_VIEWS}`
                       }
                       title={
                         !noteTypeFilterEnabled
-                          ? 'Type filters apply on Stream and Outline'
+                          ? `Type filters apply on ${NOTE_TYPE_FILTER_VIEWS}`
                           : on
-                            ? `${label} visible — click to hide from Stream and Outline`
+                            ? `${label} visible — click to hide from ${NOTE_TYPE_FILTER_VIEWS}`
                             : `${label} hidden — click to show`
                       }
                     >

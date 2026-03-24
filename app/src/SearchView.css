@@ -12,7 +12,8 @@
 .search-view {
   max-width: 640px;
   margin: 0 auto;
-  padding: 1rem 0 3rem;
+  padding: 1rem 1rem 3rem;
+  box-sizing: border-box;
   background: var(--bg);
   color: var(--text);
   color-scheme: light;
@@ -120,10 +121,7 @@
   font-family: var(--font-mono);
 }
 
+/* Same left inset as semantic mode (similarity % sits in this gutter); keeps keyword rows aligned. */
 .search-view-list .note-card {
   padding-left: 3rem;
-}
-
-.search-view-list--keyword .note-card {
-  padding-left: 0;
 }

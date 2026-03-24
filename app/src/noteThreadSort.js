@@ -29,3 +29,27 @@ export function sortNoteTreeByThreadOrder(nodes) {
       n.children?.length > 0 ? sortNoteTreeByThreadOrder(n.children) : n.children || [],
   }));
 }
+
+/**
+ * At each sibling level: starred notes first, then the rest (preserving each group’s prior order).
+ * Among starred siblings, order by thread sort key ascending (oldest edit / earliest event first).
+ */
+export function sortStarredPinned(nodes) {
+  if (!nodes?.length) return nodes || [];
+  const starred = [];
+  const rest = [];
+  for (const n of nodes) {
+    const withKids = {
+      ...n,
+      children: sortStarredPinned(n.children || []),
+    };
+    if (withKids.starred) starred.push(withKids);
+    else rest.push(withKids);
+  }
+  starred.sort((a, b) => {
+    const d = noteThreadSortKeyMs(a) - noteThreadSortKeyMs(b);
+    if (d !== 0) return d;
+    return String(a.id).localeCompare(String(b.id));
+  });
+  return [...starred, ...rest];
+}

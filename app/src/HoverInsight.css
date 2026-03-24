@@ -439,6 +439,28 @@
   color: var(--text);
   font-family: inherit;
   animation: hover-insight-slide-in-right 0.32s ease-out both;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.hover-insight-similar-btn.hover-insight-similar-btn--type-organization {
+  background: var(--note-type-bg-organization);
+}
+.hover-insight-similar-btn.hover-insight-similar-btn--type-organization:hover {
+  background: var(--note-type-bg-organization-hover);
+}
+
+.hover-insight-similar-btn.hover-insight-similar-btn--type-person {
+  background: var(--note-type-bg-person);
+}
+.hover-insight-similar-btn.hover-insight-similar-btn--type-person:hover {
+  background: var(--note-type-bg-person-hover);
+}
+
+.hover-insight-similar-btn.hover-insight-similar-btn--type-event {
+  background: var(--note-type-bg-event);
+}
+.hover-insight-similar-btn.hover-insight-similar-btn--type-event:hover {
+  background: var(--note-type-bg-event-hover);
 }
 
 .hover-insight-similar-btn:focus-visible {

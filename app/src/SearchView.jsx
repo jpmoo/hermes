@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { searchSemantic, searchContent } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
+import { filterNotesByVisibleNoteTypes } from './noteTypeFilter';
+import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './SearchView.css';
 
 export default function SearchView() {
@@ -14,6 +16,12 @@ export default function SearchView() {
   const [searchError, setSearchError] = useState(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { visibleNoteTypes } = useNoteTypeFilter();
+
+  const filteredResults = useMemo(
+    () => filterNotesByVisibleNoteTypes(results, visibleNoteTypes),
+    [results, visibleNoteTypes]
+  );
 
   const runSearch = async () => {
     if (!q.trim()) return;
@@ -56,6 +64,7 @@ export default function SearchView() {
   return (
     <Layout
       title="Search"
+      noteTypeFilterEnabled
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },
@@ -115,11 +124,15 @@ export default function SearchView() {
           </div>
         </form>
         {loading && <p className="search-view-loading">Searching…</p>}
-        {!loading && results.length > 0 && (
-          <ul
-            className={`search-view-list${searchMode === 'keyword' ? ' search-view-list--keyword' : ''}`}
-          >
-            {results.map((n) => (
+        {!loading && results.length > 0 && filteredResults.length === 0 && (
+          <p className="search-view-empty">
+            No notes match the current type filters. Use the note-type buttons in the header to show
+            more kinds.
+          </p>
+        )}
+        {!loading && filteredResults.length > 0 && (
+          <ul className="search-view-list">
+            {filteredResults.map((n) => (
               <li key={n.id}>
                 {searchMode === 'semantic' && n.similarity != null && (
                   <span className="search-view-sim">
@@ -141,9 +154,7 @@ export default function SearchView() {
                   onStarredChange={() => {
                     const id = n.id;
                     setResults((prev) =>
-                      prev.map((x) =>
-                        x.id === id ? { ...x, starred: !x.starred } : x
-                      )
+                      prev.map((x) => (x.id === id ? { ...x, starred: !x.starred } : x))
                     );
                   }}
                   onNoteUpdate={reloadResults}

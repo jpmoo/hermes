@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getTags, searchByTags } from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
+import { filterNotesByVisibleNoteTypes } from './noteTypeFilter';
+import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './TagView.css';
 
 export default function TagView() {
@@ -14,6 +16,12 @@ export default function TagView() {
   const [loading, setLoading] = useState(false);
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { visibleNoteTypes } = useNoteTypeFilter();
+
+  const filteredNotes = useMemo(
+    () => filterNotesByVisibleNoteTypes(notes, visibleNoteTypes),
+    [notes, visibleNoteTypes]
+  );
 
   useEffect(() => {
     getTags().then(setAllTags).catch(() => setAllTags([]));
@@ -56,6 +64,7 @@ export default function TagView() {
   return (
     <Layout
       title="Tags"
+      noteTypeFilterEnabled
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },
@@ -94,9 +103,14 @@ export default function TagView() {
           <p className="tag-view-empty">Select one or more tags above to see matching notes.</p>
         ) : notes.length === 0 ? (
           <p className="tag-view-empty">No notes match the selected tags.</p>
+        ) : filteredNotes.length === 0 ? (
+          <p className="tag-view-empty">
+            No notes match the current type filters. Use the note-type buttons in the header to show
+            more kinds.
+          </p>
         ) : (
           <ul className="tag-view-list">
-            {notes.map((n) => (
+            {filteredNotes.map((n) => (
               <li key={n.id}>
                 <NoteCard
                   note={n}

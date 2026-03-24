@@ -11,7 +11,7 @@ import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync'
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
-import { sortNoteTreeByThreadOrder, noteThreadSortKeyMs } from './noteThreadSort';
+import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import './StreamPage.css';
 
@@ -166,26 +166,6 @@ function buildFullThreadLevelDrops(treeRoots) {
   }
   walk(treeRoots);
   return m;
-}
-
-function sortStarredPinned(nodes) {
-  if (!nodes?.length) return nodes || [];
-  const starred = [];
-  const rest = [];
-  for (const n of nodes) {
-    const withKids = {
-      ...n,
-      children: sortStarredPinned(n.children || []),
-    };
-    if (withKids.starred) starred.push(withKids);
-    else rest.push(withKids);
-  }
-  starred.sort((a, b) => {
-    const d = noteThreadSortKeyMs(b) - noteThreadSortKeyMs(a);
-    if (d !== 0) return d;
-    return String(a.id).localeCompare(String(b.id));
-  });
-  return [...starred, ...rest];
 }
 
 /**
@@ -391,10 +371,10 @@ export default function StreamPage() {
     [treeFull, visibleNoteTypes]
   );
   const pinnedTree = useMemo(() => sortStarredPinned(tree), [tree]);
-  const filteredRoots = useMemo(
-    () => filterRootsByVisibleNoteTypes(roots, visibleNoteTypes),
-    [roots, visibleNoteTypes]
-  );
+  const filteredRoots = useMemo(() => {
+    const filtered = filterRootsByVisibleNoteTypes(roots, visibleNoteTypes);
+    return sortStarredPinned(filtered.map((r) => ({ ...r, children: [] })));
+  }, [roots, visibleNoteTypes]);
   /** URL `thread` is the canonical root; do not use `thread[0]` (API orders by created_at, not tree root). */
   const actualRootId = threadRootId;
   const displayTree = useMemo(() => {
