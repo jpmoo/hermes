@@ -38,6 +38,38 @@ function parseOptionalInstant(raw) {
   return d.toISOString();
 }
 
+function stripMentionLinksToNote(content, targetNoteId) {
+  const s = String(content ?? '');
+  const id = String(targetNoteId || '').toLowerCase();
+  if (!id) return s;
+  const esc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const mdLinkRe = new RegExp(`\\[([^\\]]*)\\]\\(hermes-note://${esc}\\)`, 'gi');
+  const bareRe = new RegExp(`hermes-note://${esc}`, 'gi');
+  return s
+    /* Keep the readable mention label; remove only link wrapper. */
+    .replace(mdLinkRe, '$1')
+    .replace(bareRe, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function stripHashtagPrefixFromContent(content, tagName) {
+  const s = String(content ?? '');
+  const name = String(tagName || '').trim();
+  if (!name) return s;
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`#${esc}(?![a-z0-9-])`, 'gi');
+  return s
+    .replace(re, (m, offset, src) => {
+      if (offset === 0 || /[\s\n([{'"`]/.test(src[offset - 1])) return m.slice(1);
+      return m;
+    })
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_BYTES, files: 20 },
@@ -541,13 +573,34 @@ router.post('/:id/tags', async (req, res) => {
 // Remove tag from note
 router.delete('/:id/tags/:tagId', async (req, res) => {
   try {
+    const noteId = req.params.id;
+    const tagId = req.params.tagId;
+    const userId = req.userId;
+    const noteRow = await pool.query(
+      'SELECT id, content FROM notes WHERE id = $1 AND user_id = $2',
+      [noteId, userId]
+    );
+    if (noteRow.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    const tagRow = await pool.query('SELECT id, name FROM tags WHERE id = $1', [tagId]);
+    if (tagRow.rows.length === 0) return res.status(404).json({ error: 'Tag not found' });
+
     const r = await pool.query(
       `DELETE FROM note_tags nt USING notes n
        WHERE nt.note_id = n.id AND n.user_id = $1 AND nt.note_id = $2 AND nt.tag_id = $3
        RETURNING nt.id`,
-      [req.userId, req.params.id, req.params.tagId]
+      [userId, noteId, tagId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Note or tag link not found' });
+
+    const current = String(noteRow.rows[0].content ?? '');
+    const next = stripHashtagPrefixFromContent(current, tagRow.rows[0].name);
+    if (next !== current) {
+      await pool.query('UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [
+        next,
+        noteId,
+        userId,
+      ]);
+    }
     res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -653,6 +706,39 @@ router.delete('/:id/connections/:linkedNoteId', async (req, res) => {
       [req.userId, a, b]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Connection not found' });
+
+    /*
+     * Connection is the source of truth: if this link is removed anywhere, scrub matching
+     * hermes-note mentions from both note bodies so text and graph stay in sync.
+     */
+    const notes = await pool.query(
+      `SELECT id, content FROM notes WHERE user_id = $1 AND id = ANY($2::uuid[])`,
+      [req.userId, [a, b]]
+    );
+    const byId = new Map(notes.rows.map((n) => [String(n.id).toLowerCase(), n]));
+    const na = byId.get(String(a).toLowerCase());
+    const nb = byId.get(String(b).toLowerCase());
+    if (na) {
+      const next = stripMentionLinksToNote(na.content, b);
+      if (next !== String(na.content ?? '')) {
+        await pool.query('UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [
+          next,
+          a,
+          req.userId,
+        ]);
+      }
+    }
+    if (nb) {
+      const next = stripMentionLinksToNote(nb.content, a);
+      if (next !== String(nb.content ?? '')) {
+        await pool.query('UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [
+          next,
+          b,
+          req.userId,
+        ]);
+      }
+    }
+
     res.status(204).send();
   } catch (err) {
     console.error(err);

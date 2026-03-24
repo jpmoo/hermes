@@ -4,6 +4,7 @@ import {
   getMentionRecentNotes,
   getTags,
   createTag,
+  createNote,
   createNoteConnection,
   addNoteTag,
 } from './api';
@@ -41,6 +42,7 @@ export default function MentionsTextarea({
   placeholder,
   disabled = false,
   autoFocus = false,
+  mentionCreateParentId = null,
   /** Stream compose: show type icon left of box; click cycles types */
   composeNoteType = null,
   composeNoteTypeOptions = null,
@@ -135,6 +137,7 @@ export default function MentionsTextarea({
 
     if (menu.type === '@') {
       const q = menu.query.trim();
+      const qForSearch = q.replace(/_/g, ' ').trim();
       if (searchTimer.current) clearTimeout(searchTimer.current);
       if (q.length < 1) {
         let cancelled = false;
@@ -145,6 +148,7 @@ export default function MentionsTextarea({
             if (cancelled) return;
             setItems(
               list.map((n) => ({
+                kind: 'note',
                 key: n.id,
                 id: n.id,
                 label:
@@ -168,19 +172,44 @@ export default function MentionsTextarea({
       setLoading(true);
       searchTimer.current = setTimeout(async () => {
         try {
-          const list = await searchContent(q, 12);
-          setItems(
-            list.map((n) => ({
-              key: n.id,
-              id: n.id,
-              label:
-                (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
-              raw: n,
-            }))
-          );
+          const list = await searchContent(qForSearch, 12);
+          const noteItems = list.map((n) => ({
+            kind: 'note',
+            key: n.id,
+            id: n.id,
+            label:
+              (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Note',
+            raw: n,
+          }));
+          const createItems =
+            noteItems.length === 0 && mentionCreateParentId && qForSearch
+              ? [
+                  {
+                    kind: 'note-create',
+                    key: '__create_mention_note__',
+                    createText: qForSearch,
+                    label: `Create note in this thread: "${qForSearch}"`,
+                  },
+                ]
+              : [];
+          setItems([
+            ...noteItems,
+            ...createItems,
+          ]);
         } catch (e) {
           console.error(e);
-          setItems([]);
+          const createItems =
+            mentionCreateParentId && qForSearch
+              ? [
+                  {
+                    kind: 'note-create',
+                    key: '__create_mention_note__',
+                    createText: qForSearch,
+                    label: `Create note in this thread: "${qForSearch}"`,
+                  },
+                ]
+              : [];
+          setItems(createItems);
         } finally {
           setLoading(false);
         }
@@ -326,12 +355,44 @@ export default function MentionsTextarea({
       };
     }
     return undefined;
-  }, [menuQueryKey, menu?.type]);
+  }, [menuQueryKey, menu?.type, mentionCreateParentId]);
 
   const applyMention = async (item) => {
     const el = taRef.current;
     if (!menu || !el) return;
     const caret = el.selectionStart ?? menu.caret;
+    if (item.kind === 'note-create') {
+      if (!mentionCreateParentId) return;
+      try {
+        const created = await createNote({
+          content: item.createText || menu.query.trim().replace(/_/g, ' '),
+          parent_id: mentionCreateParentId,
+        });
+        const label =
+          (created.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) ||
+          item.createText ||
+          'Note';
+        const link = formatNoteMentionLink(label, created.id);
+        const next = replaceTriggerQuery(el.value, menu.start, caret, link);
+        onChange(next);
+        if (noteId) {
+          try {
+            await createNoteConnection(noteId, created.id);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        closeMenu();
+        requestAnimationFrame(() => {
+          const pos = menu.start + link.length;
+          el.focus();
+          el.setSelectionRange(pos, pos);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+      return;
+    }
     const link = formatNoteMentionLink(item.label, item.id);
     const next = replaceTriggerQuery(el.value, menu.start, caret, link);
     onChange(next);

@@ -153,7 +153,7 @@ export default function NoteCard({
     try {
       await updateNote(note.id, { content: trimmed, ...meta });
       await syncTagsFromContent(note.id, trimmed, note.tags, note.content || '');
-      await syncConnectionsFromContent(note.id, trimmed);
+      await syncConnectionsFromContent(note.id, trimmed, note.content || '');
       setEditing(false);
       onNoteUpdate?.();
     } catch (err) {

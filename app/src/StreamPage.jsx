@@ -796,7 +796,7 @@ export default function StreamPage() {
     setSubmitting(true);
     try {
       const note = await createNote({ content: text, ...meta });
-      await syncConnectionsFromContent(note.id, text);
+      await syncConnectionsFromContent(note.id, text, '');
       await syncTagsFromContent(note.id, text, [], '');
       if (pendingRootFiles.length > 0) await uploadNoteFiles(note.id, pendingRootFiles);
       const full =
@@ -839,7 +839,7 @@ export default function StreamPage() {
     setSubmitting(true);
     try {
       const note = await createNote({ content: text, parent_id: replyParentId, ...meta });
-      await syncConnectionsFromContent(note.id, text);
+      await syncConnectionsFromContent(note.id, text, '');
       await syncTagsFromContent(note.id, text, [], '');
       if (pendingReplyFiles.length > 0) await uploadNoteFiles(note.id, pendingReplyFiles);
       setReplyContent('');
@@ -1005,6 +1005,7 @@ export default function StreamPage() {
                 onChange={setReplyContent}
                 rows={2}
                 disabled={submitting}
+                mentionCreateParentId={replyParentId}
                 composeNoteType={composeNoteType}
                 composeNoteTypeOptions={NOTE_TYPE_OPTIONS}
                 onComposeNoteTypeChange={setComposeNoteType}

@@ -1,4 +1,4 @@
-import { addNoteTag, removeNoteTag, createNoteConnection } from './api';
+import { addNoteTag, removeNoteTag, createNoteConnection, deleteNoteConnection } from './api';
 import { extractTagNamesFromContent, extractLinkedNoteIds } from './noteBodyUtils';
 
 /**
@@ -31,14 +31,29 @@ export async function syncTagsFromContent(noteId, content, existingTags, previou
   }
 }
 
-/** Ensure a connection exists for each hermes-note:// link in content (idempotent). */
-export async function syncConnectionsFromContent(anchorNoteId, content) {
+/**
+ * Keep mention links and connections in lockstep:
+ * - add connections for newly mentioned notes
+ * - remove connections when a previously mentioned note is no longer mentioned
+ */
+export async function syncConnectionsFromContent(anchorNoteId, content, previousContent = '') {
   const anchor = String(anchorNoteId).toLowerCase();
-  const ids = extractLinkedNoteIds(content);
-  for (const id of ids) {
+  const prevIds = new Set(extractLinkedNoteIds(previousContent).map((id) => String(id).toLowerCase()));
+  const nowIds = new Set(extractLinkedNoteIds(content).map((id) => String(id).toLowerCase()));
+
+  for (const id of nowIds) {
     if (String(id).toLowerCase() === anchor) continue;
     try {
       await createNoteConnection(anchorNoteId, id);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  for (const id of prevIds) {
+    if (id === anchor || nowIds.has(id)) continue;
+    try {
+      await deleteNoteConnection(anchorNoteId, id);
     } catch (e) {
       console.error(e);
     }

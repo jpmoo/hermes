@@ -62,7 +62,11 @@ export function getActiveTrigger(text, caretPos) {
     const prev = at > 0 ? s[at - 1] : ' ';
     if (at === 0 || /[\s\n([{'"`]/.test(prev)) {
       const after = before.slice(at + 1);
-      if (!after.includes('\n') && !after.includes(']') && /^[a-zA-Z0-9\s\-_.]*$/.test(after)) {
+      /*
+       * @ mention token ends at a real space. Users can type `_` to represent spaces
+       * while still keeping the token contiguous (e.g. @john_doe -> "john doe").
+       */
+      if (!after.includes('\n') && !after.includes(']') && /^[a-zA-Z0-9\-_.]*$/.test(after)) {
         candidates.push({ type: '@', start: at, query: after });
       }
     }
