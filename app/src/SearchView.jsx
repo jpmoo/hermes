@@ -140,14 +140,6 @@ export default function SearchView() {
   const hasTags = selectedTagIds.length > 0;
   const hasQ = q.trim().length > 0;
 
-  const emptyHint =
-    !loading &&
-    !searchError &&
-    results.length === 0 &&
-    !hasTags &&
-    !hasQ &&
-    !textSearchRequested;
-
   return (
     <Layout
       title="Search"
@@ -213,7 +205,7 @@ export default function SearchView() {
             <p className="search-view-section-label" id="search-section-text">
               Text <span className="search-view-section-optional">(optional if tags are selected)</span>
             </p>
-            <div className="search-view-field-row">
+            <div className="search-view-text-row">
               <input
                 type="search"
                 placeholder="Search notes…"
@@ -222,43 +214,42 @@ export default function SearchView() {
                 className="search-view-input"
                 aria-labelledby="search-section-text"
               />
-              <button type="submit" disabled={loading || (!hasQ && !hasTags)}>
+            </div>
+            <div className="search-view-modes-row">
+              <div className="search-view-modes" role="radiogroup" aria-label="How to match text">
+                <label className="search-view-mode">
+                  <input
+                    type="radio"
+                    name="searchMode"
+                    value="keyword"
+                    checked={searchMode === 'keyword'}
+                    onChange={() => setSearchMode('keyword')}
+                  />
+                  <span className="search-view-mode-label">Keyword</span>
+                  <span className="search-view-mode-hint">Exact text in note body</span>
+                </label>
+                <label className="search-view-mode">
+                  <input
+                    type="radio"
+                    name="searchMode"
+                    value="semantic"
+                    checked={searchMode === 'semantic'}
+                    onChange={() => setSearchMode('semantic')}
+                  />
+                  <span className="search-view-mode-label">Semantic</span>
+                  <span className="search-view-mode-hint">Meaning &amp; similarity (Ollama)</span>
+                </label>
+              </div>
+              <button
+                type="submit"
+                className="search-view-submit-btn"
+                disabled={loading || (!hasQ && !hasTags)}
+              >
                 Search
               </button>
             </div>
-            <div className="search-view-modes" role="radiogroup" aria-label="How to match text">
-              <label className="search-view-mode">
-                <input
-                  type="radio"
-                  name="searchMode"
-                  value="keyword"
-                  checked={searchMode === 'keyword'}
-                  onChange={() => setSearchMode('keyword')}
-                />
-                <span className="search-view-mode-label">Keyword</span>
-                <span className="search-view-mode-hint">Exact text in note body</span>
-              </label>
-              <label className="search-view-mode">
-                <input
-                  type="radio"
-                  name="searchMode"
-                  value="semantic"
-                  checked={searchMode === 'semantic'}
-                  onChange={() => setSearchMode('semantic')}
-                />
-                <span className="search-view-mode-label">Semantic</span>
-                <span className="search-view-mode-hint">Meaning &amp; similarity (Ollama)</span>
-              </label>
-            </div>
           </form>
         </div>
-
-        {emptyHint && (
-          <p className="search-view-empty search-view-empty--hint">
-            Choose note types above, add tags, and/or enter text, then run Search. Tags alone update
-            the list as you click them.
-          </p>
-        )}
 
         {loading && <p className="search-view-loading">Searching…</p>}
 

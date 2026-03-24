@@ -8,8 +8,6 @@ import {
   NavIconTheme,
   NavIconSignOut,
 } from './icons/NavIcons.jsx';
-import NoteTypeFilterButtons from './NoteTypeFilterButtons';
-
 const THEME_STORAGE_KEY = 'hermes.theme';
 const THEME_META = {
   light: '#f4f3f0',
@@ -18,7 +16,6 @@ const THEME_META = {
 
 export default function Layout({
   title,
-  noteTypeFilterEnabled = false,
   onLogout,
   viewLinks,
   children,
@@ -104,9 +101,6 @@ export default function Layout({
                 )
               )}
             </nav>
-            <div className="layout-filters-cluster">
-              <NoteTypeFilterButtons mode="header" disabled={!noteTypeFilterEnabled} />
-            </div>
           </div>
           <div className="layout-header-end">
             <button
