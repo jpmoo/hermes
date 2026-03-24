@@ -45,6 +45,8 @@ export default function NoteCard({
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
   const insightClickTimerRef = useRef(null);
+  /** Second click of a double-click runs drill in `click` (detail===2); skip duplicate work in `dblclick`. */
+  const skipNextStreamDblClickDrillRef = useRef(false);
   const tagDropdownRef = useRef(null);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
@@ -342,10 +344,28 @@ export default function NoteCard({
     }
   };
 
+  const runStreamDrillOpen = (ev) => {
+    if (insightClickTimerRef.current) {
+      clearTimeout(insightClickTimerRef.current);
+      insightClickTimerRef.current = null;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    hoverInsight?.clearInsightSelection?.();
+    onOpenThread?.(ev);
+  };
+
   const handleCardClick = (ev) => {
     if (editing) return;
     if (!hoverInsightEnabled) {
       onOpenThread?.(ev);
+      return;
+    }
+    /* Rely on the 2nd click of a double-click (detail===2) for drill: nested rows often miss `dblclick`
+     * on the <article>, and the 2nd single-click was restarting the insight delay timer. */
+    if (ev.detail === 2) {
+      skipNextStreamDblClickDrillRef.current = true;
+      runStreamDrillOpen(ev);
       return;
     }
     const anchorEl = ev.currentTarget;
@@ -358,15 +378,22 @@ export default function NoteCard({
 
   const handleCardDoubleClick = (ev) => {
     if (editing) return;
+    if (hoverInsightEnabled) {
+      if (skipNextStreamDblClickDrillRef.current) {
+        skipNextStreamDblClickDrillRef.current = false;
+        ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
+      runStreamDrillOpen(ev);
+      return;
+    }
     if (insightClickTimerRef.current) {
       clearTimeout(insightClickTimerRef.current);
       insightClickTimerRef.current = null;
     }
     ev.preventDefault();
     ev.stopPropagation();
-    if (hoverInsightEnabled) {
-      hoverInsight?.clearInsightSelection?.();
-    }
     onOpenThread?.(ev);
   };
 
