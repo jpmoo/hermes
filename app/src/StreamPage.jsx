@@ -652,7 +652,7 @@ export default function StreamPage() {
         return;
       }
       const displayRoot = focusId && !noteIdEq(focusId, actualRootId) ? focusId : actualRootId;
-      const idx = fullPath.indexOf(displayRoot);
+      const idx = fullPath.findIndex((x) => noteIdEq(x, displayRoot));
       const drillPath = idx >= 0 ? fullPath.slice(idx) : fullPath;
       if (drillPath.length < 2) {
         applyFocusImmediate(id);

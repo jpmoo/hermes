@@ -397,6 +397,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       const t = e.target;
       if (t.closest?.('[data-insight-ui]')) return;
       if (t.closest?.('.note-card--insight-selected')) return;
+      /* Replies sit in sibling <li>s, not inside the selected root <article>; clearing here broke double-click drill. */
+      if (t.closest?.('.stream-page-list')) return;
       clearInsightSelection();
     };
     const onKeyDown = (e) => {
