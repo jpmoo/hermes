@@ -87,6 +87,26 @@
   background: var(--note-type-bg-event-hover);
 }
 
+/* Linked stream cards: keep type tint (same specificity as plain type modifiers) */
+.note-card.note-card--linked.note-card--type-organization {
+  background: var(--note-type-bg-organization);
+}
+.note-card.note-card--linked.note-card--type-organization:hover {
+  background: var(--note-type-bg-organization-hover);
+}
+.note-card.note-card--linked.note-card--type-person {
+  background: var(--note-type-bg-person);
+}
+.note-card.note-card--linked.note-card--type-person:hover {
+  background: var(--note-type-bg-person-hover);
+}
+.note-card.note-card--linked.note-card--type-event {
+  background: var(--note-type-bg-event);
+}
+.note-card.note-card--linked.note-card--type-event:hover {
+  background: var(--note-type-bg-event-hover);
+}
+
 .note-card--depth-1 { border-left-color: #5a4a2a; }
 .note-card--depth-2 { border-left-color: #4a3a1a; }
 .note-card--depth-3 { border-left-color: #3a2a12; }

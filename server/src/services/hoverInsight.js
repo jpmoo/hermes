@@ -64,6 +64,11 @@ export async function loadPersistedLinksMetadata(anchorNoteId, userId) {
               nb.id,
               nb.content,
               nb.parent_id,
+              nb.note_type,
+              nb.event_start_at,
+              nb.event_end_at,
+              nb.starred,
+              nb.updated_at,
               NULL::uuid AS thread_root_id,
               CASE
                 WHEN an.embedding IS NOT NULL AND nb.embedding IS NOT NULL
@@ -87,6 +92,11 @@ export async function loadPersistedLinksMetadata(anchorNoteId, userId) {
       id: r.id,
       content: r.content,
       parent_id: r.parent_id,
+      note_type: r.note_type || 'note',
+      event_start_at: r.event_start_at,
+      event_end_at: r.event_end_at,
+      starred: !!r.starred,
+      updated_at: r.updated_at,
       threadRootId: r.thread_root_id,
       similarity: r.similarity != null ? Number(r.similarity) : null,
       persisted: true,

@@ -64,8 +64,9 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
     return false;
   });
   const [loading, setLoading] = useState(false);
-  const prevExpandTick = useRef(expandAllTick);
-  const prevCollapseTick = useRef(collapseAllTick);
+  /** `undefined` = not yet synced; avoids matching tick on first mount and skipping open (Expand all). */
+  const prevExpandTick = useRef(undefined);
+  const prevCollapseTick = useRef(undefined);
 
   const childCount = cc;
   const replyCount = rc;
@@ -74,17 +75,16 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
     hasSubtree || (isMultiRoot && depth === 0 && replyCount > 0);
 
   useLayoutEffect(() => {
-    if (prevExpandTick.current !== expandAllTick) {
-      prevExpandTick.current = expandAllTick;
-      setOpen(true);
-    }
+    if (prevExpandTick.current === expandAllTick) return;
+    prevExpandTick.current = expandAllTick;
+    if (expandAllTick > 0) setOpen(true);
   }, [expandAllTick]);
 
   useLayoutEffect(() => {
-    if (prevCollapseTick.current !== collapseAllTick) {
-      prevCollapseTick.current = collapseAllTick;
-      setOpen(false);
-    }
+    if (prevCollapseTick.current === collapseAllTick) return;
+    const prev = prevCollapseTick.current;
+    prevCollapseTick.current = collapseAllTick;
+    if (prev !== undefined && collapseAllTick > 0) setOpen(false);
   }, [collapseAllTick]);
 
   /** Same behavior as the ▼/▶ control: load root thread and/or flip expand state. */
@@ -399,6 +399,7 @@ export default function OutlineView() {
   };
 
   const handleCollapseAll = () => {
+    setExpandAllTick(0);
     setCollapseAllTick((t) => t + 1);
   };
 

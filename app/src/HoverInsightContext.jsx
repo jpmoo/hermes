@@ -987,8 +987,20 @@ function HoverInsightPanels() {
           {persisted.map((pn) => {
             const body = pn.content != null ? String(pn.content).trim() : '';
             const tagNames = Array.isArray(pn.tags) ? pn.tags.map((t) => t.name || t) : [];
+            const connType = pn.note_type || 'note';
+            const connTypeClass =
+              connType === 'organization'
+                ? 'hover-insight-connection-card--type-organization'
+                : connType === 'person'
+                  ? 'hover-insight-connection-card--type-person'
+                  : connType === 'event'
+                    ? 'hover-insight-connection-card--type-event'
+                    : '';
             return (
-            <div key={pn.id} className="hover-insight-connection-card">
+            <div
+              key={pn.id}
+              className={['hover-insight-connection-card', connTypeClass].filter(Boolean).join(' ')}
+            >
               <div
                 role="button"
                 tabIndex={0}

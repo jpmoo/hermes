@@ -65,6 +65,9 @@ export default function ConnectionNoteModal({
           starred: !!linked.starred,
           updated_at: linked.updated_at || new Date().toISOString(),
           parent_id: linked.parent_id ?? null,
+          note_type: linked.note_type || 'note',
+          event_start_at: linked.event_start_at ?? null,
+          event_end_at: linked.event_end_at ?? null,
           attachments: Array.isArray(linked.attachments) ? linked.attachments : [],
           reply_count: linked.reply_count ?? 0,
           connection_count:

@@ -477,6 +477,28 @@
   border-radius: 8px;
   padding: 0.35rem 0.4rem 0.35rem 0.45rem;
   box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background 0.15s ease;
+}
+
+.hover-insight-connection-card.hover-insight-connection-card--type-organization {
+  background: var(--note-type-bg-organization);
+}
+.hover-insight-connection-card.hover-insight-connection-card--type-organization:hover {
+  background: var(--note-type-bg-organization-hover);
+}
+
+.hover-insight-connection-card.hover-insight-connection-card--type-person {
+  background: var(--note-type-bg-person);
+}
+.hover-insight-connection-card.hover-insight-connection-card--type-person:hover {
+  background: var(--note-type-bg-person-hover);
+}
+
+.hover-insight-connection-card.hover-insight-connection-card--type-event {
+  background: var(--note-type-bg-event);
+}
+.hover-insight-connection-card.hover-insight-connection-card--type-event:hover {
+  background: var(--note-type-bg-event-hover);
 }
 
 .hover-insight-connection-card-main {

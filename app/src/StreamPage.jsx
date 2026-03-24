@@ -31,9 +31,14 @@ function buildTree(flat) {
   return roots;
 }
 
+function noteIdEq(a, b) {
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
 function findNode(nodes, id) {
   for (const n of nodes) {
-    if (n.id === id) return n;
+    if (noteIdEq(n.id, id)) return n;
     const f = findNode(n.children || [], id);
     if (f) return f;
   }
@@ -44,7 +49,7 @@ function findNode(nodes, id) {
 function parentInFilteredTree(nodes, targetId) {
   for (const n of nodes) {
     for (const c of n.children || []) {
-      if (c.id === targetId) return n.id;
+      if (noteIdEq(c.id, targetId)) return n.id;
     }
     const p = parentInFilteredTree(n.children || [], targetId);
     if (p != null) return p;
@@ -55,11 +60,18 @@ function parentInFilteredTree(nodes, targetId) {
 /** IDs from tree root down to target (inclusive). */
 function pathFromRootToId(nodes, targetId, acc = []) {
   for (const n of nodes) {
-    if (n.id === targetId) return [...acc, n.id];
+    if (noteIdEq(n.id, targetId)) return [...acc, n.id];
     const sub = pathFromRootToId(n.children || [], targetId, [...acc, n.id]);
     if (sub) return sub;
   }
   return null;
+}
+
+function findStreamLiByNoteId(listEl, noteId) {
+  if (!listEl || noteId == null) return null;
+  return [...listEl.querySelectorAll('li[data-stream-note]')].find((li) =>
+    noteIdEq(li.getAttribute('data-stream-note'), noteId)
+  );
 }
 
 function clearDrillDimming(container) {
@@ -73,8 +85,10 @@ function clearDrillDimming(container) {
 function applyDrillDimming(threadListEl, pathFromDisplayRoot) {
   clearDrillDimming(threadListEl);
   if (!pathFromDisplayRoot || pathFromDisplayRoot.length < 2) return null;
-  const rootLi = threadListEl.querySelector(':scope > li[data-stream-note]');
-  if (!rootLi || rootLi.dataset.streamNote !== pathFromDisplayRoot[0]) return null;
+  const headId = pathFromDisplayRoot[0];
+  const topLis = [...threadListEl.querySelectorAll(':scope > li[data-stream-note]')];
+  const rootLi = topLis.find((li) => noteIdEq(li.getAttribute('data-stream-note'), headId));
+  if (!rootLi) return null;
 
   const rootArticle = rootLi.querySelector(':scope > article');
   if (pathFromDisplayRoot.length > 1 && rootArticle) {
@@ -89,7 +103,7 @@ function applyDrillDimming(threadListEl, pathFromDisplayRoot) {
     const lis = [...ul.querySelectorAll(':scope > li[data-stream-note]')];
     let found = false;
     for (const li of lis) {
-      if (li.dataset.streamNote !== targetId) {
+      if (!noteIdEq(li.getAttribute('data-stream-note'), targetId)) {
         li.classList.add('stream-page-drill-fade');
         continue;
       }
@@ -363,7 +377,7 @@ export default function StreamPage() {
   const actualRootId = thread[0]?.id;
   const displayTree = useMemo(() => {
     const fn = focusId && actualRootId ? findNode(tree, focusId) : null;
-    if (fn && focusId !== actualRootId) {
+    if (fn && !noteIdEq(focusId, actualRootId)) {
       return [{ ...fn, children: fn.children || [] }];
     }
     return tree;
@@ -381,7 +395,7 @@ export default function StreamPage() {
 
   useEffect(() => {
     if (!focusId || !thread.length || !threadRootId) return;
-    const row = thread.find((n) => n.id === focusId);
+    const row = thread.find((n) => noteIdEq(n.id, focusId));
     if (!row) return;
     const t = row.note_type || 'note';
     if (!visibleNoteTypes.has(t)) {
@@ -389,6 +403,14 @@ export default function StreamPage() {
       setSearchParams({ thread: threadRootId });
     }
   }, [focusId, thread, threadRootId, visibleNoteTypes, setSearchParams]);
+
+  useEffect(() => {
+    if (!threadRootId || !focusId || !tree.length) return;
+    if (findNode(tree, focusId)) return;
+    focusFromUrlApplied.current = '';
+    setFocusId(null);
+    setSearchParams({ thread: threadRootId });
+  }, [threadRootId, focusId, tree, setSearchParams]);
 
   useEffect(() => {
     if (!threadRootId || !thread.length || loadingThread) return;
@@ -476,7 +498,7 @@ export default function StreamPage() {
 
   const animateToFullThread = useCallback(() => {
     if (!threadRootId || levelNavBusyRef.current || floatTimerRef.current) return;
-    if (!focusId || focusId === actualRootId) return;
+    if (!focusId || noteIdEq(focusId, actualRootId)) return;
     levelNavBusyRef.current = true;
     focusFromUrlApplied.current = '';
     setBranchHeadExiting(true);
@@ -491,10 +513,10 @@ export default function StreamPage() {
   }, [threadRootId, focusId, actualRootId, thread, tree, setSearchParams, clearLevelDropSoon]);
 
   const upOneLevel = useCallback(() => {
-    if (!threadRootId || !focusId || focusId === actualRootId) return;
+    if (!threadRootId || !focusId || noteIdEq(focusId, actualRootId)) return;
     if (levelNavBusyRef.current || floatTimerRef.current) return;
     const parentId = parentInFilteredTree(tree, focusId);
-    if (!parentId || parentId === actualRootId) {
+    if (!parentId || noteIdEq(parentId, actualRootId)) {
       animateToFullThread();
       return;
     }
@@ -608,7 +630,7 @@ export default function StreamPage() {
       setFocusId(id);
       if (!threadRootId) return;
       const rid = thread[0]?.id;
-      if (id && id !== rid) {
+      if (id && !noteIdEq(id, rid)) {
         setSearchParams({ thread: threadRootId, focus: id });
       } else {
         setSearchParams({ thread: threadRootId });
@@ -629,7 +651,7 @@ export default function StreamPage() {
         applyFocusImmediate(id);
         return;
       }
-      const displayRoot = focusId && focusId !== actualRootId ? focusId : actualRootId;
+      const displayRoot = focusId && !noteIdEq(focusId, actualRootId) ? focusId : actualRootId;
       const idx = fullPath.indexOf(displayRoot);
       const drillPath = idx >= 0 ? fullPath.slice(idx) : fullPath;
       if (drillPath.length < 2) {
@@ -637,7 +659,7 @@ export default function StreamPage() {
         return;
       }
       const li = e?.currentTarget?.closest?.('li[data-stream-note]');
-      if (!li || li.dataset.streamNote !== id) {
+      if (!li || !noteIdEq(li.getAttribute('data-stream-note'), id)) {
         applyFocusImmediate(id);
         return;
       }
@@ -647,14 +669,17 @@ export default function StreamPage() {
         clearDrillDimming(listEl);
         setFloatOpen(null);
       }
-      const targetLi = applyDrillDimming(listEl, drillPath);
+      let targetLi = applyDrillDimming(listEl, drillPath);
+      if (!targetLi) {
+        targetLi = findStreamLiByNoteId(listEl, id);
+      }
       if (!targetLi) {
         applyFocusImmediate(id);
         return;
       }
       const article = targetLi.querySelector('article');
       const r = (article || targetLi).getBoundingClientRect();
-      const row = thread.find((n) => n.id === id);
+      const row = thread.find((n) => noteIdEq(n.id, id));
       if (!row) {
         clearDrillDimming(listEl);
         applyFocusImmediate(id);
@@ -702,9 +727,9 @@ export default function StreamPage() {
   const onFocusNote = useCallback(
     (id, e) => {
       if (!threadRootId) return;
-      if (id === actualRootId) {
+      if (noteIdEq(id, actualRootId)) {
         focusFromUrlApplied.current = '';
-        if (focusId && focusId !== actualRootId) {
+        if (focusId && !noteIdEq(focusId, actualRootId)) {
           animateToFullThread();
         } else {
           setFocusId(null);
@@ -870,7 +895,7 @@ export default function StreamPage() {
           {threadRootId ? (
             <>
               <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
-                {focusId && focusId !== actualRootId ? (
+                {focusId && !noteIdEq(focusId, actualRootId) ? (
                   <button type="button" className="stream-page-nav-btn" onClick={upOneLevel}>
                     ↑ One level
                   </button>
