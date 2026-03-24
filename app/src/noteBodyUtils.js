@@ -55,23 +55,16 @@ export function getActiveTrigger(text, caretPos) {
   const s = text == null ? '' : String(text);
   const pos = Math.min(Math.max(0, caretPos), s.length);
   const before = s.slice(0, pos);
-
-  // Scan backwards within current token only; whitespace/newline ends token.
-  let i = before.length - 1;
-  while (i >= 0 && !/[\s\n]/.test(before[i])) i -= 1;
-  const tokenStart = i + 1;
-  const token = before.slice(tokenStart);
-  if (token.length < 1) return null;
-
-  const m = token.match(/^([@#])([a-zA-Z0-9._-]*)$/);
+  /*
+   * Match the most recent trigger at the caret edge.
+   * Allows punctuation boundary chars before @/# without requiring whitespace.
+   */
+  const m = before.match(/(?:^|[\s\n([{'"`])([@#])([a-zA-Z0-9._-]*)$/);
   if (!m) return null;
-
-  const sig = m[1];
+  const type = m[1];
   const query = m[2] || '';
-  const prev = tokenStart > 0 ? s[tokenStart - 1] : ' ';
-  if (!(tokenStart === 0 || /[\s\n([{'"`]/.test(prev))) return null;
-
-  return { type: sig, start: tokenStart, query };
+  const start = pos - (type.length + query.length);
+  return { type, start, query };
 }
 
 export function replaceTriggerQuery(text, triggerStart, caretPos, insertion) {
