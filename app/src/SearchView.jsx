@@ -60,6 +60,7 @@ export default function SearchView() {
       viewLinks={[
         { to: '/', label: 'Stream' },
         { to: '/outline', label: 'Outline' },
+        { to: '/calendar', label: 'Calendar' },
         { to: '/tags', label: 'Tags' },
         { to: '/search', label: 'Search' },
       ]}

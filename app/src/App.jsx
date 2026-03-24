@@ -7,6 +7,7 @@ import OutlineView from './OutlineView';
 import TagView from './TagView';
 import SearchView from './SearchView';
 import OrphanFilesView from './OrphanFilesView';
+import CalendarView from './CalendarView';
 import { NoteTypeFilterProvider } from './NoteTypeFilterContext';
 
 function PrivateRoute({ children }) {
@@ -50,6 +51,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <OutlineView />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <PrivateRoute>
+            <CalendarView />
           </PrivateRoute>
         }
       />

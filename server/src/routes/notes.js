@@ -374,6 +374,49 @@ router.get('/search-by-tags', async (req, res) => {
   }
 });
 
+/** Event notes overlapping a half-open time range [from, to) for calendar views. */
+router.get('/events-in-range', async (req, res) => {
+  try {
+    const fromRaw = req.query.from;
+    const toRaw = req.query.to;
+    if (fromRaw == null || String(fromRaw).trim() === '' || toRaw == null || String(toRaw).trim() === '') {
+      return res.status(400).json({ error: 'Query parameters from and to are required (ISO 8601)' });
+    }
+    const rangeStart = parseOptionalInstant(fromRaw);
+    const rangeEndExclusive = parseOptionalInstant(toRaw);
+    if (rangeStart === false || rangeEndExclusive === false) {
+      return res.status(400).json({ error: 'Invalid from or to timestamp' });
+    }
+    const userId = req.userId;
+    const q = `
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+             r.root_id AS thread_root_id,
+             (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+             (SELECT COUNT(*)::int FROM note_connections nc
+              WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
+      FROM notes n
+      INNER JOIN LATERAL (
+        WITH RECURSIVE anc AS (
+          SELECT id, parent_id FROM notes WHERE id = n.id
+          UNION ALL
+          SELECT p.id, p.parent_id FROM notes p INNER JOIN anc ON p.id = anc.parent_id
+        )
+        SELECT id AS root_id FROM anc WHERE parent_id IS NULL LIMIT 1
+      ) r ON true
+      WHERE n.user_id = $1
+        AND n.note_type = 'event'
+        AND n.event_start_at IS NOT NULL
+        AND n.event_start_at < $3
+        AND COALESCE(n.event_end_at, n.event_start_at) >= $2
+      ORDER BY n.event_start_at ASC`;
+    const r = await pool.query(q, [userId, rangeStart, rangeEndExclusive]);
+    res.json(r.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load events in range' });
+  }
+});
+
 // Semantic search: hybrid = substring matches first, then vector similarity (short queries often miss in pure dense search)
 router.get('/search-semantic', async (req, res) => {
   try {

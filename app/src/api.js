@@ -47,6 +47,15 @@ export async function getThread(id, starredOnly = false) {
   return r.json();
 }
 
+/** Event notes overlapping [from, to) (ISO strings). */
+export async function getEventsInRange(fromIso, toIso) {
+  const params = new URLSearchParams({ from: fromIso, to: toIso });
+  const r = await fetch(`${API}/notes/events-in-range?${params}`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load events');
+  return data;
+}
+
 export async function getNote(id) {
   const r = await fetch(`${API}/notes/${id}`, { headers: headers() });
   if (!r.ok) throw new Error('Note not found');
