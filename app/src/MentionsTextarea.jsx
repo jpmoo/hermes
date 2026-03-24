@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
+import { createPortal } from 'react-dom';
 import {
   searchContent,
   getMentionRecentNotes,
@@ -101,6 +102,7 @@ export default function MentionsTextarea({
   onComposeNoteTypeChange = null,
 }) {
   const taRef = useRef(null);
+  const wrapRef = useRef(null);
   const menuRef = useRef(null);
   const [menu, setMenu] = useState(null);
   const [items, setItems] = useState([]);
@@ -185,7 +187,13 @@ export default function MentionsTextarea({
   useEffect(() => {
     if (!menu) return undefined;
     const onDoc = (e) => {
-      if (menuRef.current?.contains(e.target) || taRef.current?.contains(e.target)) return;
+      if (
+        menuRef.current?.contains(e.target) ||
+        taRef.current?.contains(e.target) ||
+        wrapRef.current?.contains(e.target)
+      ) {
+        return;
+      }
       closeMenu();
     };
     document.addEventListener('pointerdown', onDoc, true);
@@ -554,8 +562,70 @@ export default function MentionsTextarea({
     />
   );
 
+  const menuPortal =
+    menu &&
+    createPortal(
+      <div
+        ref={menuRef}
+        id={menuDomId}
+        className="mentions-menu"
+        style={{
+          position: 'fixed',
+          top: menu.top,
+          left: menu.left,
+          zIndex: 10000,
+        }}
+        role="listbox"
+        aria-label={menu.type === '@' ? 'Notes' : 'Tags'}
+      >
+        {menu.type === '@' && menu.query.trim().length < 1 && loading && (
+          <div className="mentions-menu-hint">Loading recent notes…</div>
+        )}
+        {menu.type === '@' && menu.query.trim().length >= 1 && loading && (
+          <div className="mentions-menu-hint">Searching…</div>
+        )}
+        {menu.type === '#' && loading && (
+          <div className="mentions-menu-hint">Loading tags…</div>
+        )}
+        {!loading &&
+          items.map((it, i) => (
+            <button
+              key={it.key}
+              type="button"
+              role="option"
+              aria-selected={i === highlight}
+              className={`mentions-menu-item ${it.createNew ? 'mentions-menu-item--create' : ''} ${it.kind === 'note' ? 'mentions-menu-item--note-ref' : ''} ${i === highlight ? 'mentions-menu-item--active' : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onSelect(it)}
+              onMouseEnter={() => setHighlight(i)}
+            >
+              {menu.type === '@'
+                ? it.label
+                : it.kind === 'note'
+                  ? it.label
+                  : it.createNew
+                    ? it.label
+                    : `#${it.name}`}
+            </button>
+          ))}
+        {!loading && menu.type === '@' && menu.query.trim().length < 1 && items.length === 0 && (
+          <div className="mentions-menu-hint">No recent notes</div>
+        )}
+        {!loading && menu.type === '@' && menu.query.trim().length >= 1 && items.length === 0 && (
+          <div className="mentions-menu-hint">No matching notes</div>
+        )}
+        {!loading && menu.type === '#' && items.length === 0 && (
+          <div className="mentions-menu-hint">
+            No matching tags or notes. For a new tag, use letters, numbers, and hyphens.
+          </div>
+        )}
+      </div>,
+      document.body
+    );
+
   return (
     <div
+      ref={wrapRef}
       className={`mentions-textarea-wrap${showComposeTypeChrome ? ' mentions-textarea-wrap--with-type' : ''}`}
     >
       {showComposeTypeChrome ? (
@@ -575,63 +645,7 @@ export default function MentionsTextarea({
       ) : (
         textareaEl
       )}
-      {menu && (
-        <div
-          ref={menuRef}
-          id={menuDomId}
-          className="mentions-menu"
-          style={{
-            position: 'fixed',
-            top: menu.top,
-            left: menu.left,
-            zIndex: 10000,
-          }}
-          role="listbox"
-          aria-label={menu.type === '@' ? 'Notes' : 'Tags'}
-        >
-          {menu.type === '@' && menu.query.trim().length < 1 && loading && (
-            <div className="mentions-menu-hint">Loading recent notes…</div>
-          )}
-          {menu.type === '@' && menu.query.trim().length >= 1 && loading && (
-            <div className="mentions-menu-hint">Searching…</div>
-          )}
-          {menu.type === '#' && loading && (
-            <div className="mentions-menu-hint">Loading tags…</div>
-          )}
-          {!loading &&
-            items.map((it, i) => (
-              <button
-                key={it.key}
-                type="button"
-                role="option"
-                aria-selected={i === highlight}
-                className={`mentions-menu-item ${it.createNew ? 'mentions-menu-item--create' : ''} ${it.kind === 'note' ? 'mentions-menu-item--note-ref' : ''} ${i === highlight ? 'mentions-menu-item--active' : ''}`}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => onSelect(it)}
-                onMouseEnter={() => setHighlight(i)}
-              >
-                {menu.type === '@'
-                  ? it.label
-                  : it.kind === 'note'
-                    ? it.label
-                    : it.createNew
-                      ? it.label
-                      : `#${it.name}`}
-              </button>
-            ))}
-          {!loading && menu.type === '@' && menu.query.trim().length < 1 && items.length === 0 && (
-            <div className="mentions-menu-hint">No recent notes</div>
-          )}
-          {!loading && menu.type === '@' && menu.query.trim().length >= 1 && items.length === 0 && (
-            <div className="mentions-menu-hint">No matching notes</div>
-          )}
-          {!loading && menu.type === '#' && items.length === 0 && (
-            <div className="mentions-menu-hint">
-              No matching tags or notes. For a new tag, use letters, numbers, and hyphens.
-            </div>
-          )}
-        </div>
-      )}
+      {menuPortal}
     </div>
   );
 }
