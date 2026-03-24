@@ -244,6 +244,21 @@
   padding-right: 0.25rem;
 }
 
+/* Same pattern as edit: type button sibling + plain mentions wrap (better WebKit behavior than nesting). */
+.stream-page-compose-mentions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.stream-page-compose-mentions > .mentions-textarea-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
 .stream-page-compose textarea,
 .stream-page-compose .mentions-textarea-wrap textarea {
   width: 100%;

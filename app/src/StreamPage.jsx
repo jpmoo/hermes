@@ -6,6 +6,7 @@ import Layout from './Layout';
 import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
+import NoteTypeIcon from './NoteTypeIcon';
 import { eventFieldsToPayload, NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { HoverInsightProvider } from './HoverInsightContext';
@@ -288,6 +289,15 @@ export default function StreamPage() {
   const flipPayloadRef = useRef(null);
   const levelNavBusyRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
+
+  const cycleComposeNoteType = useCallback(() => {
+    const i = NOTE_TYPE_OPTIONS.findIndex((o) => o.value === composeNoteType);
+    const idx = i >= 0 ? i : 0;
+    setComposeNoteType(NOTE_TYPE_OPTIONS[(idx + 1) % NOTE_TYPE_OPTIONS.length].value);
+  }, [composeNoteType]);
+
+  const composeTypeLabel =
+    NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
 
   const loadRoots = useCallback(() => {
     setLoadError(null);
@@ -984,24 +994,33 @@ export default function StreamPage() {
           )}
         </div>
 
-        <div className="stream-page-compose-wrap">
+        <div className="stream-page-compose-wrap" data-stream-compose>
           {threadRootId ? (
             <form className="stream-page-compose" onSubmit={handleReply}>
-              <MentionsTextarea
-                placeholder={
-                  replyParentId === threadRootId
-                    ? 'Reply to thread… (@ link note, # tag)'
-                    : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”… (@ #)`
-                }
-                value={replyContent}
-                onChange={setReplyContent}
-                rows={2}
-                disabled={submitting}
-                mentionCreateParentId={replyParentId}
-                composeNoteType={composeNoteType}
-                composeNoteTypeOptions={NOTE_TYPE_OPTIONS}
-                onComposeNoteTypeChange={setComposeNoteType}
-              />
+              <div className="stream-page-compose-mentions">
+                <button
+                  type="button"
+                  className="mentions-compose-type-btn"
+                  disabled={submitting}
+                  onClick={cycleComposeNoteType}
+                  aria-label={`Note type: ${composeTypeLabel}. Click to switch type.`}
+                  title={`${composeTypeLabel} — click for next type`}
+                >
+                  <NoteTypeIcon type={composeNoteType} className="mentions-compose-type-icon" />
+                </button>
+                <MentionsTextarea
+                  placeholder={
+                    replyParentId === threadRootId
+                      ? 'Reply to thread… (@ link note, # tag)'
+                      : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”… (@ #)`
+                  }
+                  value={replyContent}
+                  onChange={setReplyContent}
+                  rows={2}
+                  disabled={submitting}
+                  mentionCreateParentId={replyParentId}
+                />
+              </div>
               <NoteTypeEventFields
                 idPrefix="stream-reply"
                 noteType={composeNoteType}
@@ -1041,16 +1060,25 @@ export default function StreamPage() {
             </form>
           ) : (
             <form className="stream-page-compose" onSubmit={handleNewRoot}>
-              <MentionsTextarea
-                placeholder="New thread… @ link note, # tag"
-                value={newRootContent}
-                onChange={setNewRootContent}
-                rows={2}
-                disabled={submitting}
-                composeNoteType={composeNoteType}
-                composeNoteTypeOptions={NOTE_TYPE_OPTIONS}
-                onComposeNoteTypeChange={setComposeNoteType}
-              />
+              <div className="stream-page-compose-mentions">
+                <button
+                  type="button"
+                  className="mentions-compose-type-btn"
+                  disabled={submitting}
+                  onClick={cycleComposeNoteType}
+                  aria-label={`Note type: ${composeTypeLabel}. Click to switch type.`}
+                  title={`${composeTypeLabel} — click for next type`}
+                >
+                  <NoteTypeIcon type={composeNoteType} className="mentions-compose-type-icon" />
+                </button>
+                <MentionsTextarea
+                  placeholder="New thread… @ link note, # tag"
+                  value={newRootContent}
+                  onChange={setNewRootContent}
+                  rows={2}
+                  disabled={submitting}
+                />
+              </div>
               <NoteTypeEventFields
                 idPrefix="stream-root"
                 noteType={composeNoteType}

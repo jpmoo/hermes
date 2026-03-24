@@ -430,6 +430,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     const onPointerDown = (e) => {
       const t = e.target;
       if (t.closest?.('[data-insight-ui]')) return;
+      /* Bottom reply/new-thread strip (outside .stream-page-list). */
+      if (t.closest?.('[data-stream-compose]')) return;
       /* Don’t clear while editing a card (mentions @/#, compose, search, etc.). */
       if (t.closest?.('.note-card--editing')) return;
       if (t.closest?.('textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select')) {

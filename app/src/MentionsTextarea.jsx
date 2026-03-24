@@ -15,7 +15,6 @@ import {
   formatNoteMentionLink,
   caretForTriggerReplace,
 } from './noteBodyUtils';
-import NoteTypeIcon from './NoteTypeIcon';
 import './MentionsTextarea.css';
 
 /** WebKit on iPad often reports null or stale selectionStart; clamp using known text length. */
@@ -90,9 +89,15 @@ function caretMenuPosition(textarea, caretPos) {
   document.body.removeChild(div);
 
   const menuWidth = 280;
+  const menuMaxH = 230;
   const pad = 10;
-  const left = Math.max(pad, Math.min(leftRaw, window.innerWidth - menuWidth - pad));
-  const top = Math.max(pad, Math.min(topRaw, window.innerHeight - 48));
+  const vv = window.visualViewport;
+  const vLeft = vv ? vv.offsetLeft : 0;
+  const vTop = vv ? vv.offsetTop : 0;
+  const vW = vv ? vv.width : window.innerWidth;
+  const vH = vv ? vv.height : window.innerHeight;
+  const left = Math.max(vLeft + pad, Math.min(leftRaw, vLeft + vW - menuWidth - pad));
+  const top = Math.max(vTop + pad, Math.min(topRaw, vTop + vH - menuMaxH - pad));
   return { top, left };
 }
 
@@ -106,10 +111,6 @@ export default function MentionsTextarea({
   disabled = false,
   autoFocus = false,
   mentionCreateParentId = null,
-  /** Stream compose: show type icon left of box; click cycles types */
-  composeNoteType = null,
-  composeNoteTypeOptions = null,
-  onComposeNoteTypeChange = null,
 }) {
   const taRef = useRef(null);
   const wrapRef = useRef(null);
@@ -129,21 +130,6 @@ export default function MentionsTextarea({
     },
     []
   );
-
-  const showComposeTypeChrome = Boolean(
-    composeNoteType != null && composeNoteTypeOptions?.length && onComposeNoteTypeChange
-  );
-
-  const composeTypeLabel =
-    composeNoteTypeOptions?.find((o) => o.value === composeNoteType)?.label ?? composeNoteType ?? 'Note';
-
-  const cycleComposeNoteType = useCallback(() => {
-    if (!onComposeNoteTypeChange || !composeNoteTypeOptions?.length) return;
-    const i = composeNoteTypeOptions.findIndex((o) => o.value === composeNoteType);
-    const idx = i >= 0 ? i : 0;
-    const next = composeNoteTypeOptions[(idx + 1) % composeNoteTypeOptions.length];
-    onComposeNoteTypeChange(next.value);
-  }, [composeNoteType, composeNoteTypeOptions, onComposeNoteTypeChange]);
 
   const closeMenu = useCallback(() => {
     setMenu(null);
@@ -175,6 +161,20 @@ export default function MentionsTextarea({
       return { ...trig, caret: rawPos, ...coords };
     });
   }, [closeMenu]);
+
+  /* Keep the menu above the on-screen keyboard when the visual viewport shrinks (iOS). */
+  useEffect(() => {
+    if (!menu) return undefined;
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    const bump = () => refreshMenu();
+    vv.addEventListener('resize', bump);
+    vv.addEventListener('scroll', bump);
+    return () => {
+      vv.removeEventListener('resize', bump);
+      vv.removeEventListener('scroll', bump);
+    };
+  }, [menu, refreshMenu]);
 
   const menuQueryKey = menu ? `${menu.type}\0${menu.start}\0${menu.query}` : '';
 
@@ -664,27 +664,8 @@ export default function MentionsTextarea({
     );
 
   return (
-    <div
-      ref={wrapRef}
-      className={`mentions-textarea-wrap${showComposeTypeChrome ? ' mentions-textarea-wrap--with-type' : ''}`}
-    >
-      {showComposeTypeChrome ? (
-        <>
-          <button
-            type="button"
-            className="mentions-compose-type-btn"
-            disabled={disabled}
-            onClick={cycleComposeNoteType}
-            aria-label={`Note type: ${composeTypeLabel}. Click to switch type.`}
-            title={`${composeTypeLabel} — click for next type`}
-          >
-            <NoteTypeIcon type={composeNoteType} className="mentions-compose-type-icon" />
-          </button>
-          <div className="mentions-textarea-field">{textareaEl}</div>
-        </>
-      ) : (
-        textareaEl
-      )}
+    <div ref={wrapRef} className="mentions-textarea-wrap">
+      {textareaEl}
       {menuPortal}
     </div>
   );
