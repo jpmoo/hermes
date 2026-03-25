@@ -223,8 +223,34 @@ export async function buildThreadAiSummary(opts) {
       18
     );
     if (connected.length > 0) {
-      const parts = connected.map((n) => formatNoteBlock(n, 'Connected note'));
-      connectedBlock = `\n--- Connected notes (linked from the thread) ---\n\n${parts.join('\n\n')}`;
+      const connectedEmitted = new Set();
+      const parts = [];
+      for (const c of connected) {
+        const rows = includeChildren ? await loadThreadFlat(c.id, userId) : [c];
+        const byId = new Map(rows.map((r) => [String(r.id), r]));
+        const ch = buildChildrenMap(rows);
+        const subtreeOrder = [];
+        function preorderFrom(rootId) {
+          const n = byId.get(String(rootId));
+          if (!n) return;
+          subtreeOrder.push(n);
+          for (const k of ch.get(rootId) || []) preorderFrom(k.id);
+        }
+        preorderFrom(c.id);
+        for (const n of subtreeOrder) {
+          if (connectedEmitted.has(String(n.id))) continue;
+          connectedEmitted.add(String(n.id));
+          parts.push(
+            formatNoteBlock(
+              n,
+              includeChildren ? 'Connected thread note' : 'Connected note'
+            )
+          );
+        }
+      }
+      if (parts.length > 0) {
+        connectedBlock = `\n--- Connected notes (linked from the thread) ---\n\n${parts.join('\n\n')}`;
+      }
     }
   }
 
@@ -243,7 +269,7 @@ Your response (summary or the honest “not enough context” message):`;
     return {
       ok: false,
       status: 503,
-      error: 'AI summary unavailable (check Ollama and OLLAMA_TAG_MODEL)',
+      error: 'AI summary unavailable (check the local model server and tag model env)',
     };
   }
 

@@ -93,7 +93,7 @@ export default function ThreadSummaryModal({
         <h2 id="thread-summary-modal-title">Thread summary</h2>
         <p className="thread-summary-modal-lead">
           Summarize what is on screen (current thread view), including the parent of the branch when you are
-          zoomed into a reply. Uses Ollama (<code>OLLAMA_TAG_MODEL</code>). Maximum about 250 words.
+          zoomed into a reply. Maximum about 250 words.
         </p>
         <div className="thread-summary-modal-options">
           <label className="thread-summary-modal-check">
@@ -102,7 +102,10 @@ export default function ThreadSummaryModal({
               checked={includeChildren}
               onChange={(e) => setIncludeChildren(e.target.checked)}
             />
-            <span>Include child notes (full depth under this view, including types hidden by filters)</span>
+            <span>
+              Include child notes (full depth under this view, including types hidden by filters). If connected
+              notes are included too, replies under those linked notes are included as well.
+            </span>
           </label>
           <label className="thread-summary-modal-check">
             <input
@@ -110,7 +113,7 @@ export default function ThreadSummaryModal({
               checked={includeConnected}
               onChange={(e) => setIncludeConnected(e.target.checked)}
             />
-            <span>Include connected notes (linked notes for context)</span>
+            <span>Include connected notes (linked peers for extra context)</span>
           </label>
         </div>
         <div className="thread-summary-modal-actions">
