@@ -27,6 +27,7 @@ import { stripHashtagPrefixFromContent } from './noteBodyUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { useHoverInsight } from './HoverInsightContext';
 import NoteTypeIcon from './NoteTypeIcon';
+import { NavIconAttach } from './icons/NavIcons';
 import './NoteCard.css';
 
 export default function NoteCard({
@@ -49,6 +50,7 @@ export default function NoteCard({
   /** Second click of a double-click runs drill in `click` (detail===2); skip duplicate work in `dblclick`. */
   const skipNextStreamDblClickDrillRef = useRef(false);
   const tagDropdownRef = useRef(null);
+  const editFileInputRef = useRef(null);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(note.content || '');
   const [editNoteType, setEditNoteType] = useState('note');
@@ -525,17 +527,25 @@ export default function NoteCard({
               ) : (
                 <p className="note-card-edit-no-files">No files yet.</p>
               )}
-              <label className="note-card-edit-add-files">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
-                  onChange={handleEditAddFiles}
-                />
-                Add files
-              </label>
             </div>
             <div className="note-card-edit-actions">
+              <button
+                type="button"
+                className="note-card-edit-attach-btn"
+                onClick={() => editFileInputRef.current?.click()}
+                aria-label="Attach files"
+                title="Attach files"
+              >
+                <NavIconAttach className="note-card-edit-attach-icon" />
+              </button>
+              <input
+                ref={editFileInputRef}
+                className="note-card-edit-file-input-hidden"
+                type="file"
+                multiple
+                accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
+                onChange={handleEditAddFiles}
+              />
               <button type="submit">Save</button>
               <button type="button" onClick={handleCancelEdit}>Cancel</button>
             </div>

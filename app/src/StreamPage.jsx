@@ -23,7 +23,7 @@ import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
-import { NavIconHistory, NavIconRootLevel, NavIconUpOneLevel } from './icons/NavIcons';
+import { NavIconAttach, NavIconHistory, NavIconRootLevel, NavIconUpOneLevel } from './icons/NavIcons';
 import './StreamPage.css';
 
 function buildTree(flat) {
@@ -1178,7 +1178,16 @@ export default function StreamPage() {
                 disabled={submitting}
               />
               <div className="stream-page-compose-row">
-                <label className="stream-page-file-label">
+                <button
+                  type="button"
+                  className="stream-page-attach-btn"
+                  onClick={() => replyFileRef.current?.click()}
+                  aria-label="Attach files"
+                  title="Attach files"
+                >
+                  <NavIconAttach className="stream-page-attach-icon" />
+                </button>
+                <label className="stream-page-file-label stream-page-file-label--hidden">
                   <input
                     ref={replyFileRef}
                     type="file"
@@ -1186,7 +1195,6 @@ export default function StreamPage() {
                     accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
                     onChange={(e) => setPendingReplyFiles(Array.from(e.target.files || []))}
                   />
-                  Attach files
                 </label>
                 {pendingReplyFiles.length > 0 && (
                   <span className="stream-page-file-hint">{pendingReplyFiles.length} file(s)</span>
@@ -1236,7 +1244,16 @@ export default function StreamPage() {
                 disabled={submitting}
               />
               <div className="stream-page-compose-row">
-                <label className="stream-page-file-label">
+                <button
+                  type="button"
+                  className="stream-page-attach-btn"
+                  onClick={() => rootFileRef.current?.click()}
+                  aria-label="Attach files"
+                  title="Attach files"
+                >
+                  <NavIconAttach className="stream-page-attach-icon" />
+                </button>
+                <label className="stream-page-file-label stream-page-file-label--hidden">
                   <input
                     ref={rootFileRef}
                     type="file"
@@ -1244,7 +1261,6 @@ export default function StreamPage() {
                     accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
                     onChange={(e) => setPendingRootFiles(Array.from(e.target.files || []))}
                   />
-                  Attach files
                 </label>
                 {pendingRootFiles.length > 0 && (
                   <span className="stream-page-file-hint">{pendingRootFiles.length} file(s)</span>

@@ -373,6 +373,10 @@
   cursor: pointer;
 }
 
+.stream-page-file-label--hidden {
+  display: none;
+}
+
 .stream-page-file-label input {
   display: none;
 }
@@ -380,6 +384,29 @@
 .stream-page-file-hint {
   font-size: 0.75rem;
   color: var(--accent);
+}
+
+.stream-page-attach-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stream-page-attach-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
+.stream-page-attach-icon {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .stream-page-compose-row button[type='submit'] {
