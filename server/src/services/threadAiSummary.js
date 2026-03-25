@@ -47,6 +47,27 @@ function formatInstantInZone(iso, timeZone, withTime) {
   }
 }
 
+/** Current instant as local line in `timeZone` plus ISO UTC so the model can judge past vs future events. */
+function formatReferenceNow(timeZone) {
+  const now = new Date();
+  const isoUtc = now.toISOString();
+  try {
+    const localLine = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    }).format(now);
+    return { localLine, isoUtc };
+  } catch {
+    return { localLine: isoUtc, isoUtc };
+  }
+}
+
 function formatEventRange(note, timeZone) {
   if (note.note_type !== 'event') return '';
   const s = note.event_start_at;
@@ -200,6 +221,7 @@ export async function buildThreadAiSummary(opts) {
     timeZone: timeZoneRaw,
   } = opts;
   const timeZone = sanitizeTimeZone(timeZoneRaw);
+  const { localLine: referenceNowLocal, isoUtc: referenceNowUtc } = formatReferenceNow(timeZone);
 
   if (!isUuid(threadRootId)) {
     return { ok: false, status: 400, error: 'Invalid threadRootId' };
@@ -350,13 +372,20 @@ export async function buildThreadAiSummary(opts) {
     linkedBlock ? `\n${linkedBlock}` : ''
   }`;
 
-  const prompt = `You summarize notes from a personal knowledge app for the user. Write a clear, cohesive summary in plain prose. Stay at or under 250 words (shorter is fine). Do not add a title line unless it helps; focus on substance.
+  const prompt = `You summarize notes from a personal knowledge app for the user.
+
+REFERENCE TIME — compare every dated event, meeting, and deadline in the notes to this instant (the user's zone is ${timeZone}):
+- Now (local): ${referenceNowLocal}
+- Now (UTC, ISO 8601): ${referenceNowUtc}
+Use the "Event schedule (user's timezone …)" lines in the notes as the canonical local start/end when present. If an event's end is before this reference moment, describe it as past or completed, not as upcoming. If its start is after this moment, describe it as upcoming, future, or scheduled—not as if it already happened. If it spans this moment, you may describe it as in progress, today, or similar. When note bodies disagree with the schedule line, trust the schedule line for timing. Do not convert ISO UTC lines into a different local time yourself.
+
+FORM — write one cohesive narrative in flowing paragraph form (at most two short paragraphs). Do not use bullet points, numbered lists, bold section headings with sub-points, "key takeaways," or an outline structure. Weave the substance together in full sentences as in a brief article or email, not like meeting minutes or slides.
+
+Stay at or under 250 words (shorter is fine). Skip a title unless one short phrase genuinely helps; focus on substance.
 
 Context order: first the focused subtree (under the focused note in this thread), then—if present—a block of other same-thread notes that are linked or reached via the user's reply/connected options (see section headers).
 
-For meetings and events: treat the line "Event schedule (user's timezone …)" as the correct local start/end for the user. Prefer that over any time that might appear inside note bodies, and do not convert the ISO UTC lines into a different local time yourself.
-
-If the notes are empty, too sparse, or too fragmented to justify a real narrative (e.g. only placeholders or no meaningful content to weave together), do not invent a summary. Instead reply with one or two short sentences explaining that there is not enough context to summarize meaningfully—no bullet list, no filler narrative.
+If the notes are empty, too sparse, or too fragmented to justify a real summary, do not invent one. Reply with one or two short sentences only, still in plain prose (no bullets).
 
 ${context}
 
