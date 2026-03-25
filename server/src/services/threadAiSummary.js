@@ -137,6 +137,26 @@ function preorderInPrimary(rootId, mainSet, childrenByParent, ordered) {
   }
 }
 
+/**
+ * Add strict in-thread descendants of every id already in `included` (one pass over the snapshot).
+ * Returns whether anything was added. Stops when `included.size` reaches `maxTotal`.
+ */
+function expandDescendantsInPlace(included, childrenByParent, threadIdSet, maxTotal) {
+  let added = false;
+  const snap = [...included];
+  for (const id of snap) {
+    if (included.size >= maxTotal) break;
+    for (const d of collectDescendantIds(id, childrenByParent)) {
+      const ds = String(d);
+      if (ds === String(id) || !threadIdSet.has(ds) || included.has(ds)) continue;
+      if (included.size >= maxTotal) break;
+      included.add(ds);
+      added = true;
+    }
+  }
+  return added;
+}
+
 /** Peers linked to any seed that also lie in this thread (same thread tree). */
 async function findConnectedPeerIdsInThread(userId, seedIds, threadIdArray, excludeIds) {
   if (seedIds.length === 0 || threadIdArray.length === 0) return [];
@@ -163,8 +183,8 @@ async function findConnectedPeerIdsInThread(userId, seedIds, threadIdArray, excl
  *   threadRootId: string,
  *   focusNoteId: string | null | undefined,
  *   visibleNoteIds: string[],
- *   includeChildren: boolean,
- *   includeConnected: boolean,
+ *   includeChildren: boolean, // "Replies": in-thread descendant replies (recursive) beyond what's on screen
+ *   includeConnected: boolean, // "Connected": notes linked to the current set (same thread)
  *   userId: string,
  *   timeZone?: string
  * }} opts
@@ -222,17 +242,69 @@ export async function buildThreadAiSummary(opts) {
 
   const childrenByParent = buildChildrenMap(flat);
 
-  /** Focused note at top of view + replies: visible only, or full recursive subtree in this thread when children is on. */
-  let mainSet = new Set(visibleNoteIds.map(String));
-  if (includeChildren) {
-    mainSet = new Set();
-    for (const id of collectDescendantIds(displayRoot, childrenByParent)) {
-      if (threadIdSet.has(String(id))) mainSet.add(String(id));
+  const screenSet = new Set(visibleNoteIds.map(String));
+  const threadIdArray = [...threadIdSet];
+  const MAX_INCLUDED_NOTES = 220;
+  const MAX_CLOSURE_ROUNDS = 40;
+
+  const included = new Set(screenSet);
+
+  const addConnectedPeersIntoIncluded = async () => {
+    if (threadIdArray.length === 0) return false;
+    const peers = await findConnectedPeerIdsInThread(
+      userId,
+      [...included],
+      threadIdArray,
+      [...included]
+    );
+    let added = false;
+    for (const pid of peers) {
+      const s = String(pid);
+      if (!threadIdSet.has(s) || included.has(s)) continue;
+      if (included.size >= MAX_INCLUDED_NOTES) break;
+      included.add(s);
+      added = true;
     }
+    return added;
+  };
+
+  /*
+   * Default: on-screen notes only (focused branch as rendered).
+   * Replies: add all in-thread replies under those notes, recursively, until stable.
+   * Connected: add in-thread notes linked to the current set (one hop from on-screen when that is the only extra option).
+   * Both: repeatedly add descendants, then linked notes, until stable (walk the tree).
+   */
+  if (includeConnected && includeChildren) {
+    for (let round = 0; round < MAX_CLOSURE_ROUNDS && included.size < MAX_INCLUDED_NOTES; round += 1) {
+      let grew = false;
+      while (
+        included.size < MAX_INCLUDED_NOTES &&
+        expandDescendantsInPlace(included, childrenByParent, threadIdSet, MAX_INCLUDED_NOTES)
+      ) {
+        grew = true;
+      }
+      if (included.size < MAX_INCLUDED_NOTES && (await addConnectedPeersIntoIncluded())) grew = true;
+      if (!grew) break;
+    }
+  } else if (includeChildren) {
+    while (
+      included.size < MAX_INCLUDED_NOTES &&
+      expandDescendantsInPlace(included, childrenByParent, threadIdSet, MAX_INCLUDED_NOTES)
+    ) {
+      /* grow until no new in-thread replies */
+    }
+  } else if (includeConnected) {
+    await addConnectedPeersIntoIncluded();
+  }
+
+  const subtreeUnderFocus = collectDescendantIds(displayRoot, childrenByParent);
+  const mainRegion = new Set();
+  for (const id of included) {
+    if (subtreeUnderFocus.has(id)) mainRegion.add(id);
   }
 
   const ordered = [];
-  preorderInPrimary(displayRoot, mainSet, childrenByParent, ordered);
+  preorderInPrimary(displayRoot, mainRegion, childrenByParent, ordered);
 
   const mainBlocks = [];
   for (const id of ordered) {
@@ -240,76 +312,47 @@ export async function buildThreadAiSummary(opts) {
     if (n) mainBlocks.push(formatNoteBlock(n, 'Note in view', timeZone));
   }
 
-  const MAX_LINKED_NOTES = 150;
-  const MAX_LINK_ROUNDS = 40;
-  const threadIdArray = [...threadIdSet];
-
-  const linkedSet = new Set();
-  if (includeConnected && mainSet.size > 0) {
-    const addPeersFromBundle = async () => {
-      const bundle = [...mainSet, ...linkedSet];
-      if (bundle.length === 0) return false;
-      const peers = await findConnectedPeerIdsInThread(userId, bundle, threadIdArray, bundle);
-      let added = false;
-      for (const pid of peers) {
-        const s = String(pid);
-        if (!threadIdSet.has(s) || mainSet.has(s) || linkedSet.has(s)) continue;
-        if (linkedSet.size >= MAX_LINKED_NOTES) break;
-        linkedSet.add(s);
-        added = true;
-      }
-      return added;
-    };
-
-    const addDescendantsOfLinked = () => {
-      let added = false;
-      const snap = [...linkedSet];
-      for (const lid of snap) {
-        for (const d of collectDescendantIds(lid, childrenByParent)) {
-          const ds = String(d);
-          if (!threadIdSet.has(ds) || mainSet.has(ds) || linkedSet.has(ds)) continue;
-          if (linkedSet.size >= MAX_LINKED_NOTES) break;
-          linkedSet.add(ds);
-          added = true;
-        }
-      }
-      return added;
-    };
-
-    if (includeChildren) {
-      for (let round = 0; round < MAX_LINK_ROUNDS && linkedSet.size < MAX_LINKED_NOTES; round += 1) {
-        const addedPeers = await addPeersFromBundle();
-        const addedDesc = addDescendantsOfLinked();
-        if (!addedPeers && !addedDesc) break;
-      }
-    } else {
-      await addPeersFromBundle();
-    }
-  }
+  const linkedIds = [...included].filter((id) => !mainRegion.has(id));
+  linkedIds.sort((a, b) => {
+    const na = byId.get(a);
+    const nb = byId.get(b);
+    return new Date(na?.created_at || 0) - new Date(nb?.created_at || 0);
+  });
 
   let linkedBlock = '';
-  if (linkedSet.size > 0) {
-    const linkedRows = [...linkedSet]
+  if (linkedIds.length > 0) {
+    const parts = linkedIds
       .map((id) => byId.get(id))
       .filter(Boolean)
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const parts = linkedRows.map((n) =>
-      formatNoteBlock(n, 'Linked note (same thread)', timeZone)
-    );
-    linkedBlock = `--- Linked notes (same thread only; ${
-      includeChildren
-        ? 'expanded in rounds: new links, then replies under linked notes, repeat until stable'
-        : 'direct links from the focused branch only'
-    }) ---\n\n${parts.join('\n\n')}\n\n`;
+      .map((n) => formatNoteBlock(n, 'Linked note (same thread)', timeZone));
+    const linkedExplain =
+      includeConnected && includeChildren
+        ? 'notes in this thread outside the focused subtree below, reached by walking from what was on screen: repeatedly adding in-thread replies, then notes linked to the current set, until stable'
+        : includeConnected
+          ? 'in-thread notes linked to something on screen (one step), excluding the focused subtree block above'
+          : '';
+    const linkedHeader = linkedExplain
+      ? `--- Linked notes (same thread only; ${linkedExplain}) ---`
+      : '--- Linked notes (same thread only) ---';
+    linkedBlock = `${linkedHeader}\n\n${parts.join('\n\n')}\n\n`;
   }
 
-  const context = `--- Notes in summary (focused note at top and its replies in this thread) ---\n\n${mainBlocks.join(
-    '\n\n'
-  )}${linkedBlock ? `\n${linkedBlock}` : ''}`;
+  const mainHeader =
+    !includeChildren && !includeConnected
+      ? 'Notes on screen (focused note and visible replies in this thread)'
+      : includeChildren && !includeConnected
+        ? 'Focused branch in this thread (on screen, then all in-thread replies under those notes)'
+        : !includeChildren && includeConnected
+          ? 'Focused branch on screen; linked section adds notes connected to that screen set'
+          : 'Focused branch after expanding in-thread replies; linked section adds further same-thread notes from the connected walk';
+
+  const context = `--- ${mainHeader} ---\n\n${mainBlocks.join('\n\n')}${
+    linkedBlock ? `\n${linkedBlock}` : ''
+  }`;
 
   const prompt = `You summarize notes from a personal knowledge app for the user. Write a clear, cohesive summary in plain prose. Stay at or under 250 words (shorter is fine). Do not add a title line unless it helps; focus on substance.
 
-Context order: first the focused branch (notes in view, or full in-thread subtree if child notes was selected), then any linked notes that also live in the same thread (if that option was on).
+Context order: first the focused subtree (under the focused note in this thread), then—if present—a block of other same-thread notes that are linked or reached via the user's reply/connected options (see section headers).
 
 For meetings and events: treat the line "Event schedule (user's timezone …)" as the correct local start/end for the user. Prefer that over any time that might appear inside note bodies, and do not convert the ISO UTC lines into a different local time yourself.
 

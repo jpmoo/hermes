@@ -573,7 +573,7 @@ router.post('/hover-insight', async (req, res) => {
   }
 });
 
-/** Ollama summary of visible thread + optional parent / children / connections. */
+/** Ollama summary: on-screen branch by default; optional full replies subtree and/or linked-note expansion. */
 router.post('/thread-ai-summary', async (req, res) => {
   try {
     const b = req.body ?? {};
