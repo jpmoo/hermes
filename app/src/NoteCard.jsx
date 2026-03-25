@@ -573,7 +573,7 @@ export default function NoteCard({
             {new Date(note.updated_at).toLocaleDateString(undefined, {
               month: 'short',
               day: 'numeric',
-              hour: '2-digit',
+              hour: 'numeric',
               minute: '2-digit',
             })}
           </time>
