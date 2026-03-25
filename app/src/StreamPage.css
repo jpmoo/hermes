@@ -409,8 +409,14 @@
   height: 1.05rem;
 }
 
-.stream-page-compose-row button[type='submit'] {
+.stream-page-send-group {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.stream-page-compose-row button[type='submit'] {
   padding: 0.5rem 1rem;
   background: var(--accent);
   color: var(--bg);

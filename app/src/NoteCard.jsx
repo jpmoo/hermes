@@ -521,12 +521,9 @@ export default function NoteCard({
               onEndTimeChange={setEditEndTime}
             />
             <div className="note-card-edit-attachments">
-              <p className="note-card-edit-attachments-label">Attachments</p>
               {note.attachments?.length > 0 ? (
                 <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
-              ) : (
-                <p className="note-card-edit-no-files">No files yet.</p>
-              )}
+              ) : null}
             </div>
             <div className="note-card-edit-actions">
               <button

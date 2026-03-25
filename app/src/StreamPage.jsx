@@ -1178,15 +1178,6 @@ export default function StreamPage() {
                 disabled={submitting}
               />
               <div className="stream-page-compose-row">
-                <button
-                  type="button"
-                  className="stream-page-attach-btn"
-                  onClick={() => replyFileRef.current?.click()}
-                  aria-label="Attach files"
-                  title="Attach files"
-                >
-                  <NavIconAttach className="stream-page-attach-icon" />
-                </button>
                 <label className="stream-page-file-label stream-page-file-label--hidden">
                   <input
                     ref={replyFileRef}
@@ -1199,12 +1190,23 @@ export default function StreamPage() {
                 {pendingReplyFiles.length > 0 && (
                   <span className="stream-page-file-hint">{pendingReplyFiles.length} file(s)</span>
                 )}
-                <button
-                  type="submit"
-                  disabled={(!replyContent.trim() && pendingReplyFiles.length === 0) || submitting}
-                >
-                  Send
-                </button>
+                <div className="stream-page-send-group">
+                  <button
+                    type="button"
+                    className="stream-page-attach-btn"
+                    onClick={() => replyFileRef.current?.click()}
+                    aria-label="Attach files"
+                    title="Attach files"
+                  >
+                    <NavIconAttach className="stream-page-attach-icon" />
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={(!replyContent.trim() && pendingReplyFiles.length === 0) || submitting}
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
             </form>
           ) : (
@@ -1244,15 +1246,6 @@ export default function StreamPage() {
                 disabled={submitting}
               />
               <div className="stream-page-compose-row">
-                <button
-                  type="button"
-                  className="stream-page-attach-btn"
-                  onClick={() => rootFileRef.current?.click()}
-                  aria-label="Attach files"
-                  title="Attach files"
-                >
-                  <NavIconAttach className="stream-page-attach-icon" />
-                </button>
                 <label className="stream-page-file-label stream-page-file-label--hidden">
                   <input
                     ref={rootFileRef}
@@ -1265,12 +1258,23 @@ export default function StreamPage() {
                 {pendingRootFiles.length > 0 && (
                   <span className="stream-page-file-hint">{pendingRootFiles.length} file(s)</span>
                 )}
-                <button
-                  type="submit"
-                  disabled={(!newRootContent.trim() && pendingRootFiles.length === 0) || submitting}
-                >
-                  Send
-                </button>
+                <div className="stream-page-send-group">
+                  <button
+                    type="button"
+                    className="stream-page-attach-btn"
+                    onClick={() => rootFileRef.current?.click()}
+                    aria-label="Attach files"
+                    title="Attach files"
+                  >
+                    <NavIconAttach className="stream-page-attach-icon" />
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={(!newRootContent.trim() && pendingRootFiles.length === 0) || submitting}
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
             </form>
           )}
