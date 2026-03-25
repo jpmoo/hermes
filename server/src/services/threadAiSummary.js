@@ -379,6 +379,8 @@ REFERENCE TIME — compare every dated event, meeting, and deadline in the notes
 - Now (UTC, ISO 8601): ${referenceNowUtc}
 Use the "Event schedule (user's timezone …)" lines in the notes as the canonical local start/end when present. If an event's end is before this reference moment, describe it as past or completed, not as upcoming. If its start is after this moment, describe it as upcoming, future, or scheduled—not as if it already happened. If it spans this moment, you may describe it as in progress, today, or similar. When note bodies disagree with the schedule line, trust the schedule line for timing. Do not convert ISO UTC lines into a different local time yourself.
 
+TENSE — when the relevant date or event window for something is entirely before this reference moment (including from event schedules, deadlines, or created_at when that is the only temporal cue), write about it in the past tense (e.g. "discussed," "was scheduled," "took place"). For things entirely after this moment, use future-appropriate wording. Match tense to the time of the thing you are describing, not only to whether the note still exists.
+
 FORM — write one cohesive narrative in flowing paragraph form (at most two short paragraphs). Do not use bullet points, numbered lists, bold section headings with sub-points, "key takeaways," or an outline structure. Weave the substance together in full sentences as in a brief article or email, not like meeting minutes or slides.
 
 Stay at or under 250 words (shorter is fine). Skip a title unless one short phrase genuinely helps; focus on substance.
