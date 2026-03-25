@@ -105,7 +105,7 @@ async function loadThreadFlat(threadRootId, userId) {
 function buildChildrenMap(rows) {
   const byParent = new Map();
   for (const n of rows) {
-    const pid = n.parent_id;
+    const pid = n.parent_id == null ? null : String(n.parent_id);
     if (!byParent.has(pid)) byParent.set(pid, []);
     byParent.get(pid).push(n);
   }
@@ -117,49 +117,45 @@ function buildChildrenMap(rows) {
 
 function collectDescendantIds(rootId, childrenByParent) {
   const out = new Set();
-  const stack = [rootId];
+  const stack = [String(rootId)];
   while (stack.length) {
     const id = stack.pop();
     if (out.has(id)) continue;
     out.add(id);
     const kids = childrenByParent.get(id) || [];
-    for (const k of kids) stack.push(k.id);
+    for (const k of kids) stack.push(String(k.id));
   }
   return out;
 }
 
-function preorderInPrimary(rootId, primarySet, childrenByParent, ordered) {
-  if (!primarySet.has(rootId)) return;
-  ordered.push(rootId);
-  for (const k of childrenByParent.get(rootId) || []) {
-    preorderInPrimary(k.id, primarySet, childrenByParent, ordered);
+function preorderInPrimary(rootId, mainSet, childrenByParent, ordered) {
+  const rootKey = String(rootId);
+  if (!mainSet.has(rootKey)) return;
+  ordered.push(rootKey);
+  for (const k of childrenByParent.get(rootKey) || []) {
+    preorderInPrimary(k.id, mainSet, childrenByParent, ordered);
   }
 }
 
-async function loadConnectedNotes(userId, seedIds, excludeIds, maxExtra) {
-  if (seedIds.length === 0 || maxExtra <= 0) return [];
-  const ex = [...excludeIds];
+/** Peers linked to any seed that also lie in this thread (same thread tree). */
+async function findConnectedPeerIdsInThread(userId, seedIds, threadIdArray, excludeIds) {
+  if (seedIds.length === 0 || threadIdArray.length === 0) return [];
+  const ex = excludeIds.map((id) => String(id));
   const r = await pool.query(
-    `SELECT DISTINCT nb.id
-     FROM note_connections nc
-     INNER JOIN notes nb ON nb.user_id = $1
-       AND (cardinality($2::uuid[]) = 0 OR nb.id <> ALL($2::uuid[]))
-       AND (
-         (nc.anchor_note_id = ANY($3::uuid[]) AND nb.id = nc.linked_note_id)
-         OR (nc.linked_note_id = ANY($3::uuid[]) AND nb.id = nc.anchor_note_id)
-       )
-     WHERE nc.user_id = $1
-     LIMIT $4`,
-    [userId, ex, seedIds, maxExtra * 3]
+    `SELECT DISTINCT other AS id FROM (
+       SELECT nc.linked_note_id AS other
+       FROM note_connections nc
+       WHERE nc.user_id = $1 AND nc.anchor_note_id = ANY($2::uuid[])
+       UNION
+       SELECT nc.anchor_note_id AS other
+       FROM note_connections nc
+       WHERE nc.user_id = $1 AND nc.linked_note_id = ANY($2::uuid[])
+     ) x
+     WHERE other = ANY($3::uuid[])
+       AND (cardinality($4::uuid[]) = 0 OR NOT (other = ANY($4::uuid[])))`,
+    [userId, seedIds, threadIdArray, ex]
   );
-  const peerIds = r.rows.map((row) => row.id).slice(0, maxExtra);
-  if (peerIds.length === 0) return [];
-  const nr = await pool.query(
-    `SELECT id, parent_id, content, note_type, event_start_at, event_end_at
-     FROM notes WHERE user_id = $1 AND id = ANY($2::uuid[])`,
-    [userId, peerIds]
-  );
-  return nr.rows;
+  return r.rows.map((row) => row.id);
 }
 
 /**
@@ -225,27 +221,18 @@ export async function buildThreadAiSummary(opts) {
   }
 
   const childrenByParent = buildChildrenMap(flat);
-  let primarySet = new Set(visibleNoteIds.map(String));
 
+  /** Focused note at top of view + replies: visible only, or full recursive subtree in this thread when children is on. */
+  let mainSet = new Set(visibleNoteIds.map(String));
   if (includeChildren) {
-    const desc = collectDescendantIds(displayRoot, childrenByParent);
-    for (const id of desc) {
-      if (threadIdSet.has(String(id))) primarySet.add(String(id));
+    mainSet = new Set();
+    for (const id of collectDescendantIds(displayRoot, childrenByParent)) {
+      if (threadIdSet.has(String(id))) mainSet.add(String(id));
     }
   }
 
   const ordered = [];
-  preorderInPrimary(displayRoot, primarySet, childrenByParent, ordered);
-
-  const displayRootRow = byId.get(String(displayRoot));
-  const parentId = displayRootRow?.parent_id;
-  let parentBlock = '';
-  if (parentId && threadIdSet.has(String(parentId))) {
-    const p = byId.get(String(parentId));
-    if (p) {
-      parentBlock = `${formatNoteBlock(p, 'Parent note (above the view)', timeZone)}\n\n`;
-    }
-  }
+  preorderInPrimary(displayRoot, mainSet, childrenByParent, ordered);
 
   const mainBlocks = [];
   for (const id of ordered) {
@@ -253,68 +240,76 @@ export async function buildThreadAiSummary(opts) {
     if (n) mainBlocks.push(formatNoteBlock(n, 'Note in view', timeZone));
   }
 
-  /**
-   * Linked-note seeds for this summary only. Every note in `primarySet` (visible + expanded children when
-   * that option is on), plus thread root, view root, and parent when drilled—so connections from any
-   * included child are discovered when child notes is selected.
-   */
-  const connectionSeedSet = new Set(primarySet);
-  connectionSeedSet.add(String(displayRoot));
-  connectionSeedSet.add(String(threadRootId));
-  if (parentId && threadIdSet.has(String(parentId))) {
-    connectionSeedSet.add(String(parentId));
-  }
-  const connectionSeedIds = [...connectionSeedSet];
+  const MAX_LINKED_NOTES = 150;
+  const MAX_LINK_ROUNDS = 40;
+  const threadIdArray = [...threadIdSet];
 
-  let connectedBlock = '';
-  if (includeConnected && connectionSeedIds.length > 0) {
-    const connected = await loadConnectedNotes(
-      userId,
-      connectionSeedIds,
-      [...primarySet],
-      18
-    );
-    if (connected.length > 0) {
-      const connectedEmitted = new Set();
-      const parts = [];
-      for (const c of connected) {
-        const rows = includeChildren ? await loadThreadFlat(c.id, userId) : [c];
-        const connById = new Map(rows.map((r) => [String(r.id), r]));
-        const ch = buildChildrenMap(rows);
-        const subtreeOrder = [];
-        function preorderFrom(rootId) {
-          const node = connById.get(String(rootId));
-          if (!node) return;
-          subtreeOrder.push(node);
-          for (const k of ch.get(rootId) || []) preorderFrom(k.id);
-        }
-        preorderFrom(c.id);
-        for (const n of subtreeOrder) {
-          if (connectedEmitted.has(String(n.id))) continue;
-          connectedEmitted.add(String(n.id));
-          parts.push(
-            formatNoteBlock(
-              n,
-              includeChildren ? 'Connected thread note' : 'Connected note',
-              timeZone
-            )
-          );
+  const linkedSet = new Set();
+  if (includeConnected && mainSet.size > 0) {
+    const addPeersFromBundle = async () => {
+      const bundle = [...mainSet, ...linkedSet];
+      if (bundle.length === 0) return false;
+      const peers = await findConnectedPeerIdsInThread(userId, bundle, threadIdArray, bundle);
+      let added = false;
+      for (const pid of peers) {
+        const s = String(pid);
+        if (!threadIdSet.has(s) || mainSet.has(s) || linkedSet.has(s)) continue;
+        if (linkedSet.size >= MAX_LINKED_NOTES) break;
+        linkedSet.add(s);
+        added = true;
+      }
+      return added;
+    };
+
+    const addDescendantsOfLinked = () => {
+      let added = false;
+      const snap = [...linkedSet];
+      for (const lid of snap) {
+        for (const d of collectDescendantIds(lid, childrenByParent)) {
+          const ds = String(d);
+          if (!threadIdSet.has(ds) || mainSet.has(ds) || linkedSet.has(ds)) continue;
+          if (linkedSet.size >= MAX_LINKED_NOTES) break;
+          linkedSet.add(ds);
+          added = true;
         }
       }
-      if (parts.length > 0) {
-        connectedBlock = `--- Connected notes (linked from summary scope: expanded children when that option is on, plus thread root, view root, and parent if any${
-          includeChildren ? '; each hit includes its reply subtree' : ''
-        }) ---\n\n${parts.join('\n\n')}\n\n`;
+      return added;
+    };
+
+    if (includeChildren) {
+      for (let round = 0; round < MAX_LINK_ROUNDS && linkedSet.size < MAX_LINKED_NOTES; round += 1) {
+        const addedPeers = await addPeersFromBundle();
+        const addedDesc = addDescendantsOfLinked();
+        if (!addedPeers && !addedDesc) break;
       }
+    } else {
+      await addPeersFromBundle();
     }
   }
 
-  const relatedContext = `${parentBlock}${connectedBlock}`;
-  const context = `${relatedContext}--- Notes on screen (thread context) ---\n\n${mainBlocks.join('\n\n')}`;
+  let linkedBlock = '';
+  if (linkedSet.size > 0) {
+    const linkedRows = [...linkedSet]
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const parts = linkedRows.map((n) =>
+      formatNoteBlock(n, 'Linked note (same thread)', timeZone)
+    );
+    linkedBlock = `--- Linked notes (same thread only; ${
+      includeChildren
+        ? 'expanded in rounds: new links, then replies under linked notes, repeat until stable'
+        : 'direct links from the focused branch only'
+    }) ---\n\n${parts.join('\n\n')}\n\n`;
+  }
+
+  const context = `--- Notes in summary (focused note at top and its replies in this thread) ---\n\n${mainBlocks.join(
+    '\n\n'
+  )}${linkedBlock ? `\n${linkedBlock}` : ''}`;
 
   const prompt = `You summarize notes from a personal knowledge app for the user. Write a clear, cohesive summary in plain prose. Stay at or under 250 words (shorter is fine). Do not add a title line unless it helps; focus on substance.
 
-Context order: first any parent note and connected/linked notes (if present), then the notes currently on screen. Use that ordering when relating background to the visible thread.
+Context order: first the focused branch (notes in view, or full in-thread subtree if child notes was selected), then any linked notes that also live in the same thread (if that option was on).
 
 For meetings and events: treat the line "Event schedule (user's timezone …)" as the correct local start/end for the user. Prefer that over any time that might appear inside note bodies, and do not convert the ISO UTC lines into a different local time yourself.
 

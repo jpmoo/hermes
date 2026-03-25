@@ -93,8 +93,8 @@ export default function ThreadSummaryModal({
       >
         <h2 id="thread-summary-modal-title">Thread summary</h2>
         <p className="thread-summary-modal-lead">
-          Summarize what is on screen (current thread view), including the parent of the branch when you are
-          zoomed into a reply. Maximum about 250 words.
+          Summarize the focused note at the top of the view and its replies in this thread only (nothing
+          above that branch). Maximum about 250 words.
         </p>
         <div className="thread-summary-modal-options">
           <label className="thread-summary-modal-check">
@@ -104,7 +104,8 @@ export default function ThreadSummaryModal({
               onChange={(e) => setIncludeChildren(e.target.checked)}
             />
             <span>
-              Include child notes (full replies under this view, including types hidden by filters).
+              Include all descendant notes in this thread under the focused note (recursive), including types
+              hidden by filters—not only what is visible on screen.
             </span>
           </label>
           <label className="thread-summary-modal-check">
@@ -114,9 +115,10 @@ export default function ThreadSummaryModal({
               onChange={(e) => setIncludeConnected(e.target.checked)}
             />
             <span>
-              Include connected notes (linked peers). If child notes is on too, links are followed from every
-              expanded child as well—not only from what is visible on screen. With both on, each linked note
-              includes its reply subtree in the summary context.
+              Include other notes in <strong>this same thread</strong> that are linked to anything in the
+              summary scope (including the focused note). With <strong>child notes</strong> also on, repeat:
+              add links, add all in-thread replies under those notes, then more links, until nothing new—still
+              only inside this thread.
             </span>
           </label>
         </div>
