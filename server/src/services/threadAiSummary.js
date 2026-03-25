@@ -254,19 +254,17 @@ export async function buildThreadAiSummary(opts) {
   }
 
   /**
-   * Seeds for linked-note discovery in this summary only (not elsewhere in the app).
-   * Covers: notes on screen, the view root (top of what you see), parent when drilled, thread root.
+   * Linked-note seeds for this summary only. Every note in `primarySet` (visible + expanded children when
+   * that option is on), plus thread root, view root, and parent when drilled—so connections from any
+   * included child are discovered when child notes is selected.
    */
-  const connectionSeedIds = [...ordered.map(String)];
-  if (!connectionSeedIds.includes(String(displayRoot))) {
-    connectionSeedIds.push(String(displayRoot));
+  const connectionSeedSet = new Set(primarySet);
+  connectionSeedSet.add(String(displayRoot));
+  connectionSeedSet.add(String(threadRootId));
+  if (parentId && threadIdSet.has(String(parentId))) {
+    connectionSeedSet.add(String(parentId));
   }
-  if (parentId && threadIdSet.has(String(parentId)) && !connectionSeedIds.includes(String(parentId))) {
-    connectionSeedIds.push(String(parentId));
-  }
-  if (!connectionSeedIds.includes(String(threadRootId))) {
-    connectionSeedIds.push(String(threadRootId));
-  }
+  const connectionSeedIds = [...connectionSeedSet];
 
   let connectedBlock = '';
   if (includeConnected && connectionSeedIds.length > 0) {
@@ -304,8 +302,8 @@ export async function buildThreadAiSummary(opts) {
         }
       }
       if (parts.length > 0) {
-        connectedBlock = `--- Connected notes (linked from the thread root, parent of the view if any, and/or notes on screen${
-          includeChildren ? '; each link includes its reply subtree' : ''
+        connectedBlock = `--- Connected notes (linked from summary scope: expanded children when that option is on, plus thread root, view root, and parent if any${
+          includeChildren ? '; each hit includes its reply subtree' : ''
         }) ---\n\n${parts.join('\n\n')}\n\n`;
       }
     }

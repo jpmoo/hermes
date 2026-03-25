@@ -104,8 +104,7 @@ export default function ThreadSummaryModal({
               onChange={(e) => setIncludeChildren(e.target.checked)}
             />
             <span>
-              Include child notes (full depth under this view, including types hidden by filters). If connected
-              notes are included too, replies under those linked notes are included as well.
+              Include child notes (full replies under this view, including types hidden by filters).
             </span>
           </label>
           <label className="thread-summary-modal-check">
@@ -115,8 +114,9 @@ export default function ThreadSummaryModal({
               onChange={(e) => setIncludeConnected(e.target.checked)}
             />
             <span>
-              For this summary, include notes linked to the thread root, to the note at the top of the current
-              view, to the parent when you are zoomed into a reply, and to other notes on screen.
+              Include connected notes (linked peers). If child notes is on too, links are followed from every
+              expanded child as well—not only from what is visible on screen. With both on, each linked note
+              includes its reply subtree in the summary context.
             </span>
           </label>
         </div>
