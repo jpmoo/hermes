@@ -1,6 +1,9 @@
 /**
- * Default min trimmed body length before vector “similar notes” runs (env override).
- * 0 disables the gate. User account setting in settings_json.similarNotesMinChars overrides when set.
+ * Default min trimmed body length for vector “similar notes” (env override).
+ * When > 0: the hovered note must be at least this long (after trim) to run the search (unreliable
+ * embeddings on stubs). 0 disables that gate. Whether matches must meet the same length is controlled
+ * by settings_json.similarNotesLimitResultsToMinChars (optional checkbox; default off).
+ * User account setting similarNotesMinChars overrides the env default when set.
  */
 export function similarNotesMinCharsEnvDefault() {
   const raw = process.env.HERMES_SIMILAR_NOTES_MIN_CHARS;

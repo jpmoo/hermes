@@ -23,7 +23,14 @@ import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
-import { NavIconAttach, NavIconHistory, NavIconRootLevel, NavIconUpOneLevel } from './icons/NavIcons';
+import {
+  NavIconAttach,
+  NavIconBrain,
+  NavIconHistory,
+  NavIconRootLevel,
+  NavIconUpOneLevel,
+} from './icons/NavIcons';
+import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
 import './StreamPage.css';
 
 function buildTree(flat) {
@@ -47,8 +54,22 @@ function noteIdEq(a, b) {
   return String(a) === String(b);
 }
 
-function firstLineTitle(s) {
-  return (s || '').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Untitled';
+/** First line of note body for history preview (not a separate title field). */
+function firstLinePreview(s) {
+  return (s || '').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 72);
+}
+
+/** Main line in history menu: first-line body preview; falls back to path leaf if preview missing (e.g. legacy entries). */
+function historyPrimaryLabel(storedPreview, threadPath) {
+  const t = (storedPreview || '').trim();
+  if (t && t !== 'Untitled') return t;
+  const path = (threadPath || '').trim();
+  if (path) {
+    const parts = path.split(/\s*>\s*/).filter(Boolean);
+    const leaf = parts[parts.length - 1] || path;
+    return leaf.slice(0, 72) || 'Note';
+  }
+  return 'Note';
 }
 
 function findNode(nodes, id) {
@@ -295,6 +316,7 @@ export default function StreamPage() {
   const { logout, user } = useAuth();
 
   const [floatOpen, setFloatOpen] = useState(null);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [noteHistory, setNoteHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyBtnRef = useRef(null);
@@ -451,6 +473,9 @@ export default function StreamPage() {
     }
     return pinnedTree;
   }, [pinnedTree, focusId, actualRootId]);
+  const summaryVisibleIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
+  const summaryFocusNoteId =
+    focusId && actualRootId && !noteIdEq(focusId, actualRootId) ? focusId : null;
   const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
 
   useEffect(() => {
@@ -933,10 +958,21 @@ export default function StreamPage() {
   useEffect(() => {
     const noteId = focusId || threadRootId;
     if (!noteId || !threadRootId) return;
+    // While the thread request is in flight, `thread` is [] — do not record yet or we'd cache an empty preview
+    // and skip forever (lastVisitedNoteRef already matches noteId).
+    if (loadingThread) return;
+    if (thread.length === 0) return;
+
+    const row =
+      threadById.get(noteId) ||
+      thread.find((n) => noteIdEq(n.id, noteId)) ||
+      roots.find((r) => noteIdEq(r.id, noteId));
+    if (!row) return;
+
     if (lastVisitedNoteRef.current === noteId) return;
     lastVisitedNoteRef.current = noteId;
-    const row = threadById.get(noteId) || roots.find((r) => noteIdEq(r.id, noteId));
-    const title = firstLineTitle(row?.content || '');
+
+    const title = firstLinePreview(row.content || '');
     (async () => {
       try {
         const threadPath = await getNoteThreadPath(noteId, { excludeLeaf: false });
@@ -957,7 +993,7 @@ export default function StreamPage() {
         console.error(e);
       }
     })();
-  }, [threadRootId, focusId, threadById, roots]);
+  }, [threadRootId, focusId, threadById, roots, loadingThread, thread]);
 
   const openHistoryEntry = useCallback(
     (it) => {
@@ -991,7 +1027,7 @@ export default function StreamPage() {
               {noteHistory.map((it) => (
                 <li key={it.noteId}>
                   <button type="button" className="stream-page-history-item" onClick={() => openHistoryEntry(it)}>
-                    <span className="stream-page-history-title">{it.title || 'Untitled'}</span>
+                    <span className="stream-page-history-title">{historyPrimaryLabel(it.title, it.threadPath)}</span>
                     <span className="stream-page-history-path">{it.threadPath || ''}</span>
                   </button>
                 </li>
@@ -1040,15 +1076,30 @@ export default function StreamPage() {
           {threadRootId ? (
             <>
               <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
-                {focusId && !noteIdEq(focusId, actualRootId) ? (
-                  <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
-                    <NavIconUpOneLevel className="stream-page-nav-icon" />
+                <div className="stream-page-nav-left">
+                  {focusId && !noteIdEq(focusId, actualRootId) ? (
+                    <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
+                      <NavIconUpOneLevel className="stream-page-nav-icon" />
+                    </button>
+                  ) : null}
+                  <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
+                    <NavIconRootLevel className="stream-page-nav-icon" />
                   </button>
+                  {historyControl}
+                </div>
+                {!loadingThread && thread.length > 0 && tree.length > 0 && summaryVisibleIds.length > 0 ? (
+                  <div className="stream-page-nav-right">
+                    <button
+                      type="button"
+                      className="stream-page-nav-btn stream-page-nav-btn--icon"
+                      onClick={() => setSummaryModalOpen(true)}
+                      aria-label="AI thread summary"
+                      title="AI thread summary"
+                    >
+                      <NavIconBrain className="stream-page-nav-icon" />
+                    </button>
+                  </div>
                 ) : null}
-                <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
-                  <NavIconRootLevel className="stream-page-nav-icon" />
-                </button>
-                {historyControl}
               </div>
               {loadingThread ? (
                 <p className="stream-page-muted">Loading thread…</p>
@@ -1266,6 +1317,13 @@ export default function StreamPage() {
           )}
         </div>
       </div>
+        <ThreadSummaryModal
+          open={summaryModalOpen}
+          onClose={() => setSummaryModalOpen(false)}
+          threadRootId={threadRootId}
+          focusNoteId={summaryFocusNoteId}
+          visibleNoteIds={summaryVisibleIds}
+        />
       </HoverInsightProvider>
     </Layout>
   );

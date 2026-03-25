@@ -47,6 +47,17 @@ export async function getThread(id, starredOnly = false) {
   return r.json();
 }
 
+export async function postThreadAiSummary(body) {
+  const r = await fetch(`${API}/notes/thread-ai-summary`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to generate summary');
+  return data;
+}
+
 /** Event notes overlapping [from, to) (ISO strings). */
 export async function getEventsInRange(fromIso, toIso) {
   const params = new URLSearchParams({ from: fromIso, to: toIso });

@@ -223,11 +223,8 @@ export default function CalendarView() {
                         gridColumn: `${b.colStart + 1} / span ${b.span}`,
                         gridRow: b.lane + 1,
                       }}
-                      title={`${eventBarLabel(b.event)} — ${formatEventRange(b.event)}\nDouble-click to open in Stream`}
-                      onDoubleClick={(ev) => {
-                        ev.preventDefault();
-                        goToEventInStream(b.event);
-                      }}
+                      title={`${eventBarLabel(b.event)} — ${formatEventRange(b.event)}\nOpen in Stream`}
+                      onClick={() => goToEventInStream(b.event)}
                     >
                       {eventBarLabel(b.event)}
                     </button>
@@ -235,7 +232,7 @@ export default function CalendarView() {
                 </div>
               </div>
             ))}
-            <p className="calendar-view-hint">Double-click an event to open it in Stream (focused in the thread).</p>
+            <p className="calendar-view-hint">Click an event to open it in Stream (focused in the thread).</p>
           </>
         )}
 

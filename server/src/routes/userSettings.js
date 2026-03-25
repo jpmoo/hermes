@@ -73,10 +73,12 @@ router.get('/settings', requireAuth, async (req, res) => {
     const noteTypeColors = sanitizeNoteTypeColors(raw.noteTypeColors);
     const similarStored = sanitizeSimilarNotesMinChars(raw.similarNotesMinChars);
     const noteHistory = sanitizeNoteHistory(raw.noteHistory);
+    const similarLimitResults = raw.similarNotesLimitResultsToMinChars === true;
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
+      similarNotesLimitResultsToMinChars: similarLimitResults,
       noteHistory,
     });
   } catch (err) {
@@ -87,7 +89,8 @@ router.get('/settings', requireAuth, async (req, res) => {
 
 router.patch('/settings', requireAuth, async (req, res) => {
   try {
-    const { noteTypeColors, similarNotesMinChars, noteHistory } = req.body ?? {};
+    const { noteTypeColors, similarNotesMinChars, similarNotesLimitResultsToMinChars, noteHistory } =
+      req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
       ? { ...r.rows[0].settings_json }
@@ -115,6 +118,21 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (similarNotesLimitResultsToMinChars !== undefined) {
+      if (similarNotesLimitResultsToMinChars === null) {
+        delete cur.similarNotesLimitResultsToMinChars;
+      } else if (
+        similarNotesLimitResultsToMinChars !== true &&
+        similarNotesLimitResultsToMinChars !== false
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'similarNotesLimitResultsToMinChars must be true, false, or null' });
+      } else {
+        cur.similarNotesLimitResultsToMinChars = similarNotesLimitResultsToMinChars;
+      }
+    }
+
     if (noteHistory !== undefined) {
       if (noteHistory === null) {
         delete cur.noteHistory;
@@ -131,10 +149,12 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outColors = sanitizeNoteTypeColors(cur.noteTypeColors);
     const outSimilar = sanitizeSimilarNotesMinChars(cur.similarNotesMinChars);
     const outHistory = sanitizeNoteHistory(cur.noteHistory);
+    const outLimitResults = cur.similarNotesLimitResultsToMinChars === true;
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
+      similarNotesLimitResultsToMinChars: outLimitResults,
       noteHistory: outHistory,
     });
   } catch (err) {

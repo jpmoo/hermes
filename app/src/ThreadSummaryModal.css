@@ -1,0 +1,118 @@
+.thread-summary-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: rgba(28, 27, 24, 0.45);
+  overflow: auto;
+}
+
+.thread-summary-modal {
+  width: min(36rem, 100%);
+  margin-top: min(6vh, 3rem);
+  padding: 1.25rem 1.35rem 1.35rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.thread-summary-modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.thread-summary-modal-lead {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.thread-summary-modal-lead code {
+  font-size: 0.8em;
+}
+
+.thread-summary-modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.thread-summary-modal-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.thread-summary-modal-check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.thread-summary-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.thread-summary-modal-actions button {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.875rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.thread-summary-modal-generate {
+  background: var(--bg-card);
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.thread-summary-modal-generate:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.thread-summary-modal-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--error, #b42318);
+}
+
+.thread-summary-modal-placeholder {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.thread-summary-modal-output {
+  margin-top: 0.25rem;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: min(50vh, 22rem);
+  overflow: auto;
+}

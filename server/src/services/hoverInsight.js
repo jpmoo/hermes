@@ -5,17 +5,19 @@ import {
   sanitizeSimilarNotesMinChars,
 } from '../config/similarNotes.js';
 
-async function resolveSimilarNotesMinChars(userId) {
-  const fallback = similarNotesMinCharsEnvDefault();
+async function resolveSimilarNotesSettings(userId) {
+  const fallbackMin = similarNotesMinCharsEnvDefault();
   try {
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [userId]);
-    const raw = r.rows[0]?.settings_json?.similarNotesMinChars;
-    const n = sanitizeSimilarNotesMinChars(raw);
-    if (n !== undefined) return n;
+    const sj = r.rows[0]?.settings_json;
+    const n = sanitizeSimilarNotesMinChars(sj?.similarNotesMinChars);
+    const minChars = n !== undefined ? n : fallbackMin;
+    const limitResultsToMinChars = sj?.similarNotesLimitResultsToMinChars === true;
+    return { minChars, limitResultsToMinChars };
   } catch (e) {
-    console.error('resolveSimilarNotesMinChars:', e.message || e);
+    console.error('resolveSimilarNotesSettings:', e.message || e);
+    return { minChars: fallbackMin, limitResultsToMinChars: false };
   }
-  return fallback;
 }
 
 function normalizeTagName(s) {
@@ -154,10 +156,12 @@ export async function getLinkedNotesWithTags(anchorNoteId, userId) {
  * (2) Ollama — up to 6 new hyphenated tags; (3) connected — approved tags on linked peers not on hovered note.
  * Similar notes: cosine nearest neighbors (embeddings), excluding self, connection peers, parent,
  * siblings (same parent), and immediate children (already surfaced as thread neighbors).
- * Skipped when note body is shorter than per-user (or env) minimum (unreliable embeddings on stubs).
+ * When min length > 0: skipped if the hovered note is shorter than that (unreliable embedding on stubs).
+ * If similarNotesLimitResultsToMinChars: candidates shorter than the same threshold are excluded.
  */
 export async function getHoverInsight(noteId, userId, _opts = {}) {
-  const similarBodyMin = await resolveSimilarNotesMinChars(userId);
+  const { minChars: similarBodyMin, limitResultsToMinChars: similarLimitResultsToMinChars } =
+    await resolveSimilarNotesSettings(userId);
   const noteR = await pool.query(
     `SELECT id, parent_id, content FROM notes WHERE id = $1 AND user_id = $2`,
     [noteId, userId]
@@ -387,7 +391,13 @@ JSON array only, no markdown:`;
     }
     const similarExcludeIds = [...new Set([...linkedPeerIds, ...threadNeighborIds])];
 
-    const similarSql = (hasExclude) => `WITH RECURSIVE roots AS (
+    const hasExclude = similarExcludeIds.length > 0;
+    const hasMinLen = similarBodyMin > 0 && similarLimitResultsToMinChars;
+    const minLenParam = hasExclude ? 4 : 3;
+    const minLenClause = hasMinLen
+      ? `AND char_length(trim(both from coalesce(n.content, ''))) >= $${minLenParam}`
+      : '';
+    const similarSql = `WITH RECURSIVE roots AS (
          SELECT n.id, n.id AS root_id
          FROM notes n
          WHERE n.parent_id IS NULL AND n.user_id = $2
@@ -407,11 +417,18 @@ JSON array only, no markdown:`;
          AND n.embedding IS NOT NULL
          AND n.id <> $1::uuid
          ${hasExclude ? 'AND NOT (n.id = ANY($3::uuid[]))' : ''}
+         ${minLenClause}
        ORDER BY n.embedding <=> an.embedding
        LIMIT 12`;
-    const simR = similarExcludeIds.length
-      ? await pool.query(similarSql(true), [id, userId, similarExcludeIds])
-      : await pool.query(similarSql(false), [id, userId]);
+    const similarParams =
+      hasExclude && hasMinLen
+        ? [id, userId, similarExcludeIds, similarBodyMin]
+        : hasExclude
+          ? [id, userId, similarExcludeIds]
+          : hasMinLen
+            ? [id, userId, similarBodyMin]
+            : [id, userId];
+    const simR = await pool.query(similarSql, similarParams);
     similarNotes = await Promise.all(
       simR.rows.map(async (row) => ({
         id: row.id,

@@ -1009,9 +1009,9 @@ function HoverInsightPanels() {
                     {similarNotes.length === 0 ? (
                       <p className="hover-insight-muted">
                         {insight?.similarNotesSkippedShortNote
-                          ? `Similar notes are hidden for very short notes — add at least ${
+                          ? `Similar notes are off while this note is shorter than your minimum (${
                               insight.similarNotesMinChars ?? 48
-                            } characters of text to this one (embeddings need a bit of context).`
+                            } characters after trimming). Add more text, lower the minimum in Settings, or set it to 0.`
                           : 'No similar notes (needs embeddings, or nothing close enough yet).'}
                       </p>
                     ) : filteredSimilarNotes.length === 0 ? (

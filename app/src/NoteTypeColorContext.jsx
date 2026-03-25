@@ -25,6 +25,7 @@ export function NoteTypeColorProvider({ children }) {
   const { user } = useAuth();
   const [colors, setColors] = useState(() => loadNoteTypeColorsFromStorage());
   const [similarNotesMinChars, setSimilarNotesMinChars] = useState(null);
+  const [similarNotesLimitResultsToMinChars, setSimilarNotesLimitResultsToMinChars] = useState(false);
   const [similarNotesMinDefault, setSimilarNotesMinDefault] = useState(48);
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
@@ -56,6 +57,7 @@ export function NoteTypeColorProvider({ children }) {
             ? data.similarNotesMinChars
             : null
         );
+        setSimilarNotesLimitResultsToMinChars(data.similarNotesLimitResultsToMinChars === true);
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
@@ -89,7 +91,10 @@ export function NoteTypeColorProvider({ children }) {
     prevUserRef.current = user;
     if (prev != null && user == null) {
       setColors({});
-      skipNextRemoteSave.current = true;
+      setSimilarNotesMinChars(null);
+      setSimilarNotesLimitResultsToMinChars(false);
+      skipNoteTypeColorsSave.current = true;
+      skipSimilarNotesSave.current = true;
     }
   }, [user]);
 
@@ -124,12 +129,15 @@ export function NoteTypeColorProvider({ children }) {
     if (similarSaveTimer.current) clearTimeout(similarSaveTimer.current);
     similarSaveTimer.current = setTimeout(() => {
       similarSaveTimer.current = null;
-      patchUserSettings({ similarNotesMinChars }).catch((e) => console.error(e));
+      patchUserSettings({
+        similarNotesMinChars,
+        similarNotesLimitResultsToMinChars,
+      }).catch((e) => console.error(e));
     }, 450);
     return () => {
       if (similarSaveTimer.current) clearTimeout(similarSaveTimer.current);
     };
-  }, [similarNotesMinChars, user?.id, serverReady]);
+  }, [similarNotesMinChars, similarNotesLimitResultsToMinChars, user?.id, serverReady]);
 
   const setTypeColor = useCallback((type, hexOrNull) => {
     if (!NOTE_TYPE_COLOR_KEYS.includes(type)) return;
@@ -160,22 +168,30 @@ export function NoteTypeColorProvider({ children }) {
     setSimilarNotesMinChars(v);
   }, []);
 
+  const setSimilarNotesLimitResultsSetting = useCallback((on) => {
+    setSimilarNotesLimitResultsToMinChars(Boolean(on));
+  }, []);
+
   const value = useMemo(
     () => ({
       colors,
       setTypeColor,
       resetAllTypeColors,
       similarNotesMinChars,
+      similarNotesLimitResultsToMinChars,
       similarNotesMinDefault,
       setSimilarNotesMinChars: setSimilarNotesMinCharsSetting,
+      setSimilarNotesLimitResultsToMinChars: setSimilarNotesLimitResultsSetting,
     }),
     [
       colors,
       setTypeColor,
       resetAllTypeColors,
       similarNotesMinChars,
+      similarNotesLimitResultsToMinChars,
       similarNotesMinDefault,
       setSimilarNotesMinCharsSetting,
+      setSimilarNotesLimitResultsSetting,
     ]
   );
 

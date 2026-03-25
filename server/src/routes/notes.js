@@ -8,6 +8,7 @@ import {
   getLinkedNotesWithTags,
   getNoteThreadPathDisplay,
 } from '../services/hoverInsight.js';
+import { buildThreadAiSummary } from '../services/threadAiSummary.js';
 import { attachBlobListToNotes, MAX_BYTES } from '../services/noteFileBlobs.js';
 import { canAttachTagIdByReference } from '../services/tagAccess.js';
 import { compareNotesSortDesc } from '../utils/noteSortAt.js';
@@ -569,6 +570,28 @@ router.post('/hover-insight', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to build hover insight' });
+  }
+});
+
+/** Ollama summary of visible thread + optional parent / children / connections. */
+router.post('/thread-ai-summary', async (req, res) => {
+  try {
+    const b = req.body ?? {};
+    const result = await buildThreadAiSummary({
+      threadRootId: b.threadRootId,
+      focusNoteId: b.focusNoteId,
+      visibleNoteIds: b.visibleNoteIds,
+      includeChildren: b.includeChildren === true,
+      includeConnected: b.includeConnected === true,
+      userId: req.userId,
+    });
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error });
+    }
+    res.json({ summary: result.summary });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to build thread summary' });
   }
 });
 
