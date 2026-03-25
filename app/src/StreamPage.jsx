@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getRoots, getThread, createNote, uploadNoteFiles, getNote } from './api';
+import {
+  getRoots,
+  getThread,
+  createNote,
+  uploadNoteFiles,
+  getNote,
+  getNoteThreadPath,
+  fetchUserSettings,
+  patchUserSettings,
+} from './api';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
@@ -35,6 +44,10 @@ function buildTree(flat) {
 function noteIdEq(a, b) {
   if (a == null || b == null) return false;
   return String(a) === String(b);
+}
+
+function firstLineTitle(s) {
+  return (s || '').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Untitled';
 }
 
 function findNode(nodes, id) {
@@ -278,9 +291,16 @@ export default function StreamPage() {
   const threadListRef = useRef(null);
   const focusFromUrlApplied = useRef('');
   const floatTimerRef = useRef(null);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const [floatOpen, setFloatOpen] = useState(null);
+  const [noteHistory, setNoteHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyBtnRef = useRef(null);
+  const historyMenuRef = useRef(null);
+  const historySaveTimer = useRef(null);
+  const historyInitRef = useRef(false);
+  const lastVisitedNoteRef = useRef(null);
   const [replyStagger, setReplyStagger] = useState(false);
   const [threadExiting, setThreadExiting] = useState(false);
   const [branchHeadExiting, setBranchHeadExiting] = useState(false);
@@ -289,6 +309,42 @@ export default function StreamPage() {
   const flipPayloadRef = useRef(null);
   const levelNavBusyRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
+
+  useEffect(() => {
+    if (!user?.id) {
+      setNoteHistory([]);
+      historyInitRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await fetchUserSettings();
+        if (cancelled) return;
+        setNoteHistory(Array.isArray(s.noteHistory) ? s.noteHistory : []);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setNoteHistory([]);
+      } finally {
+        if (!cancelled) historyInitRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !historyInitRef.current) return;
+    if (historySaveTimer.current) clearTimeout(historySaveTimer.current);
+    historySaveTimer.current = setTimeout(() => {
+      historySaveTimer.current = null;
+      patchUserSettings({ noteHistory }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (historySaveTimer.current) clearTimeout(historySaveTimer.current);
+    };
+  }, [noteHistory, user?.id]);
 
   const cycleComposeNoteType = useCallback(() => {
     const i = NOTE_TYPE_OPTIONS.findIndex((o) => o.value === composeNoteType);
@@ -877,6 +933,56 @@ export default function StreamPage() {
     [setSearchParams]
   );
 
+  useEffect(() => {
+    if (!historyOpen) return undefined;
+    const onDoc = (e) => {
+      if (historyMenuRef.current?.contains(e.target) || historyBtnRef.current?.contains(e.target)) return;
+      setHistoryOpen(false);
+    };
+    document.addEventListener('pointerdown', onDoc, true);
+    return () => document.removeEventListener('pointerdown', onDoc, true);
+  }, [historyOpen]);
+
+  useEffect(() => {
+    const noteId = focusId || threadRootId;
+    if (!noteId || !threadRootId) return;
+    if (lastVisitedNoteRef.current === noteId) return;
+    lastVisitedNoteRef.current = noteId;
+    const row = threadById.get(noteId) || roots.find((r) => noteIdEq(r.id, noteId));
+    const title = firstLineTitle(row?.content || '');
+    (async () => {
+      try {
+        const threadPath = await getNoteThreadPath(noteId, { excludeLeaf: false });
+        setNoteHistory((prev) => {
+          const rest = prev.filter((x) => !noteIdEq(x.noteId, noteId));
+          return [
+            {
+              noteId: String(noteId),
+              threadRootId: String(threadRootId),
+              title,
+              threadPath: threadPath || title,
+              visitedAt: new Date().toISOString(),
+            },
+            ...rest,
+          ].slice(0, 20);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [threadRootId, focusId, threadById, roots]);
+
+  const openHistoryEntry = useCallback(
+    (it) => {
+      if (!it?.noteId) return;
+      setHistoryOpen(false);
+      if (it.threadRootId) setSearchParams({ thread: it.threadRootId, focus: it.noteId });
+      else setSearchParams({ thread: it.noteId });
+      setFocusId(it.noteId);
+    },
+    [setSearchParams]
+  );
+
   const navLinks = [
     { to: '/', label: 'Stream' },
     { to: '/outline', label: 'Outline' },
@@ -887,7 +993,14 @@ export default function StreamPage() {
   return (
     <Layout title={layoutTitle} noteTypeFilterEnabled onLogout={logout} viewLinks={navLinks}>
       <HoverInsightProvider onNoteUpdated={refreshAll} onGoToNote={onHoverInsightGoToNote}>
-      <div className="stream-page">
+      <div
+        className="stream-page"
+        style={{
+          '--stream-root-icon': `url(${import.meta.env.BASE_URL}assets/root.svg)`,
+          '--stream-up-icon': `url(${import.meta.env.BASE_URL}assets/upOneLevel.svg)`,
+          '--stream-history-icon': `url(${import.meta.env.BASE_URL}assets/history.svg)`,
+        }}
+      >
         {floatOpen && (
           <div
             className={`stream-page-float ${floatOpen.phase === 'move' ? 'stream-page-float--move' : ''}`}
@@ -915,13 +1028,43 @@ export default function StreamPage() {
             <>
               <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
                 {focusId && !noteIdEq(focusId, actualRootId) ? (
-                  <button type="button" className="stream-page-nav-btn" onClick={upOneLevel}>
-                    ↑ One level
+                  <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
+                    <span className="stream-page-nav-icon stream-page-nav-icon--up" aria-hidden />
                   </button>
                 ) : null}
-                <button type="button" className="stream-page-nav-btn stream-page-nav-btn--root" onClick={closeThread}>
-                  Root level
+                <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
+                  <span className="stream-page-nav-icon stream-page-nav-icon--root" aria-hidden />
                 </button>
+                <div className="stream-page-history-wrap">
+                  <button
+                    ref={historyBtnRef}
+                    type="button"
+                    className="stream-page-nav-btn stream-page-nav-btn--icon"
+                    aria-label="History"
+                    title="History"
+                    onClick={() => setHistoryOpen((v) => !v)}
+                  >
+                    <span className="stream-page-nav-icon stream-page-nav-icon--history" aria-hidden />
+                  </button>
+                  {historyOpen && (
+                    <div ref={historyMenuRef} className="stream-page-history-menu" role="menu" aria-label="Recent notes">
+                      {noteHistory.length === 0 ? (
+                        <p className="stream-page-history-empty">No recently visited notes.</p>
+                      ) : (
+                        <ul className="stream-page-history-list">
+                          {noteHistory.map((it) => (
+                            <li key={it.noteId}>
+                              <button type="button" className="stream-page-history-item" onClick={() => openHistoryEntry(it)}>
+                                <span className="stream-page-history-title">{it.title || 'Untitled'}</span>
+                                <span className="stream-page-history-path">{it.threadPath || ''}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               {loadingThread ? (
                 <p className="stream-page-muted">Loading thread…</p>

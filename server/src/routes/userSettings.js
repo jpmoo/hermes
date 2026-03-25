@@ -9,6 +9,7 @@ import {
 const router = Router();
 
 const NOTE_TYPES = ['note', 'event', 'person', 'organization'];
+const NOTE_HISTORY_MAX = 20;
 
 function normalizeHex(v) {
   if (typeof v !== 'string') return null;
@@ -30,6 +31,40 @@ function sanitizeNoteTypeColors(input) {
   return out;
 }
 
+function sanitizeHistoryEntry(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const noteId = typeof input.noteId === 'string' ? input.noteId.trim() : '';
+  if (!noteId) return null;
+  const title = typeof input.title === 'string' ? input.title.trim().slice(0, 160) : '';
+  const threadPath = typeof input.threadPath === 'string' ? input.threadPath.trim().slice(0, 500) : '';
+  const threadRootId = typeof input.threadRootId === 'string' ? input.threadRootId.trim() : '';
+  const visitedAt = typeof input.visitedAt === 'string' ? input.visitedAt : '';
+  const d = visitedAt ? new Date(visitedAt) : null;
+  if (!d || Number.isNaN(d.getTime())) return null;
+  return {
+    noteId,
+    title,
+    threadPath,
+    ...(threadRootId ? { threadRootId } : {}),
+    visitedAt: d.toISOString(),
+  };
+}
+
+function sanitizeNoteHistory(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const it of input) {
+    const row = sanitizeHistoryEntry(it);
+    if (!row) continue;
+    if (seen.has(row.noteId)) continue;
+    seen.add(row.noteId);
+    out.push(row);
+    if (out.length >= NOTE_HISTORY_MAX) break;
+  }
+  return out;
+}
+
 router.get('/settings', requireAuth, async (req, res) => {
   try {
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
@@ -37,10 +72,12 @@ router.get('/settings', requireAuth, async (req, res) => {
     const raw = row?.settings_json && typeof row.settings_json === 'object' ? row.settings_json : {};
     const noteTypeColors = sanitizeNoteTypeColors(raw.noteTypeColors);
     const similarStored = sanitizeSimilarNotesMinChars(raw.similarNotesMinChars);
+    const noteHistory = sanitizeNoteHistory(raw.noteHistory);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
+      noteHistory,
     });
   } catch (err) {
     console.error(err);
@@ -50,7 +87,7 @@ router.get('/settings', requireAuth, async (req, res) => {
 
 router.patch('/settings', requireAuth, async (req, res) => {
   try {
-    const { noteTypeColors, similarNotesMinChars } = req.body ?? {};
+    const { noteTypeColors, similarNotesMinChars, noteHistory } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
       ? { ...r.rows[0].settings_json }
@@ -78,16 +115,27 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (noteHistory !== undefined) {
+      if (noteHistory === null) {
+        delete cur.noteHistory;
+      } else {
+        const cleaned = sanitizeNoteHistory(noteHistory);
+        cur.noteHistory = cleaned;
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
     ]);
     const outColors = sanitizeNoteTypeColors(cur.noteTypeColors);
     const outSimilar = sanitizeSimilarNotesMinChars(cur.similarNotesMinChars);
+    const outHistory = sanitizeNoteHistory(cur.noteHistory);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
+      noteHistory: outHistory,
     });
   } catch (err) {
     console.error(err);

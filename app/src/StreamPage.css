@@ -82,6 +82,16 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
+.stream-page-nav-btn--icon {
+  width: 2.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .stream-page-nav-btn:hover {
   color: var(--accent);
   border-color: var(--accent-dim);
@@ -94,6 +104,98 @@
 
 .stream-page-nav-btn--root:hover {
   color: var(--accent);
+}
+
+.stream-page-nav-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+
+.stream-page-nav-icon--root {
+  -webkit-mask-image: var(--stream-root-icon);
+  mask-image: var(--stream-root-icon);
+}
+
+.stream-page-nav-icon--up {
+  -webkit-mask-image: var(--stream-up-icon);
+  mask-image: var(--stream-up-icon);
+}
+
+.stream-page-nav-icon--history {
+  -webkit-mask-image: var(--stream-history-icon);
+  mask-image: var(--stream-history-icon);
+}
+
+.stream-page-history-wrap {
+  position: relative;
+}
+
+.stream-page-history-menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  z-index: 30;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: min(22rem, 55vh);
+  overflow: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  padding: 0.35rem;
+}
+
+.stream-page-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stream-page-history-item {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  border-radius: 8px;
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.stream-page-history-item:hover {
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.stream-page-history-title {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  margin-bottom: 0.1rem;
+}
+
+.stream-page-history-path {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stream-page-history-empty {
+  margin: 0;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 
 .stream-page-float {

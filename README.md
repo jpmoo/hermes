@@ -132,7 +132,7 @@ A note-taking system built around conversation and tree structure. Specification
 
 - `POST /api/auth/register` — `{ username, password }`
 - `POST /api/auth/login` — `{ username, password }` → `{ token, user }`
-- `GET /api/user/settings`, `PATCH /api/user/settings` — `GET` returns `{ noteTypeColors, similarNotesMinChars: number | null, similarNotesMinDefault }`. `PATCH` accepts `noteTypeColors` and/or `similarNotesMinChars` (integer **0–500**, or **`null`** to drop the override and use `similarNotesMinDefault` from env). (JWT). Run `psql "$DATABASE_URL" -f server/src/db/migrations/008_user_settings_json.sql` if upgrading an existing DB.
+- `GET /api/user/settings`, `PATCH /api/user/settings` — `GET` returns `{ noteTypeColors, similarNotesMinChars: number | null, similarNotesMinDefault, noteHistory }`. `PATCH` accepts `noteTypeColors`, `similarNotesMinChars` (integer **0–500**, or **`null`** to drop the override and use `similarNotesMinDefault` from env), and `noteHistory` (up to 20 recent `{ noteId, title, threadPath, threadRootId?, visitedAt }`). (JWT). Run `psql "$DATABASE_URL" -f server/src/db/migrations/008_user_settings_json.sql` if upgrading an existing DB.
 - `GET /api/notes/roots?starred=true|false` — root feed (requires `Authorization: Bearer <token>`)
 - `GET /api/notes/thread/:id?starred=` — full thread
 - `POST /api/notes` — create note `{ content, parent_id?, external_anchor? }`
