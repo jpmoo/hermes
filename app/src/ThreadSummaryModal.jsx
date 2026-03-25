@@ -114,7 +114,10 @@ export default function ThreadSummaryModal({
               checked={includeConnected}
               onChange={(e) => setIncludeConnected(e.target.checked)}
             />
-            <span>Include connected notes (linked peers for extra context)</span>
+            <span>
+              For this summary, include notes linked to the thread root, to the note at the top of the current
+              view, to the parent when you are zoomed into a reply, and to other notes on screen.
+            </span>
           </label>
         </div>
         <div className="thread-summary-modal-actions">

@@ -253,10 +253,19 @@ export async function buildThreadAiSummary(opts) {
     if (n) mainBlocks.push(formatNoteBlock(n, 'Note in view', timeZone));
   }
 
-  /** Seeds for discovering links: on-screen notes (preorder) plus parent, so parent connections count too. */
+  /**
+   * Seeds for linked-note discovery in this summary only (not elsewhere in the app).
+   * Covers: notes on screen, the view root (top of what you see), parent when drilled, thread root.
+   */
   const connectionSeedIds = [...ordered.map(String)];
+  if (!connectionSeedIds.includes(String(displayRoot))) {
+    connectionSeedIds.push(String(displayRoot));
+  }
   if (parentId && threadIdSet.has(String(parentId)) && !connectionSeedIds.includes(String(parentId))) {
     connectionSeedIds.push(String(parentId));
+  }
+  if (!connectionSeedIds.includes(String(threadRootId))) {
+    connectionSeedIds.push(String(threadRootId));
   }
 
   let connectedBlock = '';
@@ -295,7 +304,7 @@ export async function buildThreadAiSummary(opts) {
         }
       }
       if (parts.length > 0) {
-        connectedBlock = `--- Connected notes (linked from the parent and/or notes in view${
+        connectedBlock = `--- Connected notes (linked from the thread root, parent of the view if any, and/or notes on screen${
           includeChildren ? '; each link includes its reply subtree' : ''
         }) ---\n\n${parts.join('\n\n')}\n\n`;
       }
