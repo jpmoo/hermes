@@ -56,6 +56,7 @@ export default function ThreadSummaryModal({
         visibleNoteIds,
         includeChildren,
         includeConnected,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       setSummary(data.summary || '');
     } catch (e) {

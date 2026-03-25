@@ -584,6 +584,7 @@ router.post('/thread-ai-summary', async (req, res) => {
       includeChildren: b.includeChildren === true,
       includeConnected: b.includeConnected === true,
       userId: req.userId,
+      timeZone: b.timeZone,
     });
     if (!result.ok) {
       return res.status(result.status).json({ error: result.error });

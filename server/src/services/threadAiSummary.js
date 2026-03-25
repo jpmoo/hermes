@@ -8,42 +8,78 @@ function isUuid(s) {
   return typeof s === 'string' && UUID_RE.test(s);
 }
 
-function formatEventRange(note) {
+/** Browser/client IANA zone (e.g. America/New_York). Invalid values fall back to UTC. */
+function sanitizeTimeZone(raw) {
+  if (typeof raw !== 'string') return 'UTC';
+  const t = raw.trim();
+  if (t.length < 2 || t.length > 120) return 'UTC';
+  if (!/^[A-Za-z0-9_+\/-]+$/.test(t)) return 'UTC';
+  return t;
+}
+
+/** Whether the stored instant has a non-midnight UTC clock (skip time-of-day for date-only UTC midnight). */
+function hasUtcClockTime(iso) {
+  if (!iso) return false;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  return (
+    d.getUTCHours() !== 0 ||
+    d.getUTCMinutes() !== 0 ||
+    d.getUTCSeconds() !== 0 ||
+    d.getUTCMilliseconds() !== 0
+  );
+}
+
+function formatInstantInZone(iso, timeZone, withTime) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const opts = { timeZone, dateStyle: 'medium' };
+  if (withTime) opts.timeStyle = 'short';
+  try {
+    return d.toLocaleString('en-US', opts);
+  } catch {
+    return d.toLocaleString('en-US', {
+      timeZone: 'UTC',
+      dateStyle: 'medium',
+      ...(withTime ? { timeStyle: 'short' } : {}),
+    });
+  }
+}
+
+function formatEventRange(note, timeZone) {
   if (note.note_type !== 'event') return '';
-  const fmt = (iso, withTime) => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    return withTime
-      ? d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-      : d.toLocaleDateString(undefined, { dateStyle: 'medium' });
-  };
   const s = note.event_start_at;
   const e = note.event_end_at;
   if (!s && !e) return '';
-  const hasTime = (iso) => {
-    if (!iso) return false;
-    const d = new Date(iso);
-    const h = d.getHours();
-    const m = d.getMinutes();
-    const sec = d.getSeconds();
-    const ms = d.getMilliseconds();
-    return h !== 0 || m !== 0 || sec !== 0 || ms !== 0;
-  };
-  if (!s) return fmt(e, hasTime(e));
-  const left = fmt(s, hasTime(s));
+  if (!s) {
+    return formatInstantInZone(e, timeZone, hasUtcClockTime(e));
+  }
+  const left = formatInstantInZone(s, timeZone, hasUtcClockTime(s));
   if (!e) return left;
-  const right = fmt(e, hasTime(e));
+  const right = formatInstantInZone(e, timeZone, hasUtcClockTime(e));
   if (left && right && left !== right) return `${left} → ${right}`;
   return left || right;
 }
 
-function formatNoteBlock(note, label) {
+function formatNoteBlock(note, label, timeZone) {
   const lines = [];
   lines.push(`--- ${label} (${note.id}) ---`);
   lines.push(`Type: ${note.note_type || 'note'}`);
-  const ev = formatEventRange(note);
-  if (ev) lines.push(`Event time: ${ev}`);
+  if (note.note_type === 'event') {
+    if (note.event_start_at) {
+      const d = new Date(note.event_start_at);
+      if (!Number.isNaN(d.getTime())) lines.push(`Event start (UTC, ISO 8601): ${d.toISOString()}`);
+    }
+    if (note.event_end_at) {
+      const d = new Date(note.event_end_at);
+      if (!Number.isNaN(d.getTime())) lines.push(`Event end (UTC, ISO 8601): ${d.toISOString()}`);
+    }
+  }
+  const ev = formatEventRange(note, timeZone);
+  if (ev) {
+    lines.push(`Event schedule (user's timezone ${timeZone}): ${ev}`);
+  }
   let body = (note.content || '').trim();
   if (body.length > 8000) body = `${body.slice(0, 8000)}\n… (truncated)`;
   lines.push(body ? `Content:\n${body}` : 'Content: (empty)');
@@ -133,7 +169,8 @@ async function loadConnectedNotes(userId, seedIds, excludeIds, maxExtra) {
  *   visibleNoteIds: string[],
  *   includeChildren: boolean,
  *   includeConnected: boolean,
- *   userId: string
+ *   userId: string,
+ *   timeZone?: string
  * }} opts
  */
 export async function buildThreadAiSummary(opts) {
@@ -144,7 +181,9 @@ export async function buildThreadAiSummary(opts) {
     includeChildren,
     includeConnected,
     userId,
+    timeZone: timeZoneRaw,
   } = opts;
+  const timeZone = sanitizeTimeZone(timeZoneRaw);
 
   if (!isUuid(threadRootId)) {
     return { ok: false, status: 400, error: 'Invalid threadRootId' };
@@ -204,21 +243,27 @@ export async function buildThreadAiSummary(opts) {
   if (parentId && threadIdSet.has(String(parentId))) {
     const p = byId.get(String(parentId));
     if (p) {
-      parentBlock = `${formatNoteBlock(p, 'Parent note (above the view)')}\n\n`;
+      parentBlock = `${formatNoteBlock(p, 'Parent note (above the view)', timeZone)}\n\n`;
     }
   }
 
   const mainBlocks = [];
   for (const id of ordered) {
     const n = byId.get(String(id));
-    if (n) mainBlocks.push(formatNoteBlock(n, 'Note in view'));
+    if (n) mainBlocks.push(formatNoteBlock(n, 'Note in view', timeZone));
+  }
+
+  /** Seeds for discovering links: on-screen notes (preorder) plus parent, so parent connections count too. */
+  const connectionSeedIds = [...ordered.map(String)];
+  if (parentId && threadIdSet.has(String(parentId)) && !connectionSeedIds.includes(String(parentId))) {
+    connectionSeedIds.push(String(parentId));
   }
 
   let connectedBlock = '';
-  if (includeConnected && ordered.length > 0) {
+  if (includeConnected && connectionSeedIds.length > 0) {
     const connected = await loadConnectedNotes(
       userId,
-      ordered,
+      connectionSeedIds,
       [...primarySet],
       18
     );
@@ -227,13 +272,13 @@ export async function buildThreadAiSummary(opts) {
       const parts = [];
       for (const c of connected) {
         const rows = includeChildren ? await loadThreadFlat(c.id, userId) : [c];
-        const byId = new Map(rows.map((r) => [String(r.id), r]));
+        const connById = new Map(rows.map((r) => [String(r.id), r]));
         const ch = buildChildrenMap(rows);
         const subtreeOrder = [];
         function preorderFrom(rootId) {
-          const n = byId.get(String(rootId));
-          if (!n) return;
-          subtreeOrder.push(n);
+          const node = connById.get(String(rootId));
+          if (!node) return;
+          subtreeOrder.push(node);
           for (const k of ch.get(rootId) || []) preorderFrom(k.id);
         }
         preorderFrom(c.id);
@@ -243,20 +288,28 @@ export async function buildThreadAiSummary(opts) {
           parts.push(
             formatNoteBlock(
               n,
-              includeChildren ? 'Connected thread note' : 'Connected note'
+              includeChildren ? 'Connected thread note' : 'Connected note',
+              timeZone
             )
           );
         }
       }
       if (parts.length > 0) {
-        connectedBlock = `\n--- Connected notes (linked from the thread) ---\n\n${parts.join('\n\n')}`;
+        connectedBlock = `--- Connected notes (linked from the parent and/or notes in view${
+          includeChildren ? '; each link includes its reply subtree' : ''
+        }) ---\n\n${parts.join('\n\n')}\n\n`;
       }
     }
   }
 
-  const context = `${parentBlock}--- Notes on screen (thread context) ---\n\n${mainBlocks.join('\n\n')}${connectedBlock}`;
+  const relatedContext = `${parentBlock}${connectedBlock}`;
+  const context = `${relatedContext}--- Notes on screen (thread context) ---\n\n${mainBlocks.join('\n\n')}`;
 
-  const prompt = `You summarize notes from a personal knowledge app for the user. Write a clear, cohesive summary in plain prose. Stay at or under 250 words (shorter is fine). Do not add a title line unless it helps; focus on substance. If event times are given, you may reference them naturally.
+  const prompt = `You summarize notes from a personal knowledge app for the user. Write a clear, cohesive summary in plain prose. Stay at or under 250 words (shorter is fine). Do not add a title line unless it helps; focus on substance.
+
+Context order: first any parent note and connected/linked notes (if present), then the notes currently on screen. Use that ordering when relating background to the visible thread.
+
+For meetings and events: treat the line "Event schedule (user's timezone …)" as the correct local start/end for the user. Prefer that over any time that might appear inside note bodies, and do not convert the ISO UTC lines into a different local time yourself.
 
 If the notes are empty, too sparse, or too fragmented to justify a real narrative (e.g. only placeholders or no meaningful content to weave together), do not invent a summary. Instead reply with one or two short sentences explaining that there is not enough context to summarize meaningfully—no bullet list, no filler narrative.
 
