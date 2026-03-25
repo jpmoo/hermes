@@ -109,28 +109,7 @@
 .stream-page-nav-icon {
   width: 1.2rem;
   height: 1.2rem;
-  background: currentColor;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-}
-
-.stream-page-nav-icon--root {
-  -webkit-mask-image: var(--stream-root-icon);
-  mask-image: var(--stream-root-icon);
-}
-
-.stream-page-nav-icon--up {
-  -webkit-mask-image: var(--stream-up-icon);
-  mask-image: var(--stream-up-icon);
-}
-
-.stream-page-nav-icon--history {
-  -webkit-mask-image: var(--stream-history-icon);
-  mask-image: var(--stream-history-icon);
+  display: block;
 }
 
 .stream-page-history-wrap {

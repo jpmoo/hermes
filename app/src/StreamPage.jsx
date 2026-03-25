@@ -23,6 +23,7 @@ import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
+import { NavIconHistory, NavIconRootLevel, NavIconUpOneLevel } from './icons/NavIcons';
 import './StreamPage.css';
 
 function buildTree(flat) {
@@ -993,14 +994,7 @@ export default function StreamPage() {
   return (
     <Layout title={layoutTitle} noteTypeFilterEnabled onLogout={logout} viewLinks={navLinks}>
       <HoverInsightProvider onNoteUpdated={refreshAll} onGoToNote={onHoverInsightGoToNote}>
-      <div
-        className="stream-page"
-        style={{
-          '--stream-root-icon': `url(${import.meta.env.BASE_URL}assets/root.svg)`,
-          '--stream-up-icon': `url(${import.meta.env.BASE_URL}assets/upOneLevel.svg)`,
-          '--stream-history-icon': `url(${import.meta.env.BASE_URL}assets/history.svg)`,
-        }}
-      >
+      <div className="stream-page">
         {floatOpen && (
           <div
             className={`stream-page-float ${floatOpen.phase === 'move' ? 'stream-page-float--move' : ''}`}
@@ -1029,11 +1023,11 @@ export default function StreamPage() {
               <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
                 {focusId && !noteIdEq(focusId, actualRootId) ? (
                   <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
-                    <span className="stream-page-nav-icon stream-page-nav-icon--up" aria-hidden />
+                    <NavIconUpOneLevel className="stream-page-nav-icon" />
                   </button>
                 ) : null}
                 <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
-                  <span className="stream-page-nav-icon stream-page-nav-icon--root" aria-hidden />
+                  <NavIconRootLevel className="stream-page-nav-icon" />
                 </button>
                 <div className="stream-page-history-wrap">
                   <button
@@ -1044,7 +1038,7 @@ export default function StreamPage() {
                     title="History"
                     onClick={() => setHistoryOpen((v) => !v)}
                   >
-                    <span className="stream-page-nav-icon stream-page-nav-icon--history" aria-hidden />
+                    <NavIconHistory className="stream-page-nav-icon" />
                   </button>
                   {historyOpen && (
                     <div ref={historyMenuRef} className="stream-page-history-menu" role="menu" aria-label="Recent notes">

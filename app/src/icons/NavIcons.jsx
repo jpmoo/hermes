@@ -291,6 +291,34 @@ export function NavIconTheme(props) {
   );
 }
 
+export function NavIconRootLevel(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...common} {...props}>
+      <path d="M12 22L12 7" />
+      <path d="M5 14L12 7L19 14" />
+      <path d="M3 2H21" />
+    </svg>
+  );
+}
+
+export function NavIconUpOneLevel(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...common} {...props}>
+      <path d="M12 20L12 4" />
+      <path d="M5 11L12 4L19 11" />
+    </svg>
+  );
+}
+
+export function NavIconHistory(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...common} {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M15 16L12.5858 13.5858C12.2107 13.2107 12 12.702 12 12.1716V6" />
+    </svg>
+  );
+}
+
 function navIconForTo(to) {
   if (!to) return null;
   if (to === '/') return NavIconStream;
