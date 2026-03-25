@@ -984,6 +984,39 @@ export default function StreamPage() {
     [setSearchParams]
   );
 
+  const historyControl = (
+    <div className="stream-page-history-wrap">
+      <button
+        ref={historyBtnRef}
+        type="button"
+        className="stream-page-nav-btn stream-page-nav-btn--icon"
+        aria-label="History"
+        title="History"
+        onClick={() => setHistoryOpen((v) => !v)}
+      >
+        <NavIconHistory className="stream-page-nav-icon" />
+      </button>
+      {historyOpen && (
+        <div ref={historyMenuRef} className="stream-page-history-menu" role="menu" aria-label="Recent notes">
+          {noteHistory.length === 0 ? (
+            <p className="stream-page-history-empty">No recently visited notes.</p>
+          ) : (
+            <ul className="stream-page-history-list">
+              {noteHistory.map((it) => (
+                <li key={it.noteId}>
+                  <button type="button" className="stream-page-history-item" onClick={() => openHistoryEntry(it)}>
+                    <span className="stream-page-history-title">{it.title || 'Untitled'}</span>
+                    <span className="stream-page-history-path">{it.threadPath || ''}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const navLinks = [
     { to: '/', label: 'Stream' },
     { to: '/outline', label: 'Outline' },
@@ -1029,36 +1062,7 @@ export default function StreamPage() {
                 <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
                   <NavIconRootLevel className="stream-page-nav-icon" />
                 </button>
-                <div className="stream-page-history-wrap">
-                  <button
-                    ref={historyBtnRef}
-                    type="button"
-                    className="stream-page-nav-btn stream-page-nav-btn--icon"
-                    aria-label="History"
-                    title="History"
-                    onClick={() => setHistoryOpen((v) => !v)}
-                  >
-                    <NavIconHistory className="stream-page-nav-icon" />
-                  </button>
-                  {historyOpen && (
-                    <div ref={historyMenuRef} className="stream-page-history-menu" role="menu" aria-label="Recent notes">
-                      {noteHistory.length === 0 ? (
-                        <p className="stream-page-history-empty">No recently visited notes.</p>
-                      ) : (
-                        <ul className="stream-page-history-list">
-                          {noteHistory.map((it) => (
-                            <li key={it.noteId}>
-                              <button type="button" className="stream-page-history-item" onClick={() => openHistoryEntry(it)}>
-                                <span className="stream-page-history-title">{it.title || 'Untitled'}</span>
-                                <span className="stream-page-history-path">{it.threadPath || ''}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
+                {historyControl}
               </div>
               {loadingThread ? (
                 <p className="stream-page-muted">Loading thread…</p>
@@ -1095,9 +1099,9 @@ export default function StreamPage() {
             </>
           ) : (
             <>
-              <p className="stream-page-level-hint" role="note">
-                You are at the root.
-              </p>
+              <div className="stream-page-nav-row">
+                {historyControl}
+              </div>
               {loadError && (
                 <p className="stream-page-error" role="alert">
                   {loadError}
