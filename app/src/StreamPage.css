@@ -413,7 +413,7 @@
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 0.12rem;
+  gap: 0.5rem;
 }
 
 .stream-page-compose-row button[type='submit'] {

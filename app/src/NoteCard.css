@@ -256,8 +256,8 @@
 }
 
 .note-card-edit-attach-icon {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .note-card-content-rich {
@@ -409,8 +409,7 @@
 
 .note-card-edit-attachments {
   margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+  padding-top: 0;
 }
 
 .note-card-edit-attachments-label {
