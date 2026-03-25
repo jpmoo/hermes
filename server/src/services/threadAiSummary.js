@@ -47,9 +47,9 @@ function formatInstantInZone(iso, timeZone, withTime) {
   }
 }
 
-/** Current instant as local line in `timeZone` plus ISO UTC so the model can judge past vs future events. */
-function formatReferenceNow(timeZone) {
-  const now = new Date();
+/** `instant` as local line in `timeZone` plus ISO UTC so the model can judge past vs future events. */
+function formatReferenceNow(timeZone, instant = new Date()) {
+  const now = instant;
   const isoUtc = now.toISOString();
   try {
     const localLine = new Intl.DateTimeFormat('en-US', {
@@ -68,6 +68,68 @@ function formatReferenceNow(timeZone) {
   }
 }
 
+/** YYYY-MM-DD calendar day in `timeZone` (for comparing date-only events to "today"). */
+function ymdInZone(date, timeZone) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    const d = new Date(date);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  }
+}
+
+/**
+ * Machine-readable timing label for event notes so the model does not infer from body text alone
+ * (e.g. "March 24 meeting" still described as upcoming after that day).
+ */
+function eventTimingDirective(note, referenceInstant, timeZone) {
+  if (note.note_type !== 'event') return '';
+  const sRaw = note.event_start_at;
+  const eRaw = note.event_end_at;
+  if (!sRaw && !eRaw) return '';
+
+  const nowMs = referenceInstant.getTime();
+  const endMs = eRaw ? new Date(eRaw).getTime() : NaN;
+  const startMs = sRaw ? new Date(sRaw).getTime() : NaN;
+  if (Number.isNaN(nowMs)) return '';
+
+  const refYmd = ymdInZone(referenceInstant, timeZone);
+
+  if (!Number.isNaN(endMs)) {
+    if (nowMs > endMs) {
+      return `Event timing vs summary reference: PAST (end before reference instant). Do not say upcoming, approaching, or scheduled; use past tense only.`;
+    }
+    if (!Number.isNaN(startMs) && nowMs < startMs) {
+      return `Event timing vs summary reference: FUTURE (has not started yet at reference instant).`;
+    }
+    return `Event timing vs summary reference: IN WINDOW (reference instant is on or between start and end).`;
+  }
+
+  if (!Number.isNaN(startMs)) {
+    if (sRaw && hasUtcClockTime(sRaw)) {
+      if (nowMs > startMs) {
+        return `Event timing vs summary reference: PAST (start before reference instant; no end time stored). Do not say upcoming or approaching; use past tense unless the body clearly describes a different future occurrence.`;
+      }
+      return `Event timing vs summary reference: FUTURE (start after reference instant).`;
+    }
+    const eventYmd = ymdInZone(new Date(sRaw), timeZone);
+    if (eventYmd < refYmd) {
+      return `Event timing vs summary reference: PAST (event local calendar day ${eventYmd} is before reference day ${refYmd} in ${timeZone}). Ignore informal dates in the body if they conflict; do not say approaching or upcoming; use past tense.`;
+    }
+    if (eventYmd > refYmd) {
+      return `Event timing vs summary reference: FUTURE (event local calendar day ${eventYmd} is after reference day ${refYmd}).`;
+    }
+    return `Event timing vs summary reference: SAME CALENDAR DAY as reference (${refYmd}).`;
+  }
+
+  return '';
+}
+
 function formatEventRange(note, timeZone) {
   if (note.note_type !== 'event') return '';
   const s = note.event_start_at;
@@ -83,7 +145,7 @@ function formatEventRange(note, timeZone) {
   return left || right;
 }
 
-function formatNoteBlock(note, label, timeZone) {
+function formatNoteBlock(note, label, timeZone, referenceInstant) {
   const lines = [];
   lines.push(`--- ${label} (${note.id}) ---`);
   lines.push(`Type: ${note.note_type || 'note'}`);
@@ -96,6 +158,8 @@ function formatNoteBlock(note, label, timeZone) {
       const d = new Date(note.event_end_at);
       if (!Number.isNaN(d.getTime())) lines.push(`Event end (UTC, ISO 8601): ${d.toISOString()}`);
     }
+    const timing = eventTimingDirective(note, referenceInstant, timeZone);
+    if (timing) lines.push(timing);
   }
   const ev = formatEventRange(note, timeZone);
   if (ev) {
@@ -221,7 +285,11 @@ export async function buildThreadAiSummary(opts) {
     timeZone: timeZoneRaw,
   } = opts;
   const timeZone = sanitizeTimeZone(timeZoneRaw);
-  const { localLine: referenceNowLocal, isoUtc: referenceNowUtc } = formatReferenceNow(timeZone);
+  const referenceInstant = new Date();
+  const { localLine: referenceNowLocal, isoUtc: referenceNowUtc } = formatReferenceNow(
+    timeZone,
+    referenceInstant
+  );
 
   if (!isUuid(threadRootId)) {
     return { ok: false, status: 400, error: 'Invalid threadRootId' };
@@ -331,7 +399,7 @@ export async function buildThreadAiSummary(opts) {
   const mainBlocks = [];
   for (const id of ordered) {
     const n = byId.get(String(id));
-    if (n) mainBlocks.push(formatNoteBlock(n, 'Note in view', timeZone));
+    if (n) mainBlocks.push(formatNoteBlock(n, 'Note in view', timeZone, referenceInstant));
   }
 
   const linkedIds = [...included].filter((id) => !mainRegion.has(id));
@@ -346,7 +414,7 @@ export async function buildThreadAiSummary(opts) {
     const parts = linkedIds
       .map((id) => byId.get(id))
       .filter(Boolean)
-      .map((n) => formatNoteBlock(n, 'Linked note (same thread)', timeZone));
+      .map((n) => formatNoteBlock(n, 'Linked note (same thread)', timeZone, referenceInstant));
     const linkedExplain =
       includeConnected && includeChildren
         ? 'notes in this thread outside the focused subtree below, reached by walking from what was on screen: repeatedly adding in-thread replies, then notes linked to the current set, until stable'
@@ -378,6 +446,8 @@ REFERENCE TIME — compare every dated event, meeting, and deadline in the notes
 - Now (local): ${referenceNowLocal}
 - Now (UTC, ISO 8601): ${referenceNowUtc}
 Use the "Event schedule (user's timezone …)" lines in the notes as the canonical local start/end when present. If an event's end is before this reference moment, describe it as past or completed, not as upcoming. If its start is after this moment, describe it as upcoming, future, or scheduled—not as if it already happened. If it spans this moment, you may describe it as in progress, today, or similar. When note bodies disagree with the schedule line, trust the schedule line for timing. Do not convert ISO UTC lines into a different local time yourself.
+
+For notes with Type: event, each block may include a line starting "Event timing vs summary reference:"—that line is derived from the same reference instant as above and the stored start/end fields. Treat it as authoritative over informal dates or titles in the Content field. If it says PAST, you must not describe that event as upcoming, approaching, on the way, or soon; use past tense only. If it says FUTURE, do not write as if it already happened.
 
 TENSE — when the relevant date or event window for something is entirely before this reference moment (including from event schedules, deadlines, or created_at when that is the only temporal cue), write about it in the past tense (e.g. "discussed," "was scheduled," "took place"). For things entirely after this moment, use future-appropriate wording. Match tense to the time of the thing you are describing, not only to whether the note still exists.
 
