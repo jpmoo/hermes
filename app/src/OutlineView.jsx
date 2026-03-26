@@ -14,7 +14,7 @@ import { getRoots, getThread, getNoteThreadRoot, updateNote } from './api';
 import Layout from './Layout';
 import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from './outlineExpansionStorage';
 import NoteTypeIcon from './NoteTypeIcon';
-import NoteRichText from './NoteRichText';
+import NoteRichText, { toggleTaskMarkerAtIndex } from './NoteRichText';
 import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
@@ -52,7 +52,36 @@ function collectNoteIds(nodes) {
   return ids;
 }
 
-function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLinkedNote, onLoadThread, isMultiRoot }) {
+function replaceContentInTree(node, targetId, nextContent) {
+  const nid = String(node.id);
+  const tid = String(targetId);
+  let changed = false;
+  const nextChildren = (node.children || []).map((child) => {
+    const updated = replaceContentInTree(child, tid, nextContent);
+    if (updated !== child) changed = true;
+    return updated;
+  });
+  if (nid === tid) {
+    return {
+      ...node,
+      content: nextContent,
+      children: changed ? nextChildren : node.children,
+    };
+  }
+  if (changed) return { ...node, children: nextChildren };
+  return node;
+}
+
+function OutlineNode({
+  node,
+  depth,
+  streamThreadRootId,
+  onGoToStream,
+  onOpenLinkedNote,
+  onLoadThread,
+  onTaskContentCommit,
+  isMultiRoot,
+}) {
   const { expandAllTick, collapseAllTick } = useContext(OutlineExpandContext);
   const dnd = useContext(OutlineDndContext);
   const rc = node.reply_count ?? 0;
@@ -64,6 +93,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
     return false;
   });
   const [loading, setLoading] = useState(false);
+  const [displayContent, setDisplayContent] = useState(node.content || '');
   /** `undefined` = not yet synced; avoids matching tick on first mount and skipping open (Expand all). */
   const prevExpandTick = useRef(undefined);
   const prevCollapseTick = useRef(undefined);
@@ -86,6 +116,10 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
     prevCollapseTick.current = collapseAllTick;
     if (prev !== undefined && collapseAllTick > 0) setOpen(false);
   }, [collapseAllTick]);
+
+  useEffect(() => {
+    setDisplayContent(node.content || '');
+  }, [node.id, node.content]);
 
   /** Same behavior as the ▼/▶ control: load root thread and/or flip expand state. */
   const runToggle = async () => {
@@ -128,6 +162,13 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
   const rowPad = { paddingLeft: `${depth * 1.25 + 0.5}rem` };
 
   const tagNames = Array.isArray(node.tags) ? node.tags.map((t) => t?.name ?? t) : [];
+  const handleToggleTask = (taskIndex, nextChecked) => {
+    const prev = displayContent == null ? '' : String(displayContent);
+    const next = toggleTaskMarkerAtIndex(prev, taskIndex, nextChecked);
+    if (next === prev) return;
+    setDisplayContent(next);
+    onTaskContentCommit?.(node.id, next, prev);
+  };
 
   const rowMain = (
     <>
@@ -136,10 +177,11 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
         className={`outline-content outline-content--rich ${node.starred ? 'outline-content--starred' : ''}`}
       >
         <NoteRichText
-          text={node.content}
+          text={displayContent}
           tagNames={tagNames}
           className="outline-content-rich-inner"
           onNoteClick={onOpenLinkedNote}
+          onTaskToggle={handleToggleTask}
           stopClickPropagation={false}
         />
       </span>
@@ -207,6 +249,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
       return;
     }
     /* Let clicks bubble from rich text; http/mailto links keep native behavior without opening Stream. */
+    if (e.target.closest?.('.note-rich-task-checkbox')) return;
     if (e.target.closest?.('button.note-rich-mention')) return;
     const linkEl = e.target.closest?.('a.note-rich-link');
     if (linkEl) {
@@ -272,6 +315,7 @@ function OutlineNode({ node, depth, streamThreadRootId, onGoToStream, onOpenLink
               onGoToStream={onGoToStream}
               onOpenLinkedNote={onOpenLinkedNote}
               onLoadThread={null}
+              onTaskContentCommit={onTaskContentCommit}
               isMultiRoot={isMultiRoot}
             />
           ))}
@@ -480,6 +524,30 @@ export default function OutlineView() {
     );
   }, [loadThreadForRoot]);
 
+  const commitTaskToggleContent = useCallback(async (noteId, nextContent, prevContent) => {
+    setRoots((prev) => prev.map((r) => replaceContentInTree(r, noteId, nextContent)));
+    setRootThreads((prev) => {
+      const out = { ...prev };
+      for (const k of Object.keys(out)) {
+        out[k] = replaceContentInTree(out[k], noteId, nextContent);
+      }
+      return out;
+    });
+    try {
+      await updateNote(noteId, { content: nextContent });
+    } catch (err) {
+      console.error(err);
+      setRoots((prev) => prev.map((r) => replaceContentInTree(r, noteId, prevContent)));
+      setRootThreads((prev) => {
+        const out = { ...prev };
+        for (const k of Object.keys(out)) {
+          out[k] = replaceContentInTree(out[k], noteId, prevContent);
+        }
+        return out;
+      });
+    }
+  }, []);
+
   const performReparent = useCallback(
     async (draggedId, newParentId) => {
       try {
@@ -622,6 +690,7 @@ export default function OutlineView() {
                     isMultiRoot
                     streamThreadRootId={node.id}
                     onLoadThread={loadThreadForRoot}
+                    onTaskContentCommit={commitTaskToggleContent}
                     onOpenLinkedNote={openLinkedNote}
                     onGoToStream={(threadRoot, noteId) => {
                       const q = new URLSearchParams();

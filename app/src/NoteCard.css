@@ -340,6 +340,30 @@
   line-height: 1.12 !important;
 }
 
+.note-rich-markdown ul.contains-task-list,
+.note-rich-markdown ol.contains-task-list,
+.note-rich-markdown .note-rich-ul.contains-task-list,
+.note-rich-markdown .note-rich-ol.contains-task-list {
+  padding-left: 0 !important;
+}
+
+.note-rich-markdown li.task-list-item,
+.note-rich-markdown .note-rich-li.task-list-item {
+  list-style: none !important;
+  margin-left: 0 !important;
+}
+
+.note-rich-markdown li.task-list-item::marker,
+.note-rich-markdown .note-rich-li.task-list-item::marker {
+  content: '' !important;
+}
+
+.note-rich-task-checkbox {
+  margin: 0 0.45rem 0 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
 .note-rich-markdown blockquote {
   margin: 0.45rem 0;
   padding: 0.1rem 0 0.1rem 0.6rem;

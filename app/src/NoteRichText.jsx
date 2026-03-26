@@ -26,6 +26,28 @@ export function formatUrlDisplayLabel(href) {
 }
 
 /**
+ * Toggle the Nth markdown task marker in text (0-based among `- [ ]` / `- [x]` items).
+ * Preserves list marker and spacing; only switches the check token.
+ */
+export function toggleTaskMarkerAtIndex(text, taskIndex, nextChecked) {
+  const src = text == null ? '' : String(text);
+  if (taskIndex < 0) return src;
+  const re = /(^|\n)([ \t]*[-*]\s+\[)( |x|X)(\])/g;
+  let i = 0;
+  let replaced = false;
+  const out = src.replace(re, (m, pre, start, mark, end) => {
+    if (replaced || i !== taskIndex) {
+      i += 1;
+      return m;
+    }
+    replaced = true;
+    i += 1;
+    return `${pre}${start}${nextChecked ? 'x' : ' '}${end}`;
+  });
+  return replaced ? out : src;
+}
+
+/**
  * Note body: markdown links [t](url), bare URLs, hermes-note:// mentions, #tags (when in tagNames).
  * @param {boolean} [stopClickPropagation=true] — when false (e.g. Outline rows), clicks bubble so a parent can open the row; parent should ignore targets inside `.note-rich-link` / `button.note-rich-mention`.
  */
@@ -34,6 +56,7 @@ export default function NoteRichText({
   tagNames = null,
   className,
   onNoteClick,
+  onTaskToggle,
   stopClickPropagation = true,
 }) {
   const tagSet = tagNames instanceof Set ? tagNames : tagNames?.length ? new Set(tagNames) : null;
@@ -57,6 +80,8 @@ export default function NoteRichText({
         (m, pre, name) => (tagSet.has(name) ? `${pre}[#${name}](hermes-tag://${name})` : m)
       )
     : textWithBareHermesLinks;
+
+  let taskItemIndex = 0;
 
   return (
     <div className={[className, 'note-rich-markdown'].filter(Boolean).join(' ')}>
@@ -113,7 +138,31 @@ export default function NoteRichText({
         p: ({ children }) => <p className="note-rich-p">{children}</p>,
         ul: ({ children }) => <ul className="note-rich-ul">{children}</ul>,
         ol: ({ children }) => <ol className="note-rich-ol">{children}</ol>,
-        li: ({ children }) => <li className="note-rich-li">{children}</li>,
+        li: ({ className: liClassName, children }) => (
+          <li className={['note-rich-li', liClassName].filter(Boolean).join(' ')}>{children}</li>
+        ),
+        input: ({ type, checked, disabled, ...rest }) => {
+          if (type !== 'checkbox') return <input type={type} disabled={disabled} {...rest} />;
+          const currentIndex = taskItemIndex;
+          taskItemIndex += 1;
+          const interactive = typeof onTaskToggle === 'function';
+          return (
+            <input
+              type="checkbox"
+              className="note-rich-task-checkbox"
+              checked={checked === true}
+              disabled={!interactive || disabled}
+              onClick={(e) => {
+                if (stopClickPropagation) e.stopPropagation();
+              }}
+              onChange={(e) => {
+                if (stopClickPropagation) e.stopPropagation();
+                if (!interactive) return;
+                onTaskToggle(currentIndex, e.target.checked);
+              }}
+            />
+          );
+        },
         code: ({ inline, children }) =>
           inline ? <code>{children}</code> : <code className="note-rich-code-block">{children}</code>,
         }}

@@ -13,7 +13,7 @@ import {
   uploadNoteFiles,
   getNoteThreadRoot,
 } from './api';
-import NoteRichText from './NoteRichText';
+import NoteRichText, { toggleTaskMarkerAtIndex } from './NoteRichText';
 import NoteAttachments from './NoteAttachments';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
@@ -52,6 +52,8 @@ export default function NoteCard({
   const tagDropdownRef = useRef(null);
   const editFileInputRef = useRef(null);
   const [editing, setEditing] = useState(false);
+  const [renderedContent, setRenderedContent] = useState(note.content || '');
+  const renderedContentRef = useRef(note.content || '');
   const [editContent, setEditContent] = useState(note.content || '');
   const [editNoteType, setEditNoteType] = useState('note');
   const [editStartDate, setEditStartDate] = useState('');
@@ -70,6 +72,14 @@ export default function NoteCard({
   useEffect(() => {
     setEditContent(note.content || '');
   }, [note.id, note.content]);
+
+  useEffect(() => {
+    setRenderedContent(note.content || '');
+  }, [note.id, note.content]);
+
+  useEffect(() => {
+    renderedContentRef.current = renderedContent || '';
+  }, [renderedContent]);
 
   const resetEditMetaFromNote = () => {
     setEditNoteType(note.note_type || 'note');
@@ -356,6 +366,7 @@ export default function NoteCard({
 
   const handleCardClick = (ev) => {
     if (editing) return;
+    if (ev.target.closest?.('.note-rich-task-checkbox')) return;
     if (!hoverInsightEnabled) {
       onOpenThread?.(ev);
       return;
@@ -377,6 +388,7 @@ export default function NoteCard({
 
   const handleCardDoubleClick = (ev) => {
     if (editing) return;
+    if (ev.target.closest?.('.note-rich-task-checkbox')) return;
     if (hoverInsightEnabled) {
       if (skipNextStreamDblClickDrillRef.current) {
         skipNextStreamDblClickDrillRef.current = false;
@@ -419,6 +431,28 @@ export default function NoteCard({
             hasConnections ? ` · ${connectionCount} linked note${connectionCount === 1 ? '' : 's'}` : ''
           }`
       : undefined;
+
+  const taskUpdateChainRef = useRef(Promise.resolve());
+  const handleToggleTask = useCallback(
+    (taskIndex, nextChecked) => {
+      taskUpdateChainRef.current = taskUpdateChainRef.current.then(async () => {
+        const prevContent = renderedContentRef.current == null ? '' : String(renderedContentRef.current);
+        const nextContent = toggleTaskMarkerAtIndex(prevContent, taskIndex, nextChecked);
+        if (nextContent === prevContent) return;
+        setRenderedContent(nextContent);
+        try {
+          await updateNote(note.id, { content: nextContent });
+          await syncTagsFromContent(note.id, nextContent, note.tags, prevContent);
+          await syncConnectionsFromContent(note.id, nextContent, prevContent);
+          onNoteUpdate?.();
+        } catch (err) {
+          console.error(err);
+          setRenderedContent(prevContent);
+        }
+      });
+    },
+    [note.id, note.tags, onNoteUpdate]
+  );
 
   /**
    * Right connection stripe: for leaf notes, left uses borderWidth 1px + var(--border) — if we reused
@@ -550,12 +584,13 @@ export default function NoteCard({
         ) : (
           <>
             <div className="note-card-content">
-              {note.content?.trim() ? (
+              {renderedContent?.trim() ? (
                 <NoteRichText
-                  text={note.content}
+                  text={renderedContent}
                   tagNames={tags.map((t) => t.name)}
                   className="note-card-content-rich"
                   onNoteClick={openLinkedNote}
+                  onTaskToggle={handleToggleTask}
                 />
               ) : note.attachments?.length ? null : (
                 '—'
