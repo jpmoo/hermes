@@ -141,8 +141,8 @@ export default function NoteRichText({
         li: ({ className: liClassName, children }) => (
           <li className={['note-rich-li', liClassName].filter(Boolean).join(' ')}>{children}</li>
         ),
-        input: ({ type, checked, disabled, ...rest }) => {
-          if (type !== 'checkbox') return <input type={type} disabled={disabled} {...rest} />;
+        input: ({ type, checked, ...rest }) => {
+          if (type !== 'checkbox') return <input type={type} {...rest} />;
           const currentIndex = taskItemIndex;
           taskItemIndex += 1;
           const interactive = typeof onTaskToggle === 'function';
@@ -151,7 +151,7 @@ export default function NoteRichText({
               type="checkbox"
               className="note-rich-task-checkbox"
               checked={checked === true}
-              disabled={!interactive || disabled}
+              disabled={!interactive}
               onClick={(e) => {
                 if (stopClickPropagation) e.stopPropagation();
               }}
