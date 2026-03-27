@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -132,6 +133,22 @@ function sortBySimilarityDesc(list) {
     if (sb !== sa) return sb - sa;
     return (a.content || '').localeCompare(b.content || '');
   });
+}
+
+/** Live <article> for Stream insight layout after React replaces nodes (focus / animations). */
+function findInsightArticleEl(noteId) {
+  if (noteId == null) return null;
+  const sid = String(noteId);
+  const lists = document.querySelectorAll('ul.stream-page-list');
+  for (const list of lists) {
+    for (const li of list.querySelectorAll('li[data-stream-note]')) {
+      if (li.getAttribute('data-stream-note') === sid) {
+        const art = li.querySelector(':scope > article');
+        if (art && typeof art.getBoundingClientRect === 'function') return art;
+      }
+    }
+  }
+  return null;
 }
 
 /** Split flat tag list: neighbor (thread SQL), connected (links SQL), novel (Ollama only). */
@@ -780,6 +797,18 @@ function HoverInsightPanels() {
     };
   }, [hover?.note?.id, insightAnchorRef]);
   void layoutRev;
+
+  /** Re-bind anchor after Stream re-renders replace the <article> (stale ref → bad/zero rect and missing connection stack). */
+  useLayoutEffect(() => {
+    if (!hover?.note?.id) return;
+    const el = findInsightArticleEl(hover.note.id);
+    if (!el) return;
+    if (insightAnchorRef.current !== el) {
+      insightAnchorRef.current = el;
+      setLayoutRev((n) => n + 1);
+    }
+  }, [hover?.note?.id, layoutRev, insightAnchorRef]);
+
   const rect = insightAnchorRef.current?.getBoundingClientRect?.();
 
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));

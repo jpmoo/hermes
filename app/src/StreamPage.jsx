@@ -1205,7 +1205,7 @@ export default function StreamPage() {
               ) : roots.length > 0 ? (
                 <ul className="stream-page-list">
                   {filteredRoots.map((n) => (
-                    <li key={n.id} className="stream-page-root-item">
+                    <li key={n.id} className="stream-page-root-item" data-stream-note={n.id}>
                       <NoteCard
                         note={n}
                         depth={0}
