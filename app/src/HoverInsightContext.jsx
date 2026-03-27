@@ -92,6 +92,36 @@ function readStoredSimilarVisibleTypes() {
   }
 }
 
+/** Stable id + paths for persisted link rows (API may use snake_case or alternate keys). */
+function normalizePersistedLinkItem(p) {
+  if (!p || typeof p !== 'object') return null;
+  const id = p.id ?? p.note_id ?? p.noteId;
+  if (id == null || String(id).trim() === '') return null;
+  return {
+    ...p,
+    id,
+    threadPath: p.threadPath ?? p.thread_path ?? '',
+    note_type: p.note_type ?? p.noteType ?? 'note',
+  };
+}
+
+/** Union by note id; overlay `primary` fields onto `secondary` so hover-insight wins for detail. */
+function mergePersistedLinksLists(primary, secondary) {
+  const map = new Map();
+  for (const raw of secondary || []) {
+    const p = normalizePersistedLinkItem(raw);
+    if (p) map.set(String(p.id).toLowerCase(), { ...p });
+  }
+  for (const raw of primary || []) {
+    const p = normalizePersistedLinkItem(raw);
+    if (!p) continue;
+    const k = String(p.id).toLowerCase();
+    const existing = map.get(k) || {};
+    map.set(k, { ...existing, ...p });
+  }
+  return [...map.values()];
+}
+
 /** Ensure arrays exist (API / parse edge cases). Accept camelCase or snake_case keys. */
 function normalizeHoverInsightPayload(data) {
   if (!data || typeof data !== 'object') {
@@ -111,6 +141,9 @@ function normalizeHoverInsightPayload(data) {
         note_type: s.note_type || s.noteType || 'note',
       }))
     : [];
+  const persistedNorm = Array.isArray(persisted)
+    ? persisted.map(normalizePersistedLinkItem).filter(Boolean)
+    : [];
   const skippedShort =
     data.similarNotesSkippedShortNote === true || data.similar_notes_skipped_short_note === true;
   const minChars = data.similarNotesMinChars ?? data.similar_notes_min_chars;
@@ -119,7 +152,7 @@ function normalizeHoverInsightPayload(data) {
     ...data,
     tagSuggestions: Array.isArray(tags) ? tags : [],
     similarNotes: similarNorm,
-    persistedLinks: Array.isArray(persisted) ? persisted : [],
+    persistedLinks: persistedNorm,
     similarNotesSkippedShortNote: skippedShort,
     similarNotesMinChars: typeof minChars === 'number' && Number.isFinite(minChars) ? minChars : undefined,
   };
@@ -448,8 +481,19 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
 
       fetchTimer.current = setTimeout(() => {
         fetchHoverInsight(note.id)
-          .then((data) => {
+          .then(async (data) => {
             if (reqId.current !== id) return;
+            let quickPl = [];
+            try {
+              const q = await fetchLinkedNotesQuick(note.id);
+              quickPl = Array.isArray(q?.persistedLinks)
+                ? q.persistedLinks
+                : Array.isArray(q?.persisted_links)
+                  ? q.persisted_links
+                  : [];
+            } catch (e) {
+              console.error(e);
+            }
             const hasPersistedKey =
               data &&
               typeof data === 'object' &&
@@ -457,15 +501,20 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
               ('persistedLinks' in data || 'persisted_links' in data);
             setInsight((prev) => {
               const next = normalizeHoverInsightPayload(data);
+              const mergedPl = mergePersistedLinksLists(next.persistedLinks, quickPl);
+              const nextMerged = { ...next, persistedLinks: mergedPl };
               if (
                 !hasPersistedKey &&
-                next.persistedLinks.length === 0 &&
+                nextMerged.persistedLinks.length === 0 &&
                 Array.isArray(prev?.persistedLinks) &&
                 prev.persistedLinks.length > 0
               ) {
-                return { ...next, persistedLinks: prev.persistedLinks };
+                return {
+                  ...nextMerged,
+                  persistedLinks: mergePersistedLinksLists(nextMerged.persistedLinks, prev.persistedLinks),
+                };
               }
-              return next;
+              return nextMerged;
             });
           })
           .catch(() => {
@@ -633,16 +682,36 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       try {
         await createNoteConnection(anchorId, similarNoteId);
         onNoteUpdated?.();
-        const data = await fetchHoverInsight(anchorId);
+        const [data, quick] = await Promise.all([
+          fetchHoverInsight(anchorId),
+          fetchLinkedNotesQuick(anchorId).catch(() => ({})),
+        ]);
         if (activeHoverId.current !== anchorId) return;
-        setInsight(normalizeHoverInsightPayload(data));
+        const next = normalizeHoverInsightPayload(data);
+        const quickPl = Array.isArray(quick?.persistedLinks)
+          ? quick.persistedLinks
+          : Array.isArray(quick?.persisted_links)
+            ? quick.persisted_links
+            : [];
+        next.persistedLinks = mergePersistedLinksLists(next.persistedLinks, quickPl);
+        setInsight(next);
       } catch (e) {
         console.error(e);
         window.alert(e?.message || 'Could not connect note');
         try {
-          const data = await fetchHoverInsight(anchorId);
+          const [data, quick] = await Promise.all([
+            fetchHoverInsight(anchorId),
+            fetchLinkedNotesQuick(anchorId).catch(() => ({})),
+          ]);
           if (activeHoverId.current === anchorId) {
-            setInsight(normalizeHoverInsightPayload(data));
+            const next = normalizeHoverInsightPayload(data);
+            const quickPl = Array.isArray(quick?.persistedLinks)
+              ? quick.persistedLinks
+              : Array.isArray(quick?.persisted_links)
+                ? quick.persisted_links
+                : [];
+            next.persistedLinks = mergePersistedLinksLists(next.persistedLinks, quickPl);
+            setInsight(next);
           }
         } catch (_) {
           /* ignore */
@@ -861,19 +930,24 @@ function HoverInsightPanels() {
   );
 
   /** SQL-backed links (body mentions, similar-panel connect, etc.) — used for disconnect + “Linked” label. */
-  const persistedIdSet = useMemo(() => new Set(persisted.map((p) => String(p.id))), [persisted]);
+  const persistedIdSet = useMemo(
+    () => new Set(persisted.map((p) => String(p.id).toLowerCase())),
+    [persisted]
+  );
 
   /**
    * Under-card stack: real connections plus similar-note hits not yet in that set (same cards as “Linked”,
    * labeled “Similar” when there is no note_connections row yet).
+   * Uses similarNotesAfterSimilarity (not type-filtered) so sidebar type toggles don’t hide stack cards.
    */
   const connectionStackPeers = useMemo(() => {
     const byId = new Map();
     for (const p of persisted) {
-      byId.set(String(p.id), p);
+      const k = String(p.id).toLowerCase();
+      byId.set(k, p);
     }
-    for (const sn of filteredSimilarNotes) {
-      const k = String(sn.id);
+    for (const sn of similarNotesAfterSimilarity) {
+      const k = String(sn.id).toLowerCase();
       if (byId.has(k)) continue;
       byId.set(k, {
         id: sn.id,
@@ -891,7 +965,7 @@ function HoverInsightPanels() {
       });
     }
     return sortBySimilarityDesc([...byId.values()]);
-  }, [persisted, filteredSimilarNotes]);
+  }, [persisted, similarNotesAfterSimilarity]);
 
   const ragdollByCollection = useMemo(
     () => groupRagdollDocumentsByCollection(ragdollDocs),
@@ -1226,7 +1300,7 @@ function HoverInsightPanels() {
                     : connType === 'note'
                       ? 'hover-insight-connection-card--type-note'
                       : '';
-            const isDbLinked = persistedIdSet.has(String(pn.id));
+            const isDbLinked = persistedIdSet.has(String(pn.id).toLowerCase());
             const openModal = () =>
               setConnectionModal({
                 linked: pn,
