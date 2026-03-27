@@ -214,6 +214,23 @@
     transform 0.44s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Up one level: land on the in-tree slot (measured), same easing as drill-down */
+.stream-page-float--move-target {
+  max-width: none;
+  top: var(--fp-end-top);
+  left: var(--fp-end-left);
+  width: var(--fp-end-w);
+  transform: none;
+  transition:
+    top 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+    left 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stream-page-float-picked {
+  visibility: hidden;
+}
+
 .stream-page-root-fading {
   opacity: 0.12;
   filter: blur(3px);

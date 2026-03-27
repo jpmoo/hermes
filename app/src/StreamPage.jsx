@@ -117,6 +117,13 @@ function clearDrillDimming(container) {
   });
 }
 
+function clearFloatPicked(container) {
+  const root = container ?? document;
+  root.querySelectorAll('.stream-page-float-picked').forEach((el) => {
+    el.classList.remove('stream-page-float-picked');
+  });
+}
+
 /** Dim nodes not on path from displayed root to target; mark target li picked. Returns target li or null. */
 function applyDrillDimming(threadListEl, pathFromDisplayRoot) {
   clearDrillDimming(threadListEl);
@@ -328,8 +335,6 @@ export default function StreamPage() {
   const [threadExiting, setThreadExiting] = useState(false);
   const [branchHeadExiting, setBranchHeadExiting] = useState(false);
   const [levelDropDelays, setLevelDropDelays] = useState(null);
-  const [flipTick, setFlipTick] = useState(0);
-  const flipPayloadRef = useRef(null);
   const levelNavBusyRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
 
@@ -436,6 +441,7 @@ export default function StreamPage() {
         floatTimerRef.current = null;
       }
       setFloatOpen(null);
+      clearFloatPicked(document);
       document.querySelectorAll('.stream-page-root-item').forEach((el) => {
         el.classList.remove('stream-page-root-fading', 'stream-page-root-item--picked');
       });
@@ -524,6 +530,7 @@ export default function StreamPage() {
         clearTimeout(floatTimerRef.current);
         floatTimerRef.current = null;
       }
+      clearFloatPicked(threadListRef.current);
       setFloatOpen(null);
       setReplyStagger(false);
       setSearchParams({ thread: rootId });
@@ -544,6 +551,7 @@ export default function StreamPage() {
         clearTimeout(floatTimerRef.current);
         floatTimerRef.current = null;
       }
+      clearFloatPicked(threadListRef.current);
       const r = li.getBoundingClientRect();
       li.classList.add('stream-page-root-item--picked');
       document.querySelectorAll('.stream-page-root-item').forEach((el) => {
@@ -608,7 +616,7 @@ export default function StreamPage() {
 
   const upOneLevel = useCallback(() => {
     if (!threadRootId || !focusId || noteIdEq(focusId, actualRootId)) return;
-    if (levelNavBusyRef.current || floatTimerRef.current) return;
+    if (levelNavBusyRef.current) return;
     const parentId = parentInFilteredTree(tree, focusId);
     if (!parentId) {
       animateToFullThread();
@@ -622,39 +630,55 @@ export default function StreamPage() {
       listEl?.querySelector(`li[data-stream-note="${leavingHeadId}"] > article`) ||
       listEl?.querySelector(':scope > li[data-stream-note] > article');
     const fr = art?.getBoundingClientRect();
-    const fromRect = fr
-      ? {
-          left: fr.left,
-          top: fr.top,
-          width: fr.width,
-          height: fr.height,
-          noteId: leavingHeadId,
-          targetParentId: parentId,
-        }
-      : null;
+
+    const row = thread.find((n) => noteIdEq(n.id, leavingHeadId));
+    const headNode = findNode(tree, leavingHeadId);
+    const note =
+      row != null
+        ? { ...row, reply_count: headNode?.children?.length ?? row.reply_count ?? 0 }
+        : null;
 
     const parentNode = findNode(tree, parentId);
     const delays = parentNode ? buildParentBranchLevelDrops(parentNode, leavingHeadId) : new Map();
+    delays.delete(leavingHeadId);
 
     const movingToRoot = noteIdEq(parentId, actualRootId);
-    /* Keep the same parent-focus transition path even when parent is root. */
+    if (floatTimerRef.current) {
+      clearTimeout(floatTimerRef.current);
+      floatTimerRef.current = null;
+    }
+    clearFloatPicked(listEl);
+
     setFocusId(parentId);
     setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
-    if (fromRect) {
-      // Arc FLIP animates this note's transform; exclude it from row-level drop animation to avoid conflicts.
-      delays.delete(leavingHeadId);
-      setLevelDropDelays(delays);
-      flipPayloadRef.current = fromRect;
-      setFlipTick((x) => x + 1);
+    setLevelDropDelays(delays);
+    clearLevelDropSoon();
+
+    if (fr && note && fr.width > 0 && fr.height > 0) {
+      setFloatOpen({
+        kind: 'up',
+        note,
+        top: fr.top,
+        left: fr.left,
+        width: fr.width,
+        phase: 'idle',
+        leavingId: leavingHeadId,
+        parentId,
+      });
+      floatTimerRef.current = setTimeout(() => {
+        floatTimerRef.current = null;
+        clearFloatPicked(threadListRef.current);
+        setFloatOpen(null);
+        levelNavBusyRef.current = false;
+      }, 480);
     } else {
       const d = new Map(delays);
       d.set(leavingHeadId, 440);
       setLevelDropDelays(d);
+      window.setTimeout(() => {
+        levelNavBusyRef.current = false;
+      }, 650);
     }
-    clearLevelDropSoon();
-    window.setTimeout(() => {
-      levelNavBusyRef.current = false;
-    }, 650);
   }, [
     threadRootId,
     focusId,
@@ -666,87 +690,49 @@ export default function StreamPage() {
     clearLevelDropSoon,
   ]);
 
+  /** After “up one level” focus commit, measure the in-tree slot and drive the float (same idea as drill-down). */
   useLayoutEffect(() => {
-    const payload = flipPayloadRef.current;
-    if (!payload || !threadListRef.current) return;
-    const { noteId, targetParentId, left, top, width, height } = payload;
-    flipPayloadRef.current = null;
-
-    const runArcFlip = (el) => {
-      const tr = el.getBoundingClientRect();
-      const dx = left - tr.left;
-      const dy = top - tr.top;
-      const sx = width / Math.max(tr.width, 1);
-      const sy = height / Math.max(tr.height, 1);
-      const midX = dx * 0.45;
-      const lift = Math.max(18, Math.min(42, Math.abs(dy) * 0.22));
-      const midY = dy * 0.55 - lift;
-
-      el.style.transformOrigin = 'top left';
-      el.style.willChange = 'transform';
-      const anim = el.animate(
-        [
-          { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
-          { transform: `translate(${midX}px, ${midY}px) scale(${(sx + 1) / 2}, ${(sy + 1) / 2})` },
-          { transform: 'translate(0px, 0px) scale(1, 1)' },
-        ],
-        {
-          duration: 560,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          fill: 'both',
-        }
-      );
-      anim.onfinish = () => {
-        el.style.transformOrigin = '';
-        el.style.willChange = '';
-      };
-      anim.oncancel = () => {
-        el.style.transformOrigin = '';
-        el.style.willChange = '';
-      };
+    if (!floatOpen || floatOpen.kind !== 'up' || floatOpen.phase !== 'idle') return;
+    const { leavingId, parentId } = floatOpen;
+    const listEl = threadListRef.current;
+    const abortUp = () => {
+      if (floatTimerRef.current) {
+        clearTimeout(floatTimerRef.current);
+        floatTimerRef.current = null;
+      }
+      clearFloatPicked(listEl ?? document);
+      setFloatOpen(null);
+      levelNavBusyRef.current = false;
     };
-
-    const scopedTargetSelector =
-      targetParentId != null
-        ? `li[data-stream-note="${targetParentId}"] > ul.stream-page-replies li[data-stream-note="${noteId}"] > article`
-        : null;
-    const pickTarget = () =>
-      (scopedTargetSelector && threadListRef.current?.querySelector(scopedTargetSelector)) ||
-      threadListRef.current?.querySelector(`li[data-stream-note="${noteId}"] > article`);
-
-    let toArt = pickTarget();
-    if (!toArt) {
-      let tries = 0;
-      const retryFind = () => {
-        const retry = pickTarget();
-        if (retry) {
-          runArcFlip(retry);
-          return;
-        }
-        tries += 1;
-        if (tries < 5) requestAnimationFrame(retryFind);
-      };
-      requestAnimationFrame(retryFind);
+    if (!listEl || parentId == null || leavingId == null) {
+      abortUp();
       return;
     }
-    runArcFlip(toArt);
-    const bLi = toArt.closest('li');
-    const bUl = bLi?.querySelector(':scope > ul.stream-page-replies');
-    if (bUl) {
-      bUl.style.opacity = '0';
-      bUl.style.transition = 'none';
+    const scoped = `li[data-stream-note="${parentId}"] > ul.stream-page-replies li[data-stream-note="${leavingId}"]`;
+    let li = listEl.querySelector(scoped);
+    if (!li) li = findStreamLiByNoteId(listEl, leavingId);
+    if (!li) {
+      abortUp();
+      return;
     }
-    if (bUl) {
-      window.setTimeout(() => {
-        bUl.style.transition = 'opacity 0.38s ease';
-        bUl.style.opacity = '1';
-        window.setTimeout(() => {
-          bUl.style.transition = '';
-          bUl.style.opacity = '';
-        }, 400);
-      }, 360);
-    }
-  }, [flipTick]);
+    li.classList.add('stream-page-float-picked');
+    const destArt = li.querySelector('article');
+    const r = (destArt || li).getBoundingClientRect();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setFloatOpen((prev) => {
+          if (!prev || prev.kind !== 'up' || prev.phase !== 'idle') return prev;
+          return {
+            ...prev,
+            phase: 'move',
+            endTop: r.top,
+            endLeft: r.left,
+            endWidth: r.width,
+          };
+        });
+      });
+    });
+  }, [floatOpen]);
 
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
 
@@ -812,6 +798,7 @@ export default function StreamPage() {
         clearTimeout(floatTimerRef.current);
         floatTimerRef.current = null;
         clearDrillDimming(listEl);
+        clearFloatPicked(listEl);
         setFloatOpen(null);
       }
       let targetLi = applyDrillDimming(listEl, drillPath);
@@ -850,6 +837,7 @@ export default function StreamPage() {
       floatTimerRef.current = setTimeout(() => {
         floatTimerRef.current = null;
         clearDrillDimming(threadListRef.current);
+        clearFloatPicked(threadListRef.current);
         setFloatOpen(null);
         setReplyStagger(true);
         setFocusId(id);
@@ -1103,11 +1091,24 @@ export default function StreamPage() {
       <div className="stream-page">
         {floatOpen && (
           <div
-            className={`stream-page-float ${floatOpen.phase === 'move' ? 'stream-page-float--move' : ''}`}
+            className={`stream-page-float ${
+              floatOpen.phase === 'move'
+                ? floatOpen.kind === 'up'
+                  ? 'stream-page-float--move-target'
+                  : 'stream-page-float--move'
+                : ''
+            }`}
             style={{
               '--fp-top': `${floatOpen.top}px`,
               '--fp-left': `${floatOpen.left}px`,
               '--fp-w': `${floatOpen.width}px`,
+              ...(floatOpen.kind === 'up' &&
+                floatOpen.phase === 'move' &&
+                floatOpen.endTop != null && {
+                  '--fp-end-top': `${floatOpen.endTop}px`,
+                  '--fp-end-left': `${floatOpen.endLeft}px`,
+                  '--fp-end-w': `${floatOpen.endWidth}px`,
+                }),
             }}
             aria-hidden
           >
