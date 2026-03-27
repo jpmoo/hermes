@@ -135,17 +135,22 @@ function sortBySimilarityDesc(list) {
   });
 }
 
+/** Compare note ids for DOM data-stream-note (UUID case can differ between React and pg). */
+function noteIdAttrEq(attr, noteId) {
+  const a = (attr != null ? String(attr) : '').trim().toLowerCase();
+  const b = (noteId != null ? String(noteId) : '').trim().toLowerCase();
+  return a.length > 0 && a === b;
+}
+
 /** Live <article> for Stream insight layout after React replaces nodes (focus / animations). */
 function findInsightArticleEl(noteId) {
   if (noteId == null) return null;
-  const sid = String(noteId);
   const lists = document.querySelectorAll('ul.stream-page-list');
   for (const list of lists) {
     for (const li of list.querySelectorAll('li[data-stream-note]')) {
-      if (li.getAttribute('data-stream-note') === sid) {
-        const art = li.querySelector(':scope > article');
-        if (art && typeof art.getBoundingClientRect === 'function') return art;
-      }
+      if (!noteIdAttrEq(li.getAttribute('data-stream-note'), noteId)) continue;
+      const art = li.querySelector(':scope > article');
+      if (art && typeof art.getBoundingClientRect === 'function') return art;
     }
   }
   return null;
@@ -445,7 +450,23 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
         fetchHoverInsight(note.id)
           .then((data) => {
             if (reqId.current !== id) return;
-            setInsight(normalizeHoverInsightPayload(data));
+            const hasPersistedKey =
+              data &&
+              typeof data === 'object' &&
+              !Array.isArray(data) &&
+              ('persistedLinks' in data || 'persisted_links' in data);
+            setInsight((prev) => {
+              const next = normalizeHoverInsightPayload(data);
+              if (
+                !hasPersistedKey &&
+                next.persistedLinks.length === 0 &&
+                Array.isArray(prev?.persistedLinks) &&
+                prev.persistedLinks.length > 0
+              ) {
+                return { ...next, persistedLinks: prev.persistedLinks };
+              }
+              return next;
+            });
           })
           .catch(() => {
             if (reqId.current !== id) return;
@@ -798,18 +819,22 @@ function HoverInsightPanels() {
   }, [hover?.note?.id, insightAnchorRef]);
   void layoutRev;
 
-  /** Re-bind anchor after Stream re-renders replace the <article> (stale ref → bad/zero rect and missing connection stack). */
-  useLayoutEffect(() => {
-    if (!hover?.note?.id) return;
-    const el = findInsightArticleEl(hover.note.id);
-    if (!el) return;
-    if (insightAnchorRef.current !== el) {
-      insightAnchorRef.current = el;
-      setLayoutRev((n) => n + 1);
-    }
-  }, [hover?.note?.id, layoutRev, insightAnchorRef]);
+  /**
+   * Resolve the card <article> during render (not only via ref) so getBoundingClientRect runs on the
+   * live node. Ref can point at a detached element after Stream re-renders; that made rect useless and
+   * hid the connection stack even when persistedLinks loaded.
+   */
+  const layoutAnchorEl = useMemo(() => {
+    if (hover?.note?.id == null) return null;
+    return findInsightArticleEl(hover.note.id);
+  }, [hover?.note?.id, layoutRev]);
 
-  const rect = insightAnchorRef.current?.getBoundingClientRect?.();
+  useLayoutEffect(() => {
+    if (layoutAnchorEl) insightAnchorRef.current = layoutAnchorEl;
+  }, [layoutAnchorEl]);
+
+  const layoutEl = layoutAnchorEl ?? insightAnchorRef.current;
+  const rect = layoutEl?.getBoundingClientRect?.();
 
   const tags = (insight?.tagSuggestions || []).filter((t) => !dismissedKeys.has(t.key));
   const similarNotes = insight?.similarNotes || [];
