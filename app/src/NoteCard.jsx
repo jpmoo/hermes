@@ -612,6 +612,7 @@ export default function NoteCard({
         )}
         <div className="note-card-meta">
           <time className="note-card-time">
+            Last edited:{' '}
             {new Date(note.updated_at).toLocaleDateString(undefined, {
               month: 'short',
               day: 'numeric',
