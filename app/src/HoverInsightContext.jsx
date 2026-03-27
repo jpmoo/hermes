@@ -23,7 +23,6 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
-import { useNoteTypeColors } from './NoteTypeColorContext';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -276,7 +275,6 @@ export function useHoverInsight() {
 }
 
 export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
-  const { similarNotesMinChars, similarNotesMinDefault } = useNoteTypeColors();
   const [hover, setHover] = useState(null);
   const [insight, setInsight] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -440,25 +438,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setRagdollDocs([]);
       setRagdollError(null);
 
-      const minChars =
-        typeof similarNotesMinChars === 'number' && Number.isFinite(similarNotesMinChars)
-          ? similarNotesMinChars
-          : typeof similarNotesMinDefault === 'number' && Number.isFinite(similarNotesMinDefault)
-            ? similarNotesMinDefault
-            : 48;
-      const bodyLen = (note?.content || '').trim().length;
-      if (minChars > 0 && bodyLen < minChars) {
-        if (fetchTimer.current) clearTimeout(fetchTimer.current);
-        setInsight({
-          tagSuggestions: [],
-          similarNotes: [],
-          persistedLinks: [],
-          similarNotesSkippedShortNote: true,
-          similarNotesMinChars: minChars,
-        });
-        setLoading(false);
-        return;
-      }
+      /* Min character setting applies only to server-side vector “similar notes” (right panel), not to linked-peer cards. */
 
       fetchLinkedNotesQuick(note.id)
         .then((data) => {
@@ -530,7 +510,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
           });
       }, 220);
     },
-    [clearInsightSelection, similarNotesMinChars, similarNotesMinDefault]
+    [clearInsightSelection]
   );
 
   /** Pointer / Escape: dismiss when clicking outside insight UI and the selected card. */
