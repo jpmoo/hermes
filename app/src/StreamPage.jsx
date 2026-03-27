@@ -224,16 +224,19 @@ function StreamList({
   onNoteDelete,
   staggerDelays,
   levelDropDelays,
+  branchHeadExiting,
+  indexInParent = 0,
   parentTags = [],
   threadById,
 }) {
   return (
     <>
-      {nodes.map((n) => {
+      {nodes.map((n, i) => {
         const levelDropMs = levelDropDelays?.get(n.id);
         const replyMs = !levelDropMs && depth > 0 && staggerDelays?.get(n.id);
         const delayMs = levelDropMs ?? replyMs;
         const animClass = levelDropMs != null ? 'stream-page-level-drop' : replyMs != null ? 'stream-page-reply-stagger' : undefined;
+        const headExit = Boolean(branchHeadExiting && depth === 0 && (indexInParent + i) === 0);
         const parentTagsForInherit =
           depth > 0
             ? parentTags
@@ -244,7 +247,7 @@ function StreamList({
           <li
             key={n.id}
             data-stream-note={n.id}
-            className={animClass}
+            className={[animClass, headExit ? 'stream-page-branch-head-exit' : ''].filter(Boolean).join(' ') || undefined}
             style={delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined}
           >
             <NoteCard
@@ -272,6 +275,8 @@ function StreamList({
                   onNoteDelete={onNoteDelete}
                   staggerDelays={staggerDelays}
                   levelDropDelays={levelDropDelays}
+                  branchHeadExiting={branchHeadExiting}
+                  indexInParent={0}
                 />
               </ul>
             )}
@@ -644,51 +649,8 @@ export default function StreamPage() {
     }
     clearFloatPicked(listEl);
 
-    /* Keep branch view on screen while every card exits; only then show full thread at root (same timing as animateToFullThread). */
-    if (movingToRoot) {
-      setBranchHeadExiting(true);
-      const hasFloat = Boolean(fr && note && fr.width > 0 && fr.height > 0);
-      window.setTimeout(() => {
-        setBranchHeadExiting(false);
-        setFocusId(parentId);
-        setSearchParams({ thread: threadRootId });
-        if (hasFloat) {
-          setLevelDropDelays(delays);
-        } else {
-          const d = new Map(delays);
-          d.set(leavingHeadId, 440);
-          setLevelDropDelays(d);
-        }
-        clearLevelDropSoon();
-      }, 400);
-
-      if (hasFloat) {
-        setFloatOpen({
-          kind: 'up',
-          note,
-          top: fr.top,
-          left: fr.left,
-          width: fr.width,
-          phase: 'idle',
-          leavingId: leavingHeadId,
-          parentId,
-        });
-        floatTimerRef.current = setTimeout(() => {
-          floatTimerRef.current = null;
-          clearFloatPicked(threadListRef.current);
-          setFloatOpen(null);
-          levelNavBusyRef.current = false;
-        }, 480);
-      } else {
-        window.setTimeout(() => {
-          levelNavBusyRef.current = false;
-        }, 420);
-      }
-      return;
-    }
-
     setFocusId(parentId);
-    setSearchParams({ thread: threadRootId, focus: parentId });
+    setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
     setLevelDropDelays(delays);
     clearLevelDropSoon();
 
@@ -1199,7 +1161,7 @@ export default function StreamPage() {
                 <p className="stream-page-muted">No notes match the current type filters.</p>
               ) : (
                 <div
-                  className={`stream-page-thread-enter ${threadExiting ? 'stream-page-thread-enter--exit' : ''} ${levelDropDelays ? 'stream-page-thread-enter--level-drop' : ''} ${branchHeadExiting ? 'stream-page-thread-enter--notes-exit-to-root' : ''}`}
+                  className={`stream-page-thread-enter ${threadExiting ? 'stream-page-thread-enter--exit' : ''} ${levelDropDelays ? 'stream-page-thread-enter--level-drop' : ''}`}
                   key={threadRootId}
                   ref={threadAnchorRef}
                 >
@@ -1218,6 +1180,7 @@ export default function StreamPage() {
                       }}
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
+                      branchHeadExiting={branchHeadExiting}
                     />
                   </ul>
                 </div>

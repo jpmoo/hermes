@@ -284,24 +284,15 @@
   animation: none;
 }
 
-/* Return to full thread at root: every visible row falls and fades before the new tree appears */
-@keyframes streamNotesExitToRoot {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.stream-page-branch-head-exit > article {
+  animation: streamBranchHeadExit 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes streamBranchHeadExit {
   to {
     opacity: 0;
-    transform: translateY(36px);
+    transform: translateY(-44px) scale(0.95);
   }
-}
-
-.stream-page-thread-enter--notes-exit-to-root .stream-page-list li[data-stream-note] {
-  animation: streamNotesExitToRoot 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.stream-page-thread-enter--notes-exit-to-root .stream-page-list li[data-stream-note] > article {
-  animation: none !important;
 }
 
 .stream-page-level-drop > article {
