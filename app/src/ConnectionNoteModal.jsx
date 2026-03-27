@@ -16,6 +16,8 @@ export default function ConnectionNoteModal({
   unlinkPersisted,
   navigateToConnection,
   onNoteUpdated,
+  /** Similar-note preview: no row in note_connections yet — hide Disconnect. */
+  hideDisconnect = false,
 }) {
   const [fetched, setFetched] = useState({
     threadPath: '',
@@ -160,16 +162,18 @@ export default function ConnectionNoteModal({
           )}
         </div>
         <div className="hover-insight-modal-actions">
-          <button
-            type="button"
-            className="hover-insight-modal-btn hover-insight-modal-btn--danger"
-            onClick={() => {
-              if (!window.confirm(CONFIRM_UNLINK)) return;
-              unlinkPersisted(anchorNoteId, linked.id);
-            }}
-          >
-            Disconnect
-          </button>
+          {!hideDisconnect ? (
+            <button
+              type="button"
+              className="hover-insight-modal-btn hover-insight-modal-btn--danger"
+              onClick={() => {
+                if (!window.confirm(CONFIRM_UNLINK)) return;
+                unlinkPersisted(anchorNoteId, linked.id);
+              }}
+            >
+              Disconnect
+            </button>
+          ) : null}
           <div className="hover-insight-modal-actions-right">
             <button
               type="button"

@@ -860,6 +860,39 @@ function HoverInsightPanels() {
     [insight?.persistedLinks]
   );
 
+  /** SQL-backed links (body mentions, similar-panel connect, etc.) — used for disconnect + “Linked” label. */
+  const persistedIdSet = useMemo(() => new Set(persisted.map((p) => String(p.id))), [persisted]);
+
+  /**
+   * Under-card stack: real connections plus similar-note hits not yet in that set (same cards as “Linked”,
+   * labeled “Similar” when there is no note_connections row yet).
+   */
+  const connectionStackPeers = useMemo(() => {
+    const byId = new Map();
+    for (const p of persisted) {
+      byId.set(String(p.id), p);
+    }
+    for (const sn of filteredSimilarNotes) {
+      const k = String(sn.id);
+      if (byId.has(k)) continue;
+      byId.set(k, {
+        id: sn.id,
+        content: sn.content,
+        parent_id: sn.parent_id,
+        note_type: sn.note_type || 'note',
+        event_start_at: sn.event_start_at,
+        event_end_at: sn.event_end_at,
+        starred: sn.starred,
+        updated_at: sn.updated_at,
+        similarity: sn.similarity != null ? Number(sn.similarity) : null,
+        threadRootId: sn.threadRootId ?? sn.thread_root_id,
+        threadPath: sn.threadPath || sn.thread_path || '',
+        tags: Array.isArray(sn.tags) ? sn.tags : [],
+      });
+    }
+    return sortBySimilarityDesc([...byId.values()]);
+  }, [persisted, filteredSimilarNotes]);
+
   const ragdollByCollection = useMemo(
     () => groupRagdollDocumentsByCollection(ragdollDocs),
     [ragdollDocs]
@@ -870,7 +903,7 @@ function HoverInsightPanels() {
   /** Below the card; stack’s right edge aligns with note’s right + 60px (viewport coords). */
   const LINK_STACK_RIGHT_OUTSET = 60;
   const connectionLayout =
-    rect && persisted.length > 0
+    rect && connectionStackPeers.length > 0
       ? (() => {
           const gap = 6;
           const margin = 8;
@@ -1172,14 +1205,14 @@ function HoverInsightPanels() {
         </>
       )}
 
-      {hover && rect && persisted.length > 0 && connectionLayout && note && (
+      {hover && rect && connectionStackPeers.length > 0 && connectionLayout && note && (
         <>
         <div
           className="hover-insight-connection-stack"
           data-insight-ui
           style={connectionLayout.stackStyle}
         >
-          {persisted.map((pn) => {
+          {connectionStackPeers.map((pn) => {
             const body = pn.content != null ? String(pn.content).trim() : '';
             const tagNames = Array.isArray(pn.tags) ? pn.tags.map((t) => t.name || t) : [];
             const connType = pn.note_type || 'note';
@@ -1193,6 +1226,13 @@ function HoverInsightPanels() {
                     : connType === 'note'
                       ? 'hover-insight-connection-card--type-note'
                       : '';
+            const isDbLinked = persistedIdSet.has(String(pn.id));
+            const openModal = () =>
+              setConnectionModal({
+                linked: pn,
+                anchorNoteId: note.id,
+                hideDisconnect: !isDbLinked,
+              });
             return (
             <div
               key={pn.id}
@@ -1202,16 +1242,18 @@ function HoverInsightPanels() {
                 role="button"
                 tabIndex={0}
                 className="hover-insight-connection-card-main"
-                onClick={() => setConnectionModal({ linked: pn, anchorNoteId: note.id })}
+                onClick={openModal}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setConnectionModal({ linked: pn, anchorNoteId: note.id });
+                    openModal();
                   }
                 }}
-                title="Open linked note"
+                title={isDbLinked ? 'Open linked note' : 'Open similar note'}
               >
-                <span className="hover-insight-connection-card-label">Linked</span>
+                <span className="hover-insight-connection-card-label">
+                  {isDbLinked ? 'Linked' : 'Similar'}
+                </span>
                 {pn.similarity != null && (
                   <span className="hover-insight-connection-card-sim">
                     {Math.round(pn.similarity * 100)}%
@@ -1235,19 +1277,21 @@ function HoverInsightPanels() {
                   )}
                 </p>
               </div>
-              <button
-                type="button"
-                className="hover-insight-icon-btn hover-insight-connection-unlink"
-                aria-label="Disconnect linked note"
-                title="Disconnect link (confirm)"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!window.confirm(CONFIRM_UNLINK)) return;
-                  unlinkPersisted(note.id, pn.id);
-                }}
-              >
-                ×
-              </button>
+              {isDbLinked ? (
+                <button
+                  type="button"
+                  className="hover-insight-icon-btn hover-insight-connection-unlink"
+                  aria-label="Disconnect linked note"
+                  title="Disconnect link (confirm)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!window.confirm(CONFIRM_UNLINK)) return;
+                    unlinkPersisted(note.id, pn.id);
+                  }}
+                >
+                  ×
+                </button>
+              ) : null}
             </div>
             );
           })}
@@ -1259,6 +1303,7 @@ function HoverInsightPanels() {
         <ConnectionNoteModal
           linked={connectionModal.linked}
           anchorNoteId={connectionModal.anchorNoteId}
+          hideDisconnect={connectionModal.hideDisconnect === true}
           onClose={() => setConnectionModal(null)}
           unlinkPersisted={unlinkPersisted}
           navigateToConnection={navigateToConnection}
