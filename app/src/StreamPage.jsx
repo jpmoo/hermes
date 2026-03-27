@@ -618,7 +618,9 @@ export default function StreamPage() {
     focusFromUrlApplied.current = '';
     const leavingHeadId = focusId;
     const listEl = threadListRef.current;
-    const art = listEl?.querySelector(`li[data-stream-note="${leavingHeadId}"] > article`);
+    const art =
+      listEl?.querySelector(`li[data-stream-note="${leavingHeadId}"] > article`) ||
+      listEl?.querySelector(':scope > li[data-stream-note] > article');
     const fr = art?.getBoundingClientRect();
     const fromRect = fr
       ? {
@@ -708,17 +710,23 @@ export default function StreamPage() {
       targetParentId != null
         ? `li[data-stream-note="${targetParentId}"] > ul.stream-page-replies li[data-stream-note="${noteId}"] > article`
         : null;
-    let toArt =
-      (scopedTargetSelector && threadListRef.current.querySelector(scopedTargetSelector)) ||
-      threadListRef.current.querySelector(`li[data-stream-note="${noteId}"] > article`);
+    const pickTarget = () =>
+      (scopedTargetSelector && threadListRef.current?.querySelector(scopedTargetSelector)) ||
+      threadListRef.current?.querySelector(`li[data-stream-note="${noteId}"] > article`);
+
+    let toArt = pickTarget();
     if (!toArt) {
-      requestAnimationFrame(() => {
-        const retry =
-          (scopedTargetSelector && threadListRef.current?.querySelector(scopedTargetSelector)) ||
-          threadListRef.current?.querySelector(`li[data-stream-note="${noteId}"] > article`);
-        if (!retry) return;
-        runArcFlip(retry);
-      });
+      let tries = 0;
+      const retryFind = () => {
+        const retry = pickTarget();
+        if (retry) {
+          runArcFlip(retry);
+          return;
+        }
+        tries += 1;
+        if (tries < 5) requestAnimationFrame(retryFind);
+      };
+      requestAnimationFrame(retryFind);
       return;
     }
     runArcFlip(toArt);
