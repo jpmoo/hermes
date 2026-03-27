@@ -618,7 +618,7 @@ export default function StreamPage() {
     focusFromUrlApplied.current = '';
     const leavingHeadId = focusId;
     const listEl = threadListRef.current;
-    const art = listEl?.querySelector(':scope > li[data-stream-note] > article');
+    const art = listEl?.querySelector(`li[data-stream-note="${leavingHeadId}"] > article`);
     const fr = art?.getBoundingClientRect();
     const fromRect = fr
       ? { left: fr.left, top: fr.top, width: fr.width, height: fr.height, noteId: leavingHeadId }
@@ -660,8 +660,33 @@ export default function StreamPage() {
     if (!payload || !threadListRef.current) return;
     const { noteId, left, top, width, height } = payload;
     flipPayloadRef.current = null;
-    const toArt = threadListRef.current.querySelector(`li[data-stream-note="${noteId}"] > article`);
-    if (!toArt) return;
+    let toArt = threadListRef.current.querySelector(`li[data-stream-note="${noteId}"] > article`);
+    if (!toArt) {
+      requestAnimationFrame(() => {
+        const retry = threadListRef.current?.querySelector(`li[data-stream-note="${noteId}"] > article`);
+        if (!retry) return;
+        const retr = retry.getBoundingClientRect();
+        const rdx = left - retr.left;
+        const rdy = top - retr.top;
+        const rsx = width / Math.max(retr.width, 1);
+        const rsy = height / Math.max(retr.height, 1);
+        retry.style.transformOrigin = 'top left';
+        retry.style.transform = `translate(${rdx}px, ${rdy}px) scale(${rsx}, ${rsy})`;
+        retry.style.transition = 'none';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            retry.style.transition =
+              'transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease';
+            retry.style.transform = '';
+            window.setTimeout(() => {
+              retry.style.transition = '';
+              retry.style.transformOrigin = '';
+            }, 550);
+          });
+        });
+      });
+      return;
+    }
     const tr = toArt.getBoundingClientRect();
     const dx = left - tr.left;
     const dy = top - tr.top;
