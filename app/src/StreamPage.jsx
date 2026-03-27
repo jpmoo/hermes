@@ -638,8 +638,10 @@ export default function StreamPage() {
     /* Keep the same parent-focus transition path even when parent is root. */
     setFocusId(parentId);
     setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
-    setLevelDropDelays(delays);
     if (fromRect) {
+      // Arc FLIP animates this note's transform; exclude it from row-level drop animation to avoid conflicts.
+      delays.delete(leavingHeadId);
+      setLevelDropDelays(delays);
       flipPayloadRef.current = fromRect;
       setFlipTick((x) => x + 1);
     } else {
