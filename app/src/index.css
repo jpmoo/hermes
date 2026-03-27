@@ -17,8 +17,8 @@ html {
   --depth-1: 1;
   --depth-2: 2;
   --depth-3: 3;
-  --font-sans: Verdana, Geneva, sans-serif;
-  --font-mono: Verdana, Geneva, sans-serif;
+  --font-sans: Candara, Verdana, Geneva, sans-serif;
+  --font-mono: Candara, Verdana, Geneva, sans-serif;
   /* Text on accent-filled buttons (light cream on gold) */
   --on-accent: #f4f3f0;
   /* Status / alerts — tuned for light page bg */
