@@ -22,6 +22,7 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
+import { useNoteTypeColors } from './NoteTypeColorContext';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -220,6 +221,7 @@ export function useHoverInsight() {
 }
 
 export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
+  const { similarNotesMinChars, similarNotesMinDefault } = useNoteTypeColors();
   const [hover, setHover] = useState(null);
   const [insight, setInsight] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -383,6 +385,26 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setRagdollDocs([]);
       setRagdollError(null);
 
+      const minChars =
+        typeof similarNotesMinChars === 'number' && Number.isFinite(similarNotesMinChars)
+          ? similarNotesMinChars
+          : typeof similarNotesMinDefault === 'number' && Number.isFinite(similarNotesMinDefault)
+            ? similarNotesMinDefault
+            : 48;
+      const bodyLen = (note?.content || '').trim().length;
+      if (minChars > 0 && bodyLen < minChars) {
+        if (fetchTimer.current) clearTimeout(fetchTimer.current);
+        setInsight({
+          tagSuggestions: [],
+          similarNotes: [],
+          persistedLinks: [],
+          similarNotesSkippedShortNote: true,
+          similarNotesMinChars: minChars,
+        });
+        setLoading(false);
+        return;
+      }
+
       fetchLinkedNotesQuick(note.id)
         .then((data) => {
           if (reqId.current !== id) return;
@@ -421,7 +443,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
           });
       }, 220);
     },
-    [clearInsightSelection]
+    [clearInsightSelection, similarNotesMinChars, similarNotesMinDefault]
   );
 
   /** Pointer / Escape: dismiss when clicking outside insight UI and the selected card. */
@@ -1009,9 +1031,7 @@ function HoverInsightPanels() {
                     {similarNotes.length === 0 ? (
                       <p className="hover-insight-muted">
                         {insight?.similarNotesSkippedShortNote
-                          ? `Similar notes are off while this note is shorter than your minimum (${
-                              insight.similarNotesMinChars ?? 48
-                            } characters after trimming). Add more text, lower the minimum in Settings, or set it to 0.`
+                          ? 'This note is too short for this feature. Adjust the minimum character length of notes for similiarity analysis in settings.'
                           : 'No similar notes (needs embeddings, or nothing close enough yet).'}
                       </p>
                     ) : filteredSimilarNotes.length === 0 ? (
