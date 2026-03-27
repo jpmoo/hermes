@@ -660,68 +660,67 @@ export default function StreamPage() {
     if (!payload || !threadListRef.current) return;
     const { noteId, left, top, width, height } = payload;
     flipPayloadRef.current = null;
+
+    const runArcFlip = (el) => {
+      const tr = el.getBoundingClientRect();
+      const dx = left - tr.left;
+      const dy = top - tr.top;
+      const sx = width / Math.max(tr.width, 1);
+      const sy = height / Math.max(tr.height, 1);
+      const midX = dx * 0.45;
+      const lift = Math.max(18, Math.min(42, Math.abs(dy) * 0.22));
+      const midY = dy * 0.55 - lift;
+
+      el.style.transformOrigin = 'top left';
+      el.style.willChange = 'transform';
+      const anim = el.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
+          { transform: `translate(${midX}px, ${midY}px) scale(${(sx + 1) / 2}, ${(sy + 1) / 2})` },
+          { transform: 'translate(0px, 0px) scale(1, 1)' },
+        ],
+        {
+          duration: 560,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          fill: 'both',
+        }
+      );
+      anim.onfinish = () => {
+        el.style.transformOrigin = '';
+        el.style.willChange = '';
+      };
+      anim.oncancel = () => {
+        el.style.transformOrigin = '';
+        el.style.willChange = '';
+      };
+    };
+
     let toArt = threadListRef.current.querySelector(`li[data-stream-note="${noteId}"] > article`);
     if (!toArt) {
       requestAnimationFrame(() => {
         const retry = threadListRef.current?.querySelector(`li[data-stream-note="${noteId}"] > article`);
         if (!retry) return;
-        const retr = retry.getBoundingClientRect();
-        const rdx = left - retr.left;
-        const rdy = top - retr.top;
-        const rsx = width / Math.max(retr.width, 1);
-        const rsy = height / Math.max(retr.height, 1);
-        retry.style.transformOrigin = 'top left';
-        retry.style.transform = `translate(${rdx}px, ${rdy}px) scale(${rsx}, ${rsy})`;
-        retry.style.transition = 'none';
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            retry.style.transition =
-              'transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease';
-            retry.style.transform = '';
-            window.setTimeout(() => {
-              retry.style.transition = '';
-              retry.style.transformOrigin = '';
-            }, 550);
-          });
-        });
+        runArcFlip(retry);
       });
       return;
     }
-    const tr = toArt.getBoundingClientRect();
-    const dx = left - tr.left;
-    const dy = top - tr.top;
-    const sx = width / Math.max(tr.width, 1);
-    const sy = height / Math.max(tr.height, 1);
-    toArt.style.transformOrigin = 'top left';
-    toArt.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
-    toArt.style.transition = 'none';
+    runArcFlip(toArt);
     const bLi = toArt.closest('li');
     const bUl = bLi?.querySelector(':scope > ul.stream-page-replies');
     if (bUl) {
       bUl.style.opacity = '0';
       bUl.style.transition = 'none';
     }
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        toArt.style.transition =
-          'transform 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease';
-        toArt.style.transform = '';
+    if (bUl) {
+      window.setTimeout(() => {
+        bUl.style.transition = 'opacity 0.38s ease';
+        bUl.style.opacity = '1';
         window.setTimeout(() => {
-          toArt.style.transition = '';
-          toArt.style.transformOrigin = '';
-        }, 550);
-        if (bUl) {
-          window.setTimeout(() => {
-            bUl.style.transition = 'opacity 0.38s ease';
-            bUl.style.opacity = '1';
-            window.setTimeout(() => {
-              bUl.style.transition = '';
-              bUl.style.opacity = '';
-            }, 400);
-          }, 380);
-        }
-      });
-    });
+          bUl.style.transition = '';
+          bUl.style.opacity = '';
+        }, 400);
+      }, 360);
+    }
   }, [flipTick]);
 
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
