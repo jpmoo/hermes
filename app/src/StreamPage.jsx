@@ -621,7 +621,14 @@ export default function StreamPage() {
     const art = listEl?.querySelector(`li[data-stream-note="${leavingHeadId}"] > article`);
     const fr = art?.getBoundingClientRect();
     const fromRect = fr
-      ? { left: fr.left, top: fr.top, width: fr.width, height: fr.height, noteId: leavingHeadId }
+      ? {
+          left: fr.left,
+          top: fr.top,
+          width: fr.width,
+          height: fr.height,
+          noteId: leavingHeadId,
+          targetParentId: parentId,
+        }
       : null;
 
     const parentNode = findNode(tree, parentId);
@@ -658,7 +665,7 @@ export default function StreamPage() {
   useLayoutEffect(() => {
     const payload = flipPayloadRef.current;
     if (!payload || !threadListRef.current) return;
-    const { noteId, left, top, width, height } = payload;
+    const { noteId, targetParentId, left, top, width, height } = payload;
     flipPayloadRef.current = null;
 
     const runArcFlip = (el) => {
@@ -695,10 +702,18 @@ export default function StreamPage() {
       };
     };
 
-    let toArt = threadListRef.current.querySelector(`li[data-stream-note="${noteId}"] > article`);
+    const scopedTargetSelector =
+      targetParentId != null
+        ? `li[data-stream-note="${targetParentId}"] > ul.stream-page-replies li[data-stream-note="${noteId}"] > article`
+        : null;
+    let toArt =
+      (scopedTargetSelector && threadListRef.current.querySelector(scopedTargetSelector)) ||
+      threadListRef.current.querySelector(`li[data-stream-note="${noteId}"] > article`);
     if (!toArt) {
       requestAnimationFrame(() => {
-        const retry = threadListRef.current?.querySelector(`li[data-stream-note="${noteId}"] > article`);
+        const retry =
+          (scopedTargetSelector && threadListRef.current?.querySelector(scopedTargetSelector)) ||
+          threadListRef.current?.querySelector(`li[data-stream-note="${noteId}"] > article`);
         if (!retry) return;
         runArcFlip(retry);
       });
