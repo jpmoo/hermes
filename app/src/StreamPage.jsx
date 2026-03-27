@@ -610,7 +610,7 @@ export default function StreamPage() {
     if (!threadRootId || !focusId || noteIdEq(focusId, actualRootId)) return;
     if (levelNavBusyRef.current || floatTimerRef.current) return;
     const parentId = parentInFilteredTree(tree, focusId);
-    if (!parentId || noteIdEq(parentId, actualRootId)) {
+    if (!parentId) {
       animateToFullThread();
       return;
     }
@@ -627,8 +627,11 @@ export default function StreamPage() {
     const parentNode = findNode(tree, parentId);
     const delays = parentNode ? buildParentBranchLevelDrops(parentNode, leavingHeadId) : new Map();
 
-    setFocusId(parentId);
-    setSearchParams({ thread: threadRootId, focus: parentId });
+    const movingToRoot = noteIdEq(parentId, actualRootId);
+    setFocusId(movingToRoot ? null : parentId);
+    setSearchParams(
+      movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId }
+    );
     setLevelDropDelays(delays);
     if (fromRect) {
       flipPayloadRef.current = fromRect;
