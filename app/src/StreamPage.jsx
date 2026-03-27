@@ -628,10 +628,9 @@ export default function StreamPage() {
     const delays = parentNode ? buildParentBranchLevelDrops(parentNode, leavingHeadId) : new Map();
 
     const movingToRoot = noteIdEq(parentId, actualRootId);
-    setFocusId(movingToRoot ? null : parentId);
-    setSearchParams(
-      movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId }
-    );
+    /* Keep the same parent-focus transition path even when parent is root. */
+    setFocusId(parentId);
+    setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
     setLevelDropDelays(delays);
     if (fromRect) {
       flipPayloadRef.current = fromRect;
