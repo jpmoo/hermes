@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { flushSync } from 'react-dom';
 import {
   fetchHoverInsight,
   fetchLinkedNotesQuick,
@@ -429,20 +430,26 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     (note, anchorEl, depth) => {
       if (depth < 0 || !note?.id || !anchorEl) return;
       if (noteIdSame(activeHoverId.current, note.id)) {
-        clearInsightSelection();
+        flushSync(() => {
+          clearInsightSelection();
+        });
         return;
       }
-      insightAnchorRef.current = anchorEl;
-      setHover({ note });
-      activeHoverId.current = note.id;
-      setDismissedKeys(new Set());
-      setConnectionModal(null);
       if (fetchTimer.current) clearTimeout(fetchTimer.current);
       const id = ++reqId.current;
-      setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
-      setLoading(true);
-      setRagdollDocs([]);
-      setRagdollError(null);
+
+      /* Commit selection + dim/highlight before async fetches so stream/canvas feel instant. */
+      flushSync(() => {
+        insightAnchorRef.current = anchorEl;
+        setHover({ note });
+        activeHoverId.current = note.id;
+        setDismissedKeys(new Set());
+        setConnectionModal(null);
+        setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
+        setLoading(true);
+        setRagdollDocs([]);
+        setRagdollError(null);
+      });
 
       /* Min character setting applies only to server-side vector “similar notes” (right panel), not to linked-peer cards. */
 

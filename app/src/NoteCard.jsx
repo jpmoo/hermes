@@ -46,7 +46,6 @@ export default function NoteCard({
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
-  const insightClickTimerRef = useRef(null);
   /** Second click of a double-click runs drill in `click` (detail===2); skip duplicate work in `dblclick`. */
   const skipNextStreamDblClickDrillRef = useRef(false);
   const tagDropdownRef = useRef(null);
@@ -94,13 +93,6 @@ export default function NoteCard({
   useEffect(() => {
     setDropdownParentTags([]);
   }, [note.id]);
-
-  useEffect(
-    () => () => {
-      if (insightClickTimerRef.current) clearTimeout(insightClickTimerRef.current);
-    },
-    []
-  );
 
   useEffect(() => {
     if (!addingTag) return undefined;
@@ -358,10 +350,6 @@ export default function NoteCard({
   };
 
   const runStreamDrillOpen = (ev) => {
-    if (insightClickTimerRef.current) {
-      clearTimeout(insightClickTimerRef.current);
-      insightClickTimerRef.current = null;
-    }
     ev.preventDefault();
     ev.stopPropagation();
     hoverInsight?.clearInsightSelection?.();
@@ -376,18 +364,14 @@ export default function NoteCard({
       return;
     }
     /* Double-click drill: use the 2nd click (detail===2) so drill fires even when `dblclick` misses
-     * the <article> (nested stream rows). Single click only opens insight after a short delay. */
+     * the <article> (nested stream rows). Single click selects insight immediately (no delay — delayed
+     * open felt like missed clicks and lagged highlight when switching notes). */
     if (ev.detail === 2) {
       skipNextStreamDblClickDrillRef.current = true;
       runStreamDrillOpen(ev);
       return;
     }
-    const anchorEl = ev.currentTarget;
-    if (insightClickTimerRef.current) clearTimeout(insightClickTimerRef.current);
-    insightClickTimerRef.current = setTimeout(() => {
-      insightClickTimerRef.current = null;
-      hoverInsight?.selectInsightNote?.(note, anchorEl, depth);
-    }, 280);
+    hoverInsight?.selectInsightNote?.(note, ev.currentTarget, depth);
   };
 
   const handleCardDoubleClick = (ev) => {
@@ -402,10 +386,6 @@ export default function NoteCard({
       }
       runStreamDrillOpen(ev);
       return;
-    }
-    if (insightClickTimerRef.current) {
-      clearTimeout(insightClickTimerRef.current);
-      insightClickTimerRef.current = null;
     }
     ev.preventDefault();
     ev.stopPropagation();
