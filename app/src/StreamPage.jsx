@@ -11,6 +11,7 @@ import {
   fetchUserSettings,
   patchUserSettings,
 } from './api';
+import { firstLinePreview, historyPrimaryLabel } from './noteHistoryUtils';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
@@ -58,24 +59,6 @@ function buildTree(flat) {
 function noteIdEq(a, b) {
   if (a == null || b == null) return false;
   return String(a) === String(b);
-}
-
-/** First line of note body for history preview (not a separate title field). */
-function firstLinePreview(s) {
-  return (s || '').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 72);
-}
-
-/** Main line in history menu: first-line body preview; falls back to path leaf if preview missing (e.g. legacy entries). */
-function historyPrimaryLabel(storedPreview, threadPath) {
-  const t = (storedPreview || '').trim();
-  if (t && t !== 'Untitled') return t;
-  const path = (threadPath || '').trim();
-  if (path) {
-    const parts = path.split(/\s*>\s*/).filter(Boolean);
-    const leaf = parts[parts.length - 1] || path;
-    return leaf.slice(0, 72) || 'Note';
-  }
-  return 'Note';
 }
 
 function findNode(nodes, id) {

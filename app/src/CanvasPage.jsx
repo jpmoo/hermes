@@ -13,12 +13,14 @@ import {
   getThread,
   getRoots,
   getNote,
+  getNoteThreadPath,
   createNote,
   uploadNoteFiles,
   fetchUserSettings,
   patchUserSettings,
   unstarNote,
 } from './api';
+import { firstLinePreview, historyPrimaryLabel } from './noteHistoryUtils';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import NoteTypeIcon from './NoteTypeIcon';
@@ -32,6 +34,7 @@ import {
 } from './canvasLayoutApi';
 import {
   NavIconAttach,
+  NavIconHistory,
   NavIconUpOneLevel,
   NavIconRootLevel,
   NavIconRefresh,
@@ -251,6 +254,8 @@ export default function CanvasPage() {
   const [loadingThread, setLoadingThread] = useState(true);
   const [focusId, setFocusId] = useState(null);
   const [canvasLayouts, setCanvasLayouts] = useState({});
+  const [noteHistory, setNoteHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [showSequenceLines, setShowSequenceLines] = useState(true);
 
@@ -294,6 +299,11 @@ export default function CanvasPage() {
   const canvasReplyFileRef = useRef(null);
   const canvasRootFileRef = useRef(null);
   const focusFromUrl = useRef('');
+  const historyBtnRef = useRef(null);
+  const historyMenuRef = useRef(null);
+  const historySaveTimer = useRef(null);
+  const historyInitRef = useRef(false);
+  const lastVisitedNoteRef = useRef(null);
   /** After layout reset: always fit all cards in view. */
   const pendingFitAllRef = useRef(false);
   /** Avoid repeated fit while saved layout is still empty (e.g. before first save completes). */
@@ -328,13 +338,41 @@ export default function CanvasPage() {
   }, [threadRootId, setSearchParams]);
 
   useEffect(() => {
-    if (!user) return;
-    fetchUserSettings()
-      .then((s) => {
+    if (!user?.id) {
+      setNoteHistory([]);
+      historyInitRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await fetchUserSettings();
+        if (cancelled) return;
         if (s?.campusLayouts && typeof s.campusLayouts === 'object') setCanvasLayouts(s.campusLayouts);
-      })
-      .catch(() => {});
-  }, [user]);
+        setNoteHistory(Array.isArray(s.noteHistory) ? s.noteHistory : []);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setNoteHistory([]);
+      } finally {
+        if (!cancelled) historyInitRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !historyInitRef.current) return;
+    if (historySaveTimer.current) clearTimeout(historySaveTimer.current);
+    historySaveTimer.current = setTimeout(() => {
+      historySaveTimer.current = null;
+      patchUserSettings({ noteHistory }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (historySaveTimer.current) clearTimeout(historySaveTimer.current);
+    };
+  }, [noteHistory, user?.id]);
 
   const treeFull = useMemo(() => {
     if (!threadRootId) {
@@ -378,6 +416,51 @@ export default function CanvasPage() {
   const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
   const focusSnippet = focusedNode?.content?.slice(0, 50) || '';
+
+  useEffect(() => {
+    const noteId = focusId || threadRootId;
+    if (!noteId || !threadRootId) return;
+    if (loadingThread) return;
+    if (thread.length === 0) return;
+
+    const row = threadById.get(noteId) || thread.find((n) => noteIdEq(n.id, noteId));
+    if (!row) return;
+
+    if (lastVisitedNoteRef.current === noteId) return;
+    lastVisitedNoteRef.current = noteId;
+
+    const title = firstLinePreview(row.content || '');
+    (async () => {
+      try {
+        const threadPath = await getNoteThreadPath(noteId, { excludeLeaf: false });
+        setNoteHistory((prev) => {
+          const rest = prev.filter((x) => !noteIdEq(x.noteId, noteId));
+          return [
+            {
+              noteId: String(noteId),
+              threadRootId: String(threadRootId),
+              title,
+              threadPath: threadPath || title,
+              visitedAt: new Date().toISOString(),
+            },
+            ...rest,
+          ].slice(0, 20);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [threadRootId, focusId, threadById, loadingThread, thread]);
+
+  useEffect(() => {
+    if (!historyOpen) return undefined;
+    const onDoc = (e) => {
+      if (historyMenuRef.current?.contains(e.target) || historyBtnRef.current?.contains(e.target)) return;
+      setHistoryOpen(false);
+    };
+    document.addEventListener('pointerdown', onDoc, true);
+    return () => document.removeEventListener('pointerdown', onDoc, true);
+  }, [historyOpen]);
 
   const resetComposeMeta = useCallback(() => {
     setComposeNoteType('note');
@@ -1160,6 +1243,50 @@ export default function CanvasPage() {
 
   const summaryIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
 
+  const openHistoryEntry = useCallback(
+    (it) => {
+      if (!it?.noteId) return;
+      setHistoryOpen(false);
+      if (it.threadRootId) setSearchParams({ thread: it.threadRootId, focus: it.noteId });
+      else setSearchParams({ thread: it.noteId });
+      setFocusId(it.noteId);
+    },
+    [setSearchParams]
+  );
+
+  const historyControl = (
+    <div className="stream-page-history-wrap canvas-toolbar-history-wrap">
+      <button
+        ref={historyBtnRef}
+        type="button"
+        className="canvas-icon-btn"
+        aria-label="History"
+        title="History"
+        onClick={() => setHistoryOpen((v) => !v)}
+      >
+        <NavIconHistory className="stream-page-nav-icon" />
+      </button>
+      {historyOpen && (
+        <div ref={historyMenuRef} className="stream-page-history-menu" role="menu" aria-label="Recent notes">
+          {noteHistory.length === 0 ? (
+            <p className="stream-page-history-empty">No recently visited notes.</p>
+          ) : (
+            <ul className="stream-page-history-list">
+              {noteHistory.map((it) => (
+                <li key={it.noteId}>
+                  <button type="button" className="stream-page-history-item" onClick={() => openHistoryEntry(it)}>
+                    <span className="stream-page-history-title">{historyPrimaryLabel(it.title, it.threadPath)}</span>
+                    <span className="stream-page-history-path">{it.threadPath || ''}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const showCompose = !loadingThread && !(threadRootId && thread.length === 0);
 
   const navLinks = [
@@ -1176,6 +1303,7 @@ export default function CanvasPage() {
         <div className="canvas-page">
           <div className="canvas-toolbar">
             <div className="canvas-toolbar-left">
+              {user ? historyControl : null}
               {focusId && !noteIdEq(focusId, actualRootId) ? (
                 <button
                   type="button"

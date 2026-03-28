@@ -15,14 +15,9 @@
   position: relative;
 }
 
-/* Same column width + horizontal inset as stream (see Layout.css --hermes-*). */
+/* Width/max-width come from StreamPage.css (.canvas-page-compose-wrap shared with stream). */
 .canvas-page-compose-wrap {
   flex-shrink: 0;
-  max-width: var(--hermes-stream-column-max);
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  box-sizing: border-box;
 }
 
 .canvas-page--empty {
@@ -52,6 +47,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
+}
+
+.canvas-toolbar-history-wrap {
+  position: relative;
+  z-index: 25;
 }
 
 .canvas-icon-btn {

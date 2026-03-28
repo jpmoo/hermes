@@ -238,7 +238,4 @@
   /* Stream thread nav (sticky) sits below sticky header — tune if header height changes */
   --stream-nav-sticky-top: 3.5rem;
   --stream-nav-sticky-top-mobile: 6.85rem;
-  /* Shared column + compose: 1600px prior cap × 3.5 = prior + 250% (full width on typical viewports via min with vw) */
-  --hermes-stream-column-max: min(5600px, calc(100vw - 2rem));
-  --hermes-compose-inset-x: 0.75rem;
 }

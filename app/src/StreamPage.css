@@ -1,10 +1,13 @@
 .stream-page {
+  width: 100%;
   max-width: var(--hermes-stream-column-max);
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
   min-height: calc(100vh - 8rem);
   display: flex;
   flex-direction: column;
   padding: 0 0 1rem;
+  box-sizing: border-box;
 }
 
 .stream-page-scroll {
@@ -368,16 +371,35 @@
   }
 }
 
-.stream-page-compose-wrap {
+/* Stream + canvas: same max width as note column; centered so textarea matches card width */
+.stream-page-compose-wrap,
+.canvas-page-compose-wrap {
   box-sizing: border-box;
+  width: 100%;
+  max-width: var(--hermes-stream-column-max);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--hermes-compose-inset-x);
+  padding-right: var(--hermes-compose-inset-x);
+}
+
+/* Sticky composer chrome only on Stream (canvas uses the same width rules but not this bar). */
+.stream-page > .stream-page-compose-wrap {
   position: sticky;
   bottom: 0;
   margin-top: auto;
   padding-top: 1rem;
   padding-bottom: 0.5rem;
   background: linear-gradient(to top, var(--bg) 85%, transparent);
-  padding-left: var(--hermes-compose-inset-x, 0.75rem);
-  padding-right: var(--hermes-compose-inset-x, 0.75rem);
+}
+
+.canvas-page-compose-wrap {
+  padding-top: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+.stream-page-compose {
+  width: 100%;
 }
 
 /* Same pattern as edit: type button sibling + plain mentions wrap (better WebKit behavior than nesting). */
