@@ -287,18 +287,21 @@
 @keyframes streamNotesExitToRoot {
   from {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
   to {
     opacity: 0;
-    transform: translateY(36px);
+    transform: translateY(72px) scale(0.9);
+    filter: blur(8px);
   }
 }
 
 /* Full-thread-at-root transition: every visible row exits (animateToFullThread + up-one-level to thread root) */
 .stream-page-thread-enter--notes-exit-to-root .stream-page-list li[data-stream-note] {
-  animation: streamNotesExitToRoot 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: streamNotesExitToRoot 0.55s cubic-bezier(0.32, 0, 0.67, 1) forwards;
   pointer-events: none;
+  will-change: transform, opacity, filter;
 }
 
 .stream-page-thread-enter--notes-exit-to-root .stream-page-list li.stream-page-level-drop > article {

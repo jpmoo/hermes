@@ -103,11 +103,30 @@ function pathFromRootToId(nodes, targetId, acc = []) {
   return null;
 }
 
+function streamNoteAttrEscaped(id) {
+  if (id == null) return '';
+  const s = String(id);
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(s);
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function findStreamLiByNoteId(listEl, noteId) {
   if (!listEl || noteId == null) return null;
   return [...listEl.querySelectorAll('li[data-stream-note]')].find((li) =>
     noteIdEq(li.getAttribute('data-stream-note'), noteId)
   );
+}
+
+/** Parent row is always a direct child of the thread list; replies live in ul.stream-page-replies (one UI level). */
+function findDrillUpDestinationLi(listEl, parentId, leavingId) {
+  if (!listEl || parentId == null || leavingId == null) return null;
+  const topLis = [...listEl.querySelectorAll(':scope > li[data-stream-note]')];
+  const parentLi = topLis.find((li) => noteIdEq(li.getAttribute('data-stream-note'), parentId));
+  if (!parentLi) return null;
+  const repliesUl = parentLi.querySelector(':scope > ul.stream-page-replies');
+  if (!repliesUl) return null;
+  const replyLis = [...repliesUl.querySelectorAll(':scope > li[data-stream-note]')];
+  return replyLis.find((li) => noteIdEq(li.getAttribute('data-stream-note'), leavingId)) ?? null;
 }
 
 function clearDrillDimming(container) {
@@ -606,7 +625,7 @@ export default function StreamPage() {
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
       clearLevelDropSoon();
       levelNavBusyRef.current = false;
-    }, 400);
+    }, 560);
   }, [threadRootId, focusId, actualRootId, thread, tree, setSearchParams, clearLevelDropSoon]);
 
   const upOneLevel = useCallback(() => {
@@ -621,8 +640,11 @@ export default function StreamPage() {
     focusFromUrlApplied.current = '';
     const leavingHeadId = focusId;
     const listEl = threadListRef.current;
+    const headLi = listEl?.querySelector(
+      `:scope > li[data-stream-note="${streamNoteAttrEscaped(leavingHeadId)}"]`
+    );
     const art =
-      listEl?.querySelector(`li[data-stream-note="${leavingHeadId}"] > article`) ||
+      headLi?.querySelector(':scope > article') ??
       listEl?.querySelector(':scope > li[data-stream-note] > article');
     const fr = art?.getBoundingClientRect();
 
@@ -660,7 +682,7 @@ export default function StreamPage() {
           setLevelDropDelays(d);
         }
         clearLevelDropSoon();
-      }, 400);
+      }, 560);
     } else {
       setFocusId(parentId);
       setSearchParams({ thread: threadRootId, focus: parentId });
@@ -695,7 +717,7 @@ export default function StreamPage() {
     } else {
       window.setTimeout(() => {
         levelNavBusyRef.current = false;
-      }, 420);
+      }, 580);
     }
   }, [
     threadRootId,
@@ -726,16 +748,19 @@ export default function StreamPage() {
       abortUp();
       return;
     }
-    const scoped = `li[data-stream-note="${parentId}"] > ul.stream-page-replies li[data-stream-note="${leavingId}"]`;
-    let li = listEl.querySelector(scoped);
+    let li = findDrillUpDestinationLi(listEl, parentId, leavingId);
     if (!li) li = findStreamLiByNoteId(listEl, leavingId);
     if (!li) {
       abortUp();
       return;
     }
-    li.classList.add('stream-page-float-picked');
     const destArt = li.querySelector('article');
     const r = (destArt || li).getBoundingClientRect();
+    if (r.width < 1 && r.height < 1) {
+      abortUp();
+      return;
+    }
+    li.classList.add('stream-page-float-picked');
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setFloatOpen((prev) => {
