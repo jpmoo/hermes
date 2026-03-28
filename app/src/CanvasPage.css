@@ -7,6 +7,26 @@
   background: var(--bg);
 }
 
+.canvas-page-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Match stream compose width; stream-page-compose-wrap styles come from StreamPage.css */
+.canvas-page-compose-wrap {
+  flex-shrink: 0;
+  max-width: 640px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  box-sizing: border-box;
+}
+
 .canvas-page--empty {
   padding: 1.5rem;
 }
@@ -59,21 +79,6 @@
 
 .canvas-icon-btn--off:hover {
   opacity: 0.75;
-}
-
-.canvas-add-btn {
-  margin-left: 0.35rem;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.canvas-add-btn:hover {
-  background: var(--bg-hover);
 }
 
 .canvas-zoom-hint {

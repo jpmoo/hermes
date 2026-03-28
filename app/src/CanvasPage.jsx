@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
@@ -12,11 +12,18 @@ import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import {
   getThread,
   getRoots,
+  getNote,
   createNote,
+  uploadNoteFiles,
   fetchUserSettings,
   patchUserSettings,
   unstarNote,
 } from './api';
+import NoteTypeEventFields from './NoteTypeEventFields';
+import MentionsTextarea from './MentionsTextarea';
+import NoteTypeIcon from './NoteTypeIcon';
+import { eventFieldsToPayload, NOTE_TYPE_OPTIONS } from './noteEventUtils';
+import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
   canvasFocusKey,
   canvasLayoutThreadKey,
@@ -24,12 +31,14 @@ import {
   replaceCanvasLayoutFocusBlock,
 } from './canvasLayoutApi';
 import {
+  NavIconAttach,
   NavIconUpOneLevel,
   NavIconRootLevel,
   NavIconRefresh,
   NavIconBrain,
   NavIconSequenceLines,
 } from './icons/NavIcons';
+import './StreamPage.css';
 import './CanvasPage.css';
 
 function buildTree(flat) {
@@ -225,7 +234,6 @@ const MIN_H = 120;
 
 export default function CanvasPage() {
   const { logout } = useAuth();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
@@ -236,6 +244,17 @@ export default function CanvasPage() {
   const [canvasLayouts, setCanvasLayouts] = useState({});
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [showSequenceLines, setShowSequenceLines] = useState(true);
+
+  const [composeNoteType, setComposeNoteType] = useState('note');
+  const [composeStartDate, setComposeStartDate] = useState('');
+  const [composeStartTime, setComposeStartTime] = useState('');
+  const [composeEndDate, setComposeEndDate] = useState('');
+  const [composeEndTime, setComposeEndTime] = useState('');
+  const [replyContent, setReplyContent] = useState('');
+  const [newRootContent, setNewRootContent] = useState('');
+  const [pendingReplyFiles, setPendingReplyFiles] = useState([]);
+  const [pendingRootFiles, setPendingRootFiles] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
@@ -261,6 +280,8 @@ export default function CanvasPage() {
   const pointerMoveInnerRef = useRef(() => {});
   const pointerUpInnerRef = useRef(() => {});
   const saveTimerRef = useRef(null);
+  const canvasReplyFileRef = useRef(null);
+  const canvasRootFileRef = useRef(null);
   const focusFromUrl = useRef('');
   /** After layout reset: always fit all cards in view. */
   const pendingFitAllRef = useRef(false);
@@ -344,6 +365,28 @@ export default function CanvasPage() {
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
   const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
+  const focusSnippet = focusedNode?.content?.slice(0, 50) || '';
+
+  const resetComposeMeta = useCallback(() => {
+    setComposeNoteType('note');
+    setComposeStartDate('');
+    setComposeStartTime('');
+    setComposeEndDate('');
+    setComposeEndTime('');
+  }, []);
+
+  useEffect(() => {
+    resetComposeMeta();
+  }, [threadRootId, resetComposeMeta]);
+
+  const cycleComposeNoteType = useCallback(() => {
+    const i = NOTE_TYPE_OPTIONS.findIndex((o) => o.value === composeNoteType);
+    const idx = i < 0 ? 0 : i;
+    setComposeNoteType(NOTE_TYPE_OPTIONS[(idx + 1) % NOTE_TYPE_OPTIONS.length].value);
+  }, [composeNoteType]);
+
+  const composeTypeLabel =
+    NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
 
   const fk = canvasFocusKey(focusId);
 
@@ -652,12 +695,11 @@ export default function CanvasPage() {
     }
   }, [threadRootId, focusId, actualRootId, tree, setSearchParams, applyFocus]);
 
-  /** Same as Stream “Root level”: leave thread and return to stream root list. */
-  const closeThread = useCallback(() => {
+  /** Clear thread/focus but stay on Canvas (all threads view). */
+  const goToCanvasRoot = useCallback(() => {
     setFocusId(null);
     setSearchParams({});
-    navigate({ pathname: '/', search: '' });
-  }, [navigate, setSearchParams]);
+  }, [setSearchParams]);
 
   const makeOpenThread = useCallback(
     (noteId) => () => {
@@ -735,27 +777,81 @@ export default function CanvasPage() {
     }
   }, [layoutStorageKey, fk]);
 
-  const handleAddCard = useCallback(async () => {
-    try {
-      if (threadRootId) {
-        if (replyParentId == null) return;
-        await createNote({
-          content: '',
-          parent_id: replyParentId,
-          note_type: 'note',
-        });
-      } else {
-        await createNote({
-          content: '',
-          parent_id: null,
-          note_type: 'note',
-        });
-      }
-      refreshThread();
-    } catch (e) {
-      console.error(e);
+  const handleCanvasReply = async (e) => {
+    e.preventDefault();
+    if (!threadRootId || !replyParentId) return;
+    const text = replyContent.trim();
+    if ((!text && pendingReplyFiles.length === 0) || submitting) return;
+    const meta = eventFieldsToPayload(composeNoteType, {
+      startDate: composeStartDate,
+      startTime: composeStartTime,
+      endDate: composeEndDate,
+      endTime: composeEndTime,
+    });
+    if (meta.error) {
+      console.error(meta.error);
+      return;
     }
-  }, [threadRootId, replyParentId, refreshThread]);
+    setSubmitting(true);
+    try {
+      const note = await createNote({ content: text, parent_id: replyParentId, ...meta });
+      await syncConnectionsFromContent(note.id, text, '');
+      await syncTagsFromContent(note.id, text, [], '');
+      if (pendingReplyFiles.length > 0) await uploadNoteFiles(note.id, pendingReplyFiles);
+      setReplyContent('');
+      setPendingReplyFiles([]);
+      resetComposeMeta();
+      if (canvasReplyFileRef.current) canvasReplyFileRef.current.value = '';
+      refreshThread();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCanvasNewRoot = async (e) => {
+    e.preventDefault();
+    const text = newRootContent.trim();
+    if ((!text && pendingRootFiles.length === 0) || submitting) return;
+    const meta = eventFieldsToPayload(composeNoteType, {
+      startDate: composeStartDate,
+      startTime: composeStartTime,
+      endDate: composeEndDate,
+      endTime: composeEndTime,
+    });
+    if (meta.error) {
+      console.error(meta.error);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const note = await createNote({ content: text, ...meta });
+      await syncConnectionsFromContent(note.id, text, '');
+      await syncTagsFromContent(note.id, text, [], '');
+      if (pendingRootFiles.length > 0) await uploadNoteFiles(note.id, pendingRootFiles);
+      const full =
+        pendingRootFiles.length > 0
+          ? await getNote(note.id)
+          : {
+              ...note,
+              reply_count: note.reply_count ?? 0,
+              connection_count: note.connection_count ?? 0,
+              attachments: note.attachments || [],
+            };
+      setNewRootContent('');
+      setPendingRootFiles([]);
+      resetComposeMeta();
+      if (canvasRootFileRef.current) canvasRootFileRef.current.value = '';
+      setThread((prev) => [full, ...prev.filter((x) => x.id !== full.id)]);
+      setFocusId(null);
+      setSearchParams({ thread: String(full.id) });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   /** Drag from anywhere on the card (not just a strip). Uses a small move threshold so clicks / insight still work. */
   const onCanvasCardPointerDown = useCallback(
@@ -964,6 +1060,8 @@ export default function CanvasPage() {
 
   const summaryIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
 
+  const showCompose = !loadingThread && !(threadRootId && thread.length === 0);
+
   const navLinks = [
     { to: '/', label: 'Stream' },
     { to: '/campus', label: 'Canvas' },
@@ -992,9 +1090,9 @@ export default function CanvasPage() {
               <button
                 type="button"
                 className="canvas-icon-btn"
-                onClick={closeThread}
-                aria-label="Root level"
-                title="Root level"
+                onClick={goToCanvasRoot}
+                aria-label="Canvas root — all threads"
+                title="Canvas root — all threads"
               >
                 <NavIconRootLevel />
               </button>
@@ -1030,17 +1128,17 @@ export default function CanvasPage() {
               >
                 <NavIconSequenceLines />
               </button>
-              <button type="button" className="canvas-add-btn" onClick={handleAddCard}>
-                {threadRootId ? '+ Add to thread' : '+ Add note'}
-              </button>
             </div>
             <div className="canvas-zoom-hint">Pinch/zoom to adjust magnification</div>
           </div>
 
+          <div className="canvas-page-main">
           {loadingThread ? (
             <p className="canvas-muted">Loading…</p>
+          ) : threadRootId && thread.length === 0 ? (
+            <p className="canvas-muted">Thread not found.</p>
           ) : thread.length === 0 ? (
-            <p className="canvas-muted">{threadRootId ? 'Thread not found.' : 'No notes yet.'}</p>
+            <p className="canvas-muted">No notes yet.</p>
           ) : (
             <>
             <div
@@ -1178,6 +1276,154 @@ export default function CanvasPage() {
             </aside>
             </>
           )}
+          </div>
+
+          {showCompose ? (
+            <div className="stream-page-compose-wrap canvas-page-compose-wrap" data-canvas-compose>
+              {threadRootId ? (
+                <form className="stream-page-compose" onSubmit={handleCanvasReply}>
+                  <div className="stream-page-compose-mentions">
+                    <button
+                      type="button"
+                      className="mentions-compose-type-btn"
+                      disabled={submitting}
+                      onClick={cycleComposeNoteType}
+                      aria-label={`Note type: ${composeTypeLabel}. Click to switch type.`}
+                      title={`${composeTypeLabel} — click for next type`}
+                    >
+                      <NoteTypeIcon type={composeNoteType} className="mentions-compose-type-icon" />
+                    </button>
+                    <MentionsTextarea
+                      placeholder={
+                        replyParentId === threadRootId
+                          ? 'Reply to thread… (@ link note, # tag)'
+                          : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”… (@ #)`
+                      }
+                      value={replyContent}
+                      onChange={setReplyContent}
+                      rows={2}
+                      disabled={submitting}
+                      mentionCreateParentId={replyParentId}
+                    />
+                  </div>
+                  <NoteTypeEventFields
+                    idPrefix="canvas-reply"
+                    noteType={composeNoteType}
+                    onNoteTypeChange={setComposeNoteType}
+                    hideTypeSelect
+                    startDate={composeStartDate}
+                    onStartDateChange={setComposeStartDate}
+                    startTime={composeStartTime}
+                    onStartTimeChange={setComposeStartTime}
+                    endDate={composeEndDate}
+                    onEndDateChange={setComposeEndDate}
+                    endTime={composeEndTime}
+                    onEndTimeChange={setComposeEndTime}
+                    disabled={submitting}
+                  />
+                  <div className="stream-page-compose-row">
+                    <label className="stream-page-file-label stream-page-file-label--hidden">
+                      <input
+                        ref={canvasReplyFileRef}
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
+                        onChange={(e) => setPendingReplyFiles(Array.from(e.target.files || []))}
+                      />
+                    </label>
+                    {pendingReplyFiles.length > 0 && (
+                      <span className="stream-page-file-hint">{pendingReplyFiles.length} file(s)</span>
+                    )}
+                    <div className="stream-page-send-group">
+                      <button
+                        type="button"
+                        className="stream-page-attach-btn"
+                        onClick={() => canvasReplyFileRef.current?.click()}
+                        aria-label="Attach files"
+                        title="Attach files"
+                      >
+                        <NavIconAttach className="stream-page-attach-icon" />
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={(!replyContent.trim() && pendingReplyFiles.length === 0) || submitting}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <form className="stream-page-compose" onSubmit={handleCanvasNewRoot}>
+                  <div className="stream-page-compose-mentions">
+                    <button
+                      type="button"
+                      className="mentions-compose-type-btn"
+                      disabled={submitting}
+                      onClick={cycleComposeNoteType}
+                      aria-label={`Note type: ${composeTypeLabel}. Click to switch type.`}
+                      title={`${composeTypeLabel} — click for next type`}
+                    >
+                      <NoteTypeIcon type={composeNoteType} className="mentions-compose-type-icon" />
+                    </button>
+                    <MentionsTextarea
+                      placeholder="New thread… @ link note, # tag"
+                      value={newRootContent}
+                      onChange={setNewRootContent}
+                      rows={2}
+                      disabled={submitting}
+                    />
+                  </div>
+                  <NoteTypeEventFields
+                    idPrefix="canvas-root"
+                    noteType={composeNoteType}
+                    onNoteTypeChange={setComposeNoteType}
+                    hideTypeSelect
+                    startDate={composeStartDate}
+                    onStartDateChange={setComposeStartDate}
+                    startTime={composeStartTime}
+                    onStartTimeChange={setComposeStartTime}
+                    endDate={composeEndDate}
+                    onEndDateChange={setComposeEndDate}
+                    endTime={composeEndTime}
+                    onEndTimeChange={setComposeEndTime}
+                    disabled={submitting}
+                  />
+                  <div className="stream-page-compose-row">
+                    <label className="stream-page-file-label stream-page-file-label--hidden">
+                      <input
+                        ref={canvasRootFileRef}
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.txt,.md,.doc,.docx,.zip"
+                        onChange={(e) => setPendingRootFiles(Array.from(e.target.files || []))}
+                      />
+                    </label>
+                    {pendingRootFiles.length > 0 && (
+                      <span className="stream-page-file-hint">{pendingRootFiles.length} file(s)</span>
+                    )}
+                    <div className="stream-page-send-group">
+                      <button
+                        type="button"
+                        className="stream-page-attach-btn"
+                        onClick={() => canvasRootFileRef.current?.click()}
+                        aria-label="Attach files"
+                        title="Attach files"
+                      >
+                        <NavIconAttach className="stream-page-attach-icon" />
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={(!newRootContent.trim() && pendingRootFiles.length === 0) || submitting}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+            </div>
+          ) : null}
 
           <ThreadSummaryModal
             open={summaryOpen}
