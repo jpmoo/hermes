@@ -40,11 +40,24 @@
   opacity: 1;
   filter: none;
   position: relative;
-  z-index: 3;
   transition:
     opacity 0.2s ease,
     filter 0.2s ease;
   box-shadow: none;
+}
+
+/*
+ * Insight selected used z-index to sit above dimmed peers, but the thread head lives in the same <li>
+ * as <ul class="stream-page-replies">. A positive z-index on the head stacks above that entire subtree,
+ * so the first reply (directly under the focus note) failed hit-testing / felt unclickable.
+ * Keep the head at auto/0; only lift selected cards inside the replies list above dimmed siblings.
+ */
+.stream-page-list > li > article.note-card.note-card--insight-selected {
+  z-index: 0;
+}
+
+.stream-page-replies .note-card.note-card--insight-selected {
+  z-index: 2;
 }
 
 .stream-page-nav-row {
@@ -536,6 +549,9 @@
   margin: 0.25rem 0 0.25rem 1rem;
   padding-left: 0.5rem;
   border-left: 1px solid var(--border);
+  /* Stack above the sibling thread-head <article> so insight z-index on the head never eats clicks on replies. */
+  position: relative;
+  z-index: 1;
 }
 
 .stream-page-list > li,
