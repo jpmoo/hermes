@@ -668,24 +668,25 @@ export default function StreamPage() {
 
     const canFloat = Boolean(fr && note && fr.width > 0 && fr.height > 0);
 
-    if (movingToRoot) {
+    /*
+     * Up to thread root: deferring focus keeps the parent row out of the DOM, so the float cannot
+     * measure the real reply slot (fallback = head row = no motion). When we can float, commit focus
+     * immediately so the root row exists; keep the staged exit only when there is no float.
+     */
+    if (movingToRoot && !canFloat) {
       setBranchHeadExiting(true);
       window.setTimeout(() => {
         setBranchHeadExiting(false);
         setFocusId(parentId);
         setSearchParams({ thread: threadRootId });
-        if (canFloat) {
-          setLevelDropDelays(delays);
-        } else {
-          const d = new Map(delays);
-          d.set(leavingHeadId, 440);
-          setLevelDropDelays(d);
-        }
+        const d = new Map(delays);
+        d.set(leavingHeadId, 440);
+        setLevelDropDelays(d);
         clearLevelDropSoon();
       }, 560);
     } else {
       setFocusId(parentId);
-      setSearchParams({ thread: threadRootId, focus: parentId });
+      setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
       setLevelDropDelays(delays);
       clearLevelDropSoon();
     }
