@@ -328,6 +328,8 @@
 .canvas-card-body .note-card-body {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
 }
 
@@ -335,29 +337,44 @@
   overflow: visible;
 }
 
-.canvas-card-body .note-card-tag-dropdown {
-  z-index: 60;
-}
-
-/* Meta row: full width for Edit / Delete / + Tag / ★ — truncate time instead of wrapping controls. */
+/* Bottom bar: “Last edited” + Edit / Delete / + Tag / ★ — actions centered on the card bottom. */
 .canvas-card-body .note-card-meta {
-  flex-wrap: nowrap;
-  gap: 0.35rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
   min-width: 0;
+  margin-top: auto;
+  flex-shrink: 0;
+  padding-top: 0.35rem;
 }
 
 .canvas-card-body .note-card-time {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .canvas-card-body .note-card-actions {
+  display: flex;
   flex-shrink: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.4rem;
+  width: 100%;
+}
+
+/* Tag menu above + Tag; centered under the control when the action row is centered. */
+.canvas-card-body .note-card-tag-dropdown {
+  z-index: 60;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
 }
 
 .canvas-card-body .note-card-actions .note-card-btn,

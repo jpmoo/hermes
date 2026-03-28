@@ -227,7 +227,7 @@ function isCanvasDragInteractiveTarget(target) {
   );
 }
 
-const SAVE_DEBOUNCE_MS = 450;
+const SAVE_DEBOUNCE_MS = 200;
 /** Room for Edit / Delete / + Tag / star without wrapping at narrow widths. */
 const MIN_W = 280;
 const MIN_H = 120;
@@ -242,7 +242,7 @@ const WHEEL_ZOOM_SENS = 0.009;
 const PINCH_ZOOM_EXP = 1.22;
 
 export default function CanvasPage() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
@@ -328,12 +328,13 @@ export default function CanvasPage() {
   }, [threadRootId, setSearchParams]);
 
   useEffect(() => {
+    if (!user) return;
     fetchUserSettings()
       .then((s) => {
         if (s?.campusLayouts && typeof s.campusLayouts === 'object') setCanvasLayouts(s.campusLayouts);
       })
       .catch(() => {});
-  }, []);
+  }, [user]);
 
   const treeFull = useMemo(() => {
     if (!threadRootId) {
@@ -400,6 +401,10 @@ export default function CanvasPage() {
     NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
 
   const fk = canvasFocusKey(focusId);
+  const layoutStorageKeyRef = useRef(layoutStorageKey);
+  const fkRef = useRef(fk);
+  layoutStorageKeyRef.current = layoutStorageKey;
+  fkRef.current = fk;
 
   /** Only changes when saved card JSON for this view changes — avoids re-hydrating rects on every save echo (which broke drag). */
   const savedCardsLayoutSig = useMemo(() => {
@@ -460,42 +465,67 @@ export default function CanvasPage() {
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
-    if (block?.view) {
-      const v = block.view;
-      if (typeof v.scale === 'number' && v.scale >= 0.1 && v.scale <= 10) setScale(v.scale);
-      if (typeof v.tx === 'number') setTx(v.tx);
-      if (typeof v.ty === 'number') setTy(v.ty);
-      setShowSequenceLines(v.showSequenceLines !== false);
-    } else {
-      setScale(1);
-      setTx(0);
-      setTy(0);
-      setShowSequenceLines(true);
-    }
+    const v = block?.view;
+    const hasView = v && typeof v === 'object';
+    const nextScale =
+      hasView && typeof v.scale === 'number' && v.scale >= 0.1 && v.scale <= 10 ? v.scale : 1;
+    const nextTx = hasView && typeof v.tx === 'number' ? v.tx : 0;
+    const nextTy = hasView && typeof v.ty === 'number' ? v.ty : 0;
+    const nextSeq = !hasView || v.showSequenceLines !== false;
+    setScale(nextScale);
+    setTx(nextTx);
+    setTy(nextTy);
+    setShowSequenceLines(nextSeq);
   }, [layoutStorageKey, fk, canvasLayouts]);
+
+  const persistCanvasLayoutNow = useCallback(async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const tid = layoutStorageKeyRef.current;
+    const focusKey = fkRef.current;
+    const cards = { ...cardRectsRef.current };
+    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, {
+      view: {
+        scale: scaleRef.current,
+        tx: txRef.current,
+        ty: tyRef.current,
+        showSequenceLines: showSequenceLinesRef.current,
+      },
+      cards,
+    });
+    try {
+      await patchUserSettings({ campusLayouts: patchLayouts });
+      setCanvasLayouts(patchLayouts);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
+    saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
-      const cards = { ...cardRectsRef.current };
-      const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, layoutStorageKey, fk, {
-        view: {
-          scale: scaleRef.current,
-          tx: txRef.current,
-          ty: tyRef.current,
-          showSequenceLines: showSequenceLinesRef.current,
-        },
-        cards,
-      });
-      try {
-        await patchUserSettings({ campusLayouts: patchLayouts });
-        setCanvasLayouts(patchLayouts);
-      } catch (e) {
-        console.error(e);
-      }
+      void persistCanvasLayoutNow();
     }, SAVE_DEBOUNCE_MS);
-  }, [layoutStorageKey, fk]);
+  }, [persistCanvasLayoutNow]);
+
+  useEffect(() => {
+    const onHidden = () => {
+      void persistCanvasLayoutNow();
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') onHidden();
+    };
+    window.addEventListener('pagehide', onHidden);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('pagehide', onHidden);
+      document.removeEventListener('visibilitychange', onVis);
+      void persistCanvasLayoutNow();
+    };
+  }, [persistCanvasLayoutNow]);
 
   scaleRef.current = scale;
   txRef.current = tx;
@@ -785,11 +815,13 @@ export default function CanvasPage() {
   );
 
   const toggleSequenceLines = useCallback(async () => {
+    const tid = layoutStorageKey;
+    const focusKey = fk;
     const prev = showSequenceLinesRef.current;
     const next = !prev;
     setShowSequenceLines(next);
     showSequenceLinesRef.current = next;
-    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, layoutStorageKey, fk, {
+    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, {
       view: {
         scale: scaleRef.current,
         tx: txRef.current,
@@ -816,6 +848,8 @@ export default function CanvasPage() {
     ) {
       return;
     }
+    const tid = layoutStorageKey;
+    const focusKey = fk;
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
@@ -826,8 +860,8 @@ export default function CanvasPage() {
     };
     const patchLayouts = replaceCanvasLayoutFocusBlock(
       canvasLayoutsRef.current,
-      layoutStorageKey,
-      fk,
+      tid,
+      focusKey,
       emptyBlock
     );
     try {
