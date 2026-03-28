@@ -219,7 +219,8 @@ function isCanvasDragInteractiveTarget(target) {
 }
 
 const SAVE_DEBOUNCE_MS = 450;
-const MIN_W = 200;
+/** Room for Edit / Delete / + Tag / star without wrapping at narrow widths. */
+const MIN_W = 280;
 const MIN_H = 120;
 
 export default function CanvasPage() {
@@ -261,6 +262,11 @@ export default function CanvasPage() {
   const pointerUpInnerRef = useRef(() => {});
   const saveTimerRef = useRef(null);
   const focusFromUrl = useRef('');
+  /** After layout reset: always fit all cards in view. */
+  const pendingFitAllRef = useRef(false);
+  /** Avoid repeated fit while saved layout is still empty (e.g. before first save completes). */
+  const fitAppliedForEmptyRef = useRef(false);
+  const canvasViewKeyRef = useRef('');
   const { visibleNoteTypes } = useNoteTypeFilter();
 
   useEffect(() => {
@@ -441,6 +447,73 @@ export default function CanvasPage() {
   txRef.current = tx;
   tyRef.current = ty;
   scheduleSaveRef.current = scheduleSave;
+
+  const fitAllCardsInView = useCallback(() => {
+    const vp = viewportRef.current;
+    const notes = canvasNotes;
+    if (!vp || !notes.length) return;
+    const rects = cardRectsRef.current;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const n of notes) {
+      const r = rects[String(n.id)];
+      if (!r) return;
+      minX = Math.min(minX, r.x);
+      minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + r.w);
+      maxY = Math.max(maxY, r.y + r.h);
+    }
+    const bw = Math.max(maxX - minX, 1);
+    const bh = Math.max(maxY - minY, 1);
+    const { width: vw, height: vh } = vp.getBoundingClientRect();
+    const pad = 40;
+    const fitW = (vw - pad * 2) / bw;
+    const fitH = (vh - pad * 2) / bh;
+    let nextScale = Math.min(fitW, fitH, 2.5, 4);
+    if (!Number.isFinite(nextScale) || nextScale <= 0) nextScale = 1;
+    nextScale = Math.max(0.2, nextScale);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setScale(nextScale);
+    setTx(vw / 2 - cx * nextScale);
+    setTy(vh / 2 - cy * nextScale);
+  }, [canvasNotes]);
+
+  /** Fit everything when there is no saved card layout yet, or after explicit reset. */
+  useEffect(() => {
+    const vk = `${layoutStorageKey}|${fk}`;
+    if (canvasViewKeyRef.current !== vk) {
+      canvasViewKeyRef.current = vk;
+      fitAppliedForEmptyRef.current = false;
+    }
+
+    if (loadingThread || !canvasNotes.length) return;
+    if (!viewportRef.current) return;
+    if (canvasNotes.some((n) => !cardRects[String(n.id)])) return;
+
+    const emptySaved = savedCardsLayoutSig === '{}' || savedCardsLayoutSig === 'null';
+    if (!emptySaved && !pendingFitAllRef.current) {
+      fitAppliedForEmptyRef.current = false;
+      return;
+    }
+    if (fitAppliedForEmptyRef.current && !pendingFitAllRef.current) return;
+
+    if (pendingFitAllRef.current) pendingFitAllRef.current = false;
+    fitAppliedForEmptyRef.current = true;
+
+    fitAllCardsInView();
+    scheduleSaveRef.current();
+  }, [
+    loadingThread,
+    canvasNotes,
+    cardRects,
+    savedCardsLayoutSig,
+    layoutStorageKey,
+    fk,
+    fitAllCardsInView,
+  ]);
 
   const handleWheelNative = useCallback(
     (e) => {
@@ -652,10 +725,9 @@ export default function CanvasPage() {
     );
     try {
       await patchUserSettings({ campusLayouts: patchLayouts });
+      pendingFitAllRef.current = true;
+      fitAppliedForEmptyRef.current = false;
       setCanvasLayouts(patchLayouts);
-      setScale(1);
-      setTx(0);
-      setTy(0);
       setShowSequenceLines(true);
       showSequenceLinesRef.current = true;
     } catch (e) {

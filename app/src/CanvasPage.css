@@ -220,7 +220,7 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  min-width: 200px;
+  min-width: 280px;
   min-height: 120px;
   border-radius: 10px;
   /* Visual chrome lives on .note-card; frame is positioning + hit area only */
@@ -238,12 +238,21 @@
   z-index: 4;
 }
 
+/* Tag dropdown is position:absolute upward; overflow on ancestors clips it — undo while open. */
+.canvas-card-frame:has(.note-card-tag-dropdown) {
+  z-index: 50;
+}
+
 .canvas-card-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.canvas-card-body:has(.note-card-tag-dropdown) {
+  overflow: visible;
 }
 
 .canvas-card-body .note-card {
@@ -257,6 +266,10 @@
   overflow: hidden;
 }
 
+.canvas-card-body .note-card:has(.note-card-tag-dropdown) {
+  overflow: visible;
+}
+
 .canvas-card-body .note-card:active {
   cursor: grabbing;
 }
@@ -265,6 +278,44 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.canvas-card-body .note-card-body:has(.note-card-tag-dropdown) {
+  overflow: visible;
+}
+
+.canvas-card-body .note-card-tag-dropdown {
+  z-index: 60;
+}
+
+/* Meta row: full width for Edit / Delete / + Tag / ★ — truncate time instead of wrapping controls. */
+.canvas-card-body .note-card-meta {
+  flex-wrap: nowrap;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.canvas-card-body .note-card-time {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-card-body .note-card-actions {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+}
+
+.canvas-card-body .note-card-actions .note-card-btn,
+.canvas-card-body .note-card-tag-add-btn {
+  white-space: nowrap;
+}
+
+.canvas-card-body .note-card-tag-add {
+  flex-shrink: 0;
 }
 
 .canvas-card-body .note-card textarea,
