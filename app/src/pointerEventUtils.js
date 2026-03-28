@@ -21,19 +21,31 @@ export function pointerEventTargetElement(event) {
 const INTERACTIVE_FIELD =
   'textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select';
 
+function elementKeepsInsightOpen(el) {
+  if (!el || el.nodeType !== 1 || typeof el.closest !== 'function') return false;
+  if (el.closest?.('[data-insight-ui]')) return true;
+  if (el.closest?.('[data-stream-compose]') || el.closest?.('[data-canvas-compose]')) return true;
+  if (el.classList?.contains('note-card--editing') || el.closest?.('.note-card--editing')) return true;
+  if (el.matches?.(INTERACTIVE_FIELD)) return true;
+  if (el.classList?.contains('note-card') || el.closest?.('.note-card')) return true;
+  return false;
+}
+
 /**
- * True if this event target should not dismiss hover-insight (hit on card, panel, compose, etc.).
- * Uses `pointerEventTargetElement` + `closest()` so Text-node targets and odd `target` values
- * still resolve to a card or chrome.
+ * True if this event should not dismiss hover-insight (hit on card, panel, compose, etc.).
+ * Walks composedPath when available so capture-phase listeners still see the full hit path; also
+ * uses pointerEventTargetElement for target/closest.
  */
 export function insightPointerPathShouldKeepOpen(event) {
   if (event?.pointerType === 'mouse' && event.button !== 0) return true;
+  if (typeof event?.composedPath === 'function') {
+    const path = event.composedPath();
+    for (let i = 0; i < path.length; i += 1) {
+      const n = path[i];
+      if (n && n.nodeType === 1 && elementKeepsInsightOpen(n)) return true;
+    }
+  }
   const t = pointerEventTargetElement(event);
-  if (!t || typeof t.closest !== 'function') return false;
-  if (t.closest('[data-insight-ui]')) return true;
-  if (t.closest('[data-stream-compose]') || t.closest('[data-canvas-compose]')) return true;
-  if (t.closest('.note-card--editing')) return true;
-  if (t.matches?.(INTERACTIVE_FIELD)) return true;
-  if (t.closest('.note-card')) return true;
-  return false;
+  if (!t) return false;
+  return elementKeepsInsightOpen(t);
 }

@@ -522,23 +522,23 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   );
 
   /**
-   * Dismiss on outside click (bubble, default). Runs on document *after* the event reaches the
-   * React root, so note cards handle `click` first; `pointerdown` was still racing React and felt
-   * kludgy. `insightPointerPathShouldKeepOpen` skips when the hit is on a card, compose, or panel.
+   * Dismiss on outside click in **capture** phase on document, before the event reaches the React
+   * root. Bubble-phase dismiss ran *after* React and could call clearInsightSelection in the same
+   * tick as selectInsightNote — batched updates then left hover cleared (single-click felt dead).
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
-    const onDocumentClick = (e) => {
+    const onDocumentClickCapture = (e) => {
       if (insightPointerPathShouldKeepOpen(e)) return;
       clearInsightSelection();
     };
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
-    document.addEventListener('click', onDocumentClick);
+    document.addEventListener('click', onDocumentClickCapture, true);
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('click', onDocumentClick);
+      document.removeEventListener('click', onDocumentClickCapture, true);
       document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [hover?.note, clearInsightSelection]);
