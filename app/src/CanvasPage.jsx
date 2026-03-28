@@ -77,10 +77,45 @@ function flattenCanvasNotes(displayTree) {
   return out;
 }
 
-function defaultRect(i) {
-  const col = i % 4;
-  const row = Math.floor(i / 4);
-  return { x: 48 + col * 380, y: 48 + row * 260, w: 340, h: 220 };
+const DEFAULT_CARD_W = 340;
+const DEFAULT_CARD_H = 220;
+const DEFAULT_CARD_GAP_Y = 36;
+const DEFAULT_CARD_START_X = 48;
+const DEFAULT_CARD_START_Y = 48;
+
+/** Sort key: event start (when set), else note creation time. */
+function noteTimelineMs(n) {
+  if (n.note_type === 'event' && n.event_start_at) {
+    const ev = Date.parse(n.event_start_at);
+    if (Number.isFinite(ev)) return ev;
+  }
+  const raw = n.created_at || n.updated_at;
+  if (!raw) return 0;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+/** Map note id -> rank 0..n-1 earliest→latest (for default positions when nothing is saved). */
+function chronologicalRankById(notes) {
+  const items = notes.map((n, streamIdx) => ({
+    id: String(n.id),
+    t: noteTimelineMs(n),
+    streamIdx,
+  }));
+  items.sort((a, b) => (a.t !== b.t ? a.t - b.t : a.streamIdx - b.streamIdx));
+  const m = new Map();
+  items.forEach((item, rank) => m.set(item.id, rank));
+  return m;
+}
+
+/** Vertical timeline: older notes higher, newer lower. */
+function defaultRectForRank(rank) {
+  return {
+    x: DEFAULT_CARD_START_X,
+    y: DEFAULT_CARD_START_Y + rank * (DEFAULT_CARD_H + DEFAULT_CARD_GAP_Y),
+    w: DEFAULT_CARD_W,
+    h: DEFAULT_CARD_H,
+  };
 }
 
 function notePreview(content, max = 72) {
@@ -219,6 +254,7 @@ export default function CanvasPage() {
   }, [pinnedTree, focusId, actualRootId]);
 
   const canvasNotes = useMemo(() => flattenCanvasNotes(displayTree), [displayTree]);
+  const canvasChronoRankById = useMemo(() => chronologicalRankById(canvasNotes), [canvasNotes]);
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
   const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
@@ -261,7 +297,8 @@ export default function CanvasPage() {
       } catch {
         saved = {};
       }
-      canvasNotes.forEach((n, i) => {
+      const rankById = chronologicalRankById(canvasNotes);
+      canvasNotes.forEach((n) => {
         const id = String(n.id);
         if (saved[id] && typeof saved[id].x === 'number') {
           next[id] = {
@@ -271,7 +308,7 @@ export default function CanvasPage() {
             h: saved[id].h,
           };
         } else if (!next[id]) {
-          next[id] = defaultRect(i);
+          next[id] = defaultRectForRank(rankById.get(id) ?? 0);
         }
       });
       Object.keys(next).forEach((id) => {
@@ -874,7 +911,9 @@ export default function CanvasPage() {
                 ) : null}
                 {canvasNotes.map((n) => {
                   const id = String(n.id);
-                  const r = cardRects[id] || defaultRect(0);
+                  const r =
+                    cardRects[id] ||
+                    defaultRectForRank(canvasChronoRankById.get(id) ?? 0);
                   const topIds = new Set(displayTree.map((x) => String(x.id)));
                   const depth = topIds.has(id) ? 0 : 1;
                   const parentTagsForInherit =
@@ -901,7 +940,6 @@ export default function CanvasPage() {
                         <NoteCard
                           note={n}
                           depth={depth}
-                          hideStar
                           hasReplies={
                             (n.children?.length ?? 0) > 0 ||
                             (typeof n.reply_count === 'number' && n.reply_count > 0)
