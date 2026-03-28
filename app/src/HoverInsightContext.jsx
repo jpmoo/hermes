@@ -294,6 +294,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const activeHoverId = useRef(null);
   /** Selected card element for layout (connection stack / scroll sync). */
   const insightAnchorRef = useRef(null);
+  /** Mirror of `hover?.note` for outside-dismiss (updated synchronously in select/clear). */
+  const hoverNoteRef = useRef(null);
   const ragdollEnabledRef = useRef(false);
   const ragdollReqId = useRef(0);
   const [ragdollEnabled, setRagdollEnabled] = useState(false);
@@ -405,6 +407,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const clearInsightSelection = useCallback(() => {
     activeHoverId.current = null;
     insightAnchorRef.current = null;
+    hoverNoteRef.current = null;
     if (fetchTimer.current) clearTimeout(fetchTimer.current);
     setHover(null);
     setInsight(null);
@@ -438,6 +441,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       const id = ++reqId.current;
 
       insightAnchorRef.current = anchorEl;
+      hoverNoteRef.current = note;
       setHover({ note });
       activeHoverId.current = note.id;
       setDismissedKeys(new Set());
@@ -522,32 +526,27 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [clearInsightSelection]
   );
 
-  /** Ref so deferred outside-dismiss sees current insight without stale closures. */
-  const hoverNoteRef = useRef(null);
-  useLayoutEffect(() => {
-    hoverNoteRef.current = hover?.note ?? null;
-  }, [hover?.note]);
-
   /**
-   * Click outside to exit (bubble on document). Stream note cards register a native **bubble**
-   * `click` on `<article>` that calls `stopPropagation()` for handled card-body clicks so this
-   * listener does not run for those.
+   * Outside dismiss: **capture** on `document` runs before the event reaches the note card, so we
+   * decide from `composedPath()` alone — no reliance on `stopPropagation()` from the card (fragile
+   * with React roots, extensions, retargeting). Clicks whose path includes `.note-card`, insight
+   * UI, compose, etc. return early; the bubble handler on `<article>` then runs `selectInsightNote`.
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
-    const onDocumentClick = (e) => {
+    const onDocumentClickCapture = (e) => {
       if (!hoverNoteRef.current) return;
       if (insightPointerPathShouldKeepOpen(e)) return;
       clearInsightSelection();
     };
     document.addEventListener('keydown', onKeyDown, true);
-    document.addEventListener('click', onDocumentClick, false);
+    document.addEventListener('click', onDocumentClickCapture, true);
     return () => {
       document.removeEventListener('keydown', onKeyDown, true);
-      document.removeEventListener('click', onDocumentClick, false);
+      document.removeEventListener('click', onDocumentClickCapture, true);
     };
   }, [hover?.note, clearInsightSelection]);
 

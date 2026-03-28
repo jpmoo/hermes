@@ -370,9 +370,9 @@ export default function NoteCard({
   runStreamDrillOpenRef.current = runStreamDrillOpen;
 
   /**
-   * Stream insight: React’s delegated `onClick` races the document dismiss listener. Use a native
-   * **bubble** listener on `<article>` so interactive children run first; then we select / drill
-   * and `stopPropagation()` so the document dismiss does not run for in-card “chrome” clicks.
+   * Stream insight: native **bubble** `click` on `<article>` so rich-text controls run first;
+   * then select / drill. Outside-dismiss uses **capture** on `document` + `composedPath()` (see
+   * HoverInsightContext) — `stopPropagation()` here only reduces noise to parents / React root.
    */
   useLayoutEffect(() => {
     if (!hoverInsightEnabled || editing) return undefined;
