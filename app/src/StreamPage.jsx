@@ -37,7 +37,7 @@ import './StreamPage.css';
  * Must exceed max `--stream-exit-delay` + `--stream-exit-duration` from exit stagger
  * (see useLayoutEffect on thread list when branchHeadExiting).
  */
-const NOTES_EXIT_TO_ROOT_COMMIT_MS = 3000;
+const NOTES_EXIT_TO_ROOT_COMMIT_MS = 2900;
 
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
@@ -382,8 +382,8 @@ export default function StreamPage() {
       'cubic-bezier(0.25, 0.5, 0.4, 1)',
     ];
     lis.forEach((li, i) => {
-      const delay = Math.min(i, 20) * 22 + ((i * 5) % 7) * 36;
-      const duration = 520 + ((i * 11 + (i % 5) * 3) % 17) * 118;
+      const delay = Math.min(i, 18) * 44 + (i % 5) * 32;
+      const duration = 720 + (i % 12) * 105;
       const ease = easings[i % easings.length];
       li.style.setProperty('--stream-exit-delay', `${delay}ms`);
       li.style.setProperty('--stream-exit-duration', `${duration}ms`);
@@ -721,12 +721,11 @@ export default function StreamPage() {
     const canFloat = Boolean(fr && note && fr.width > 0 && fr.height > 0);
 
     /*
-     * Up to thread root: always run the staged row exit (branchHeadExiting + deferred focus).
-     * Do not run the drill-up float here — float needs the parent row in the DOM, which only exists
-     * after focus commits; the exit animation is the primary transition for every depth (including
-     * one level below root).
+     * Up to thread root: deferring focus keeps the parent row out of the DOM, so the float cannot
+     * measure the real reply slot (fallback = head row = no motion). When we can float, commit focus
+     * immediately so the root row exists; keep the staged exit only when there is no float.
      */
-    if (movingToRoot) {
+    if (movingToRoot && !canFloat) {
       setBranchHeadExiting(true);
       window.setTimeout(() => {
         setBranchHeadExiting(false);
@@ -736,16 +735,15 @@ export default function StreamPage() {
         d.set(leavingHeadId, 440);
         setLevelDropDelays(d);
         clearLevelDropSoon();
-        levelNavBusyRef.current = false;
       }, NOTES_EXIT_TO_ROOT_COMMIT_MS);
     } else {
       setFocusId(parentId);
-      setSearchParams({ thread: threadRootId, focus: parentId });
+      setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
       setLevelDropDelays(delays);
       clearLevelDropSoon();
     }
 
-    if (canFloat && !movingToRoot) {
+    if (canFloat) {
       setFloatOpen({
         kind: 'up',
         note,
@@ -762,13 +760,17 @@ export default function StreamPage() {
         setFloatOpen(null);
         levelNavBusyRef.current = false;
       }, 480);
-    } else if (!movingToRoot && !canFloat) {
+    } else if (!movingToRoot) {
       const d = new Map(delays);
       d.set(leavingHeadId, 440);
       setLevelDropDelays(d);
       window.setTimeout(() => {
         levelNavBusyRef.current = false;
       }, 650);
+    } else {
+      window.setTimeout(() => {
+        levelNavBusyRef.current = false;
+      }, NOTES_EXIT_TO_ROOT_COMMIT_MS + 40);
     }
   }, [
     threadRootId,
