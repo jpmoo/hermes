@@ -33,8 +33,11 @@ import {
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
 import './StreamPage.css';
 
-/** Must cover max `--stream-exit-delay` + `--stream-exit-duration` from exit stagger (see layout effect). */
-const NOTES_EXIT_TO_ROOT_COMMIT_MS = 1550;
+/**
+ * Must exceed max `--stream-exit-delay` + `--stream-exit-duration` from exit stagger
+ * (see useLayoutEffect on thread list when branchHeadExiting).
+ */
+const NOTES_EXIT_TO_ROOT_COMMIT_MS = 2500;
 
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
@@ -354,6 +357,24 @@ export default function StreamPage() {
   const [levelDropDelays, setLevelDropDelays] = useState(null);
   const levelNavBusyRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
+
+  useLayoutEffect(() => {
+    const listEl = threadListRef.current;
+    if (!branchHeadExiting || !listEl) return;
+    const lis = [...listEl.querySelectorAll('li[data-stream-note]')];
+    lis.forEach((li, i) => {
+      const delay = Math.min(i, 16) * 52 + (i % 5) * 28;
+      const duration = 920 + (i % 9) * 78;
+      li.style.setProperty('--stream-exit-delay', `${delay}ms`);
+      li.style.setProperty('--stream-exit-duration', `${duration}ms`);
+    });
+    return () => {
+      lis.forEach((li) => {
+        li.style.removeProperty('--stream-exit-delay');
+        li.style.removeProperty('--stream-exit-duration');
+      });
+    };
+  }, [branchHeadExiting]);
 
   useEffect(() => {
     if (!user?.id) {

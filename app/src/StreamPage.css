@@ -290,33 +290,34 @@
     transform: translateY(0) scale(1);
     filter: blur(0);
   }
-  /* Fall while fully opaque */
-  52% {
+  /* Long visible fall — most travel happens before any fade */
+  68% {
     opacity: 1;
-    transform: translateY(56px) scale(0.94);
+    transform: translateY(132px) scale(0.9);
     filter: blur(0);
   }
-  /* Then step down in opacity (still moving) */
-  74% {
-    opacity: 0.42;
-    transform: translateY(88px) scale(0.88);
-    filter: blur(4px);
+  84% {
+    opacity: 0.38;
+    transform: translateY(188px) scale(0.84);
+    filter: blur(5px);
   }
   100% {
     opacity: 0;
-    transform: translateY(118px) scale(0.8);
-    filter: blur(12px);
+    transform: translateY(228px) scale(0.76);
+    filter: blur(14px);
   }
 }
 
 /* Full-thread-at-root transition: every visible row exits (animateToFullThread + up-one-level to thread root) */
 .stream-page-thread-enter--notes-exit-to-root .stream-page-list li[data-stream-note] {
   animation-name: streamNotesExitToRoot;
-  animation-duration: var(--stream-exit-duration, 760ms);
+  animation-duration: var(--stream-exit-duration, 1100ms);
   animation-delay: var(--stream-exit-delay, 0ms);
-  animation-timing-function: cubic-bezier(0.28, 0, 0.22, 1);
+  /* Ease-in so the drop accelerates like gravity; stagger + duration vars differentiate cards */
+  animation-timing-function: cubic-bezier(0.32, 0.02, 0.67, 1);
   animation-fill-mode: forwards;
   pointer-events: none;
+  transform-origin: 50% 0;
   will-change: transform, opacity, filter;
 }
 
