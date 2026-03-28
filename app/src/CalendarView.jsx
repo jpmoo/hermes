@@ -160,7 +160,7 @@ export default function CalendarView() {
 
   const viewLinks = [
     { to: '/', label: 'Stream' },
-    { to: '/campus', label: 'Campus' },
+    { to: '/campus', label: 'Canvas' },
     { to: '/outline', label: 'Outline' },
     { to: '/calendar', label: 'Calendar' },
     { to: '/search', label: 'Search' },

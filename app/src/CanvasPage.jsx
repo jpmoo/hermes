@@ -6,24 +6,25 @@ import NoteCard from './NoteCard';
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
-import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
+import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import {
   getThread,
+  getRoots,
   createNote,
   fetchUserSettings,
   patchUserSettings,
   unstarNote,
 } from './api';
-import { campusFocusKey, mergeCampusLayoutPatch } from './campusLayoutApi';
+import { canvasFocusKey, canvasLayoutThreadKey, mergeCanvasLayoutPatch } from './canvasLayoutApi';
 import {
   NavIconUpOneLevel,
   NavIconRootLevel,
   NavIconBrain,
   NavIconSequenceLines,
 } from './icons/NavIcons';
-import './CampusPage.css';
+import './CanvasPage.css';
 
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
@@ -67,7 +68,7 @@ function parentInFilteredTree(nodes, targetId) {
 }
 
 /** Visible notes in stream order: head row(s) then direct replies only (same as StreamList). */
-function flattenCampusNotes(displayTree) {
+function flattenCanvasNotes(displayTree) {
   const out = [];
   for (const root of displayTree) {
     out.push(root);
@@ -93,7 +94,7 @@ const SAVE_DEBOUNCE_MS = 450;
 const MIN_W = 200;
 const MIN_H = 120;
 
-export default function CampusPage() {
+export default function CanvasPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -101,9 +102,9 @@ export default function CampusPage() {
   const focusParam = searchParams.get('focus')?.trim() || null;
 
   const [thread, setThread] = useState([]);
-  const [loadingThread, setLoadingThread] = useState(!!threadRootId);
+  const [loadingThread, setLoadingThread] = useState(true);
   const [focusId, setFocusId] = useState(null);
-  const [campusLayouts, setCampusLayouts] = useState({});
+  const [canvasLayouts, setCanvasLayouts] = useState({});
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [showSequenceLines, setShowSequenceLines] = useState(true);
 
@@ -133,8 +134,11 @@ export default function CampusPage() {
 
   useEffect(() => {
     if (!threadRootId) {
-      setThread([]);
-      setLoadingThread(false);
+      setLoadingThread(true);
+      getRoots(false)
+        .then(setThread)
+        .catch(() => setThread([]))
+        .finally(() => setLoadingThread(false));
       return;
     }
     setLoadingThread(true);
@@ -153,18 +157,27 @@ export default function CampusPage() {
   useEffect(() => {
     fetchUserSettings()
       .then((s) => {
-        if (s?.campusLayouts && typeof s.campusLayouts === 'object') setCampusLayouts(s.campusLayouts);
+        if (s?.campusLayouts && typeof s.campusLayouts === 'object') setCanvasLayouts(s.campusLayouts);
       })
       .catch(() => {});
   }, []);
 
-  const treeFull = useMemo(() => buildTree(thread), [thread]);
-  const tree = useMemo(
-    () => sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes)),
-    [treeFull, visibleNoteTypes]
-  );
+  const treeFull = useMemo(() => {
+    if (!threadRootId) {
+      const roots = filterRootsByVisibleNoteTypes(thread, visibleNoteTypes);
+      return sortNoteTreeByThreadOrder(roots.map((r) => ({ ...r, children: [] })));
+    }
+    return buildTree(thread);
+  }, [thread, threadRootId, visibleNoteTypes]);
+
+  const tree = useMemo(() => {
+    if (!threadRootId) return treeFull;
+    return sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes));
+  }, [threadRootId, treeFull, visibleNoteTypes]);
+
   const pinnedTree = useMemo(() => sortStarredPinned(tree), [tree]);
   const actualRootId = threadRootId;
+  const layoutStorageKey = useMemo(() => canvasLayoutThreadKey(threadRootId), [threadRootId]);
 
   const displayTree = useMemo(() => {
     const fn = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
@@ -174,20 +187,24 @@ export default function CampusPage() {
     return pinnedTree;
   }, [pinnedTree, focusId, actualRootId]);
 
-  const campusNotes = useMemo(() => flattenCampusNotes(displayTree), [displayTree]);
+  const canvasNotes = useMemo(() => flattenCanvasNotes(displayTree), [displayTree]);
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
   const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
 
-  const fk = campusFocusKey(focusId);
+  const fk = canvasFocusKey(focusId);
   const layoutBlock = useMemo(() => {
-    if (!threadRootId) return null;
-    const t = campusLayouts[String(threadRootId)];
+    const t = canvasLayouts[String(layoutStorageKey)];
     return t && typeof t === 'object' ? t[fk] : null;
-  }, [campusLayouts, threadRootId, fk]);
+  }, [canvasLayouts, layoutStorageKey, fk]);
 
   useEffect(() => {
-    if (!threadRootId || !thread.length) return;
+    if (!threadRootId) {
+      setFocusId(null);
+      focusFromUrl.current = '';
+      return;
+    }
+    if (!thread.length) return;
     const key = `${threadRootId}|${focusParam || ''}`;
     if (focusFromUrl.current === key) return;
     if (focusParam && !findNode(pinnedTree, focusParam)) return;
@@ -196,14 +213,14 @@ export default function CampusPage() {
   }, [threadRootId, focusParam, thread, pinnedTree]);
 
   useEffect(() => {
-    if (!campusNotes.length) {
+    if (!canvasNotes.length) {
       setCardRects({});
       return;
     }
     setCardRects((prev) => {
       const next = { ...prev };
       const saved = layoutBlock?.cards && typeof layoutBlock.cards === 'object' ? layoutBlock.cards : {};
-      campusNotes.forEach((n, i) => {
+      canvasNotes.forEach((n, i) => {
         const id = String(n.id);
         if (saved[id] && typeof saved[id].x === 'number') {
           next[id] = {
@@ -217,15 +234,14 @@ export default function CampusPage() {
         }
       });
       Object.keys(next).forEach((id) => {
-        if (!campusNotes.some((n) => String(n.id) === id)) delete next[id];
+        if (!canvasNotes.some((n) => String(n.id) === id)) delete next[id];
       });
       return next;
     });
-  }, [campusNotes, layoutBlock, threadRootId, fk]);
+  }, [canvasNotes, layoutBlock, layoutStorageKey, fk]);
 
   useEffect(() => {
-    if (!threadRootId) return;
-    const block = campusLayouts[String(threadRootId)]?.[fk];
+    const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
     if (block?.view) {
       const v = block.view;
       if (typeof v.scale === 'number' && v.scale >= 0.1 && v.scale <= 10) setScale(v.scale);
@@ -238,26 +254,25 @@ export default function CampusPage() {
       setTy(0);
       setShowSequenceLines(true);
     }
-  }, [threadRootId, fk, campusLayouts]);
+  }, [layoutStorageKey, fk, canvasLayouts]);
 
   const scheduleSave = useCallback(() => {
-    if (!threadRootId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       saveTimerRef.current = null;
       const cards = { ...cardRects };
-      const patchLayouts = mergeCampusLayoutPatch(campusLayouts, threadRootId, fk, {
+      const patchLayouts = mergeCanvasLayoutPatch(canvasLayouts, layoutStorageKey, fk, {
         view: { scale, tx, ty, showSequenceLines },
         cards,
       });
       try {
         await patchUserSettings({ campusLayouts: patchLayouts });
-        setCampusLayouts(patchLayouts);
+        setCanvasLayouts(patchLayouts);
       } catch (e) {
         console.error(e);
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [threadRootId, fk, campusLayouts, cardRects, scale, tx, ty, showSequenceLines]);
+  }, [layoutStorageKey, fk, canvasLayouts, cardRects, scale, tx, ty, showSequenceLines]);
 
   scaleRef.current = scale;
   txRef.current = tx;
@@ -324,7 +339,7 @@ export default function CampusPage() {
   const onViewportPointerDown = useCallback(
     (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (e.target.closest('.campus-card-frame')) return;
+      if (e.target.closest('.canvas-card-frame')) return;
       const el = viewportRef.current;
       if (!el) return;
       try {
@@ -365,8 +380,11 @@ export default function CampusPage() {
   }, [detachViewportPointerTracking]);
 
   const refreshThread = useCallback(() => {
-    if (!threadRootId) return;
-    getThread(threadRootId, false).then(setThread).catch(() => {});
+    if (!threadRootId) {
+      getRoots(false).then(setThread).catch(() => {});
+    } else {
+      getThread(threadRootId, false).then(setThread).catch(() => {});
+    }
   }, [threadRootId]);
 
   const applyFocus = useCallback(
@@ -407,9 +425,13 @@ export default function CampusPage() {
 
   const makeOpenThread = useCallback(
     (noteId) => () => {
+      if (!threadRootId) {
+        setSearchParams({ thread: String(noteId) });
+        return;
+      }
       applyFocus(noteId);
     },
-    [applyFocus]
+    [threadRootId, setSearchParams, applyFocus]
   );
 
   const onGoToNote = useCallback(
@@ -420,24 +442,23 @@ export default function CampusPage() {
   );
 
   const toggleSequenceLines = useCallback(async () => {
-    if (!threadRootId) return;
     const next = !showSequenceLines;
     setShowSequenceLines(next);
-    const patchLayouts = mergeCampusLayoutPatch(campusLayouts, threadRootId, fk, {
+    const patchLayouts = mergeCanvasLayoutPatch(canvasLayouts, layoutStorageKey, fk, {
       view: { scale, tx, ty, showSequenceLines: next },
       cards: { ...cardRects },
     });
     try {
       await patchUserSettings({ campusLayouts: patchLayouts });
-      setCampusLayouts(patchLayouts);
+      setCanvasLayouts(patchLayouts);
     } catch (e) {
       console.error(e);
       setShowSequenceLines(!next);
     }
   }, [
-    threadRootId,
+    layoutStorageKey,
     showSequenceLines,
-    campusLayouts,
+    canvasLayouts,
     fk,
     scale,
     tx,
@@ -446,13 +467,21 @@ export default function CampusPage() {
   ]);
 
   const handleAddCard = useCallback(async () => {
-    if (!threadRootId || !replyParentId) return;
     try {
-      await createNote({
-        content: '',
-        parent_id: replyParentId,
-        note_type: 'note',
-      });
+      if (threadRootId) {
+        if (replyParentId == null) return;
+        await createNote({
+          content: '',
+          parent_id: replyParentId,
+          note_type: 'note',
+        });
+      } else {
+        await createNote({
+          content: '',
+          parent_id: null,
+          note_type: 'note',
+        });
+      }
       refreshThread();
     } catch (e) {
       console.error(e);
@@ -522,8 +551,8 @@ export default function CampusPage() {
   );
 
   const starredOnCanvas = useMemo(
-    () => campusNotes.filter((n) => n.starred),
-    [campusNotes]
+    () => canvasNotes.filter((n) => n.starred),
+    [canvasNotes]
   );
 
   const zoomToCard = useCallback(
@@ -563,9 +592,9 @@ export default function CampusPage() {
 
   const connectorPoints = useMemo(() => {
     const pts = [];
-    for (let i = 0; i < campusNotes.length - 1; i++) {
-      const a = cardRects[String(campusNotes[i].id)];
-      const b = cardRects[String(campusNotes[i + 1].id)];
+    for (let i = 0; i < canvasNotes.length - 1; i++) {
+      const a = cardRects[String(canvasNotes[i].id)];
+      const b = cardRects[String(canvasNotes[i + 1].id)];
       if (!a || !b) continue;
       pts.push({
         x1: a.x + a.w / 2,
@@ -575,7 +604,7 @@ export default function CampusPage() {
       });
     }
     return pts;
-  }, [campusNotes, cardRects]);
+  }, [canvasNotes, cardRects]);
 
   pointerMoveInnerRef.current = (e) => {
     if (!viewportRef.current) return;
@@ -631,38 +660,28 @@ export default function CampusPage() {
   const layoutTitle =
     threadRootId && rootNote
       ? rootNote.content?.slice(0, 40) + (rootNote.content?.length > 40 ? '…' : '')
-      : 'Campus';
+      : 'Canvas';
 
   const summaryIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
 
   const navLinks = [
     { to: '/', label: 'Stream' },
-    { to: '/campus', label: 'Campus' },
+    { to: '/campus', label: 'Canvas' },
     { to: '/outline', label: 'Outline' },
     { to: '/calendar', label: 'Calendar' },
     { to: '/search', label: 'Search' },
   ];
 
-  if (!threadRootId) {
-    return (
-      <Layout title="Campus" noteTypeFilterEnabled onLogout={logout} viewLinks={navLinks}>
-        <div className="campus-page campus-page--empty">
-          <p className="campus-muted">Open a thread from Stream, then use the Campus icon in the header.</p>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout title={layoutTitle} noteTypeFilterEnabled onLogout={logout} viewLinks={navLinks}>
       <HoverInsightProvider onNoteUpdated={refreshThread} onGoToNote={onGoToNote}>
-        <div className="campus-page">
-          <div className="campus-toolbar">
-            <div className="campus-toolbar-left">
+        <div className="canvas-page">
+          <div className="canvas-toolbar">
+            <div className="canvas-toolbar-left">
               {focusId && !noteIdEq(focusId, actualRootId) ? (
                 <button
                   type="button"
-                  className="campus-icon-btn"
+                  className="canvas-icon-btn"
                   onClick={upOneLevel}
                   aria-label="Up one level"
                   title="Up one level"
@@ -672,17 +691,17 @@ export default function CampusPage() {
               ) : null}
               <button
                 type="button"
-                className="campus-icon-btn"
+                className="canvas-icon-btn"
                 onClick={closeThread}
                 aria-label="Root level"
                 title="Root level"
               >
                 <NavIconRootLevel />
               </button>
-              {summaryIds.length > 0 ? (
+              {threadRootId && summaryIds.length > 0 ? (
                 <button
                   type="button"
-                  className="campus-icon-btn"
+                  className="canvas-icon-btn"
                   onClick={() => setSummaryOpen(true)}
                   aria-label="AI thread summary"
                   title="AI thread summary"
@@ -692,7 +711,7 @@ export default function CampusPage() {
               ) : null}
               <button
                 type="button"
-                className={`campus-icon-btn${showSequenceLines ? '' : ' campus-icon-btn--off'}`}
+                className={`canvas-icon-btn${showSequenceLines ? '' : ' canvas-icon-btn--off'}`}
                 onClick={toggleSequenceLines}
                 aria-label={showSequenceLines ? 'Hide sequence lines' : 'Show sequence lines'}
                 aria-pressed={showSequenceLines}
@@ -700,35 +719,33 @@ export default function CampusPage() {
               >
                 <NavIconSequenceLines />
               </button>
-              <button type="button" className="campus-add-btn" onClick={handleAddCard}>
-                + Add to thread
+              <button type="button" className="canvas-add-btn" onClick={handleAddCard}>
+                {threadRootId ? '+ Add to thread' : '+ Add note'}
               </button>
             </div>
-            <div className="campus-zoom-hint">
-              Pinch to zoom (two-finger drag does not pan) · ⌃ scroll to zoom · drag background to pan
-            </div>
+            <div className="canvas-zoom-hint">Pinch/zoom to adjust magnification</div>
           </div>
 
           {loadingThread ? (
-            <p className="campus-muted">Loading thread…</p>
+            <p className="canvas-muted">Loading…</p>
           ) : thread.length === 0 ? (
-            <p className="campus-muted">Thread not found.</p>
+            <p className="canvas-muted">{threadRootId ? 'Thread not found.' : 'No notes yet.'}</p>
           ) : (
             <>
-            <aside className="campus-starred-dock" aria-label="Starred notes">
-              <div className="campus-starred-dock-title">Starred</div>
-              <ul className="campus-starred-dock-list">
+            <aside className="canvas-starred-dock" aria-label="Starred notes">
+              <div className="canvas-starred-dock-title">Starred</div>
+              <ul className="canvas-starred-dock-list">
                 {starredOnCanvas.map((n) => (
                   <li key={String(n.id)}>
                     <div
-                      className="campus-starred-row"
+                      className="canvas-starred-row"
                       onDoubleClick={() => zoomToCard(n.id)}
                       title="Double-click to zoom to this note on the canvas"
                     >
-                      <span className="campus-starred-preview">{notePreview(n.content)}</span>
+                      <span className="canvas-starred-preview">{notePreview(n.content)}</span>
                       <button
                         type="button"
-                        className="campus-starred-unstar"
+                        className="canvas-starred-unstar"
                         onClick={(e) => {
                           e.stopPropagation();
                           unstarFromDock(n.id);
@@ -743,23 +760,23 @@ export default function CampusPage() {
                 ))}
               </ul>
               {starredOnCanvas.length === 0 ? (
-                <p className="campus-starred-dock-empty">No starred notes in this view.</p>
+                <p className="canvas-starred-dock-empty">No starred notes in this view.</p>
               ) : null}
             </aside>
             <div
-              className="campus-viewport"
+              className="canvas-viewport"
               ref={viewportRef}
               onPointerDown={onViewportPointerDown}
             >
               <div
-                className="campus-world"
+                className="canvas-world"
                 style={{
                   transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
                   transformOrigin: '0 0',
                 }}
               >
                 {showSequenceLines ? (
-                  <svg className="campus-connectors" aria-hidden>
+                  <svg className="canvas-connectors" aria-hidden>
                     {connectorPoints.map((seg, i) => (
                       <line
                         key={i}
@@ -775,7 +792,7 @@ export default function CampusPage() {
                     ))}
                   </svg>
                 ) : null}
-                {campusNotes.map((n) => {
+                {canvasNotes.map((n) => {
                   const id = String(n.id);
                   const r = cardRects[id] || defaultRect(0);
                   const topIds = new Set(displayTree.map((x) => String(x.id)));
@@ -783,12 +800,14 @@ export default function CampusPage() {
                   const parentTagsForInherit =
                     depth > 0 && n.parent_id
                       ? threadById.get(n.parent_id)?.tags ?? []
-                      : threadById.get(actualRootId)?.tags ?? [];
+                      : actualRootId
+                        ? threadById.get(actualRootId)?.tags ?? []
+                        : [];
                   return (
                     <div
                       key={id}
-                      className="campus-card-frame"
-                      data-campus-note-id={id}
+                      className="canvas-card-frame"
+                      data-canvas-note-id={id}
                       style={{
                         left: r.x,
                         top: r.y,
@@ -797,16 +816,19 @@ export default function CampusPage() {
                       }}
                     >
                       <div
-                        className="campus-card-drag"
+                        className="canvas-card-drag"
                         onPointerDown={(e) => startDrag(n.id, e)}
                         title="Drag to move"
                       />
-                      <div className="campus-card-inner">
+                      <div className="canvas-card-inner">
                         <NoteCard
                           note={n}
                           depth={depth}
                           hideStar
-                          hasReplies={(n.children?.length ?? 0) > 0}
+                          hasReplies={
+                            (n.children?.length ?? 0) > 0 ||
+                            (typeof n.reply_count === 'number' && n.reply_count > 0)
+                          }
                           hoverInsightEnabled
                           parentTagsForInherit={parentTagsForInherit}
                           onOpenThread={makeOpenThread(n.id)}
@@ -817,7 +839,7 @@ export default function CampusPage() {
                       </div>
                       <button
                         type="button"
-                        className="campus-card-resize"
+                        className="canvas-card-resize"
                         aria-label="Resize card"
                         onPointerDown={(e) => startResize(n.id, e)}
                       />

@@ -65,7 +65,7 @@ function sanitizeNoteHistory(input) {
   return out;
 }
 
-/** Campus infinite canvas: per-thread, per-focus view + card rects (stored in settings_json). */
+/** Canvas layouts (stored as campusLayouts in settings_json): per-thread, per-focus view + card rects. */
 function sanitizeCampusLayouts(input) {
   if (input == null || typeof input !== 'object' || Array.isArray(input)) return {};
   const out = {};

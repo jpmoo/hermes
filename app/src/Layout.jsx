@@ -85,7 +85,7 @@ export default function Layout({
                       tooltip ??
                       (to === '/'
                         ? 'Return to last Stream level'
-                        : 'Infinite campus — last thread')
+                        : 'Infinite canvas — last thread')
                     }
                     onClick={(e) => {
                       e.preventDefault();

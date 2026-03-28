@@ -1,21 +1,22 @@
-.campus-page {
+.canvas-page {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  width: 100%;
   background: var(--bg);
 }
 
-.campus-page--empty {
+.canvas-page--empty {
   padding: 1.5rem;
 }
 
-.campus-muted {
+.canvas-muted {
   color: var(--text-muted);
   padding: 1rem;
 }
 
-.campus-toolbar {
+.canvas-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -27,14 +28,14 @@
   flex-shrink: 0;
 }
 
-.campus-toolbar-left {
+.canvas-toolbar-left {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
 }
 
-.campus-icon-btn {
+.canvas-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -48,19 +49,19 @@
   cursor: pointer;
 }
 
-.campus-icon-btn:hover {
+.canvas-icon-btn:hover {
   background: var(--bg-hover);
 }
 
-.campus-icon-btn--off {
+.canvas-icon-btn--off {
   opacity: 0.55;
 }
 
-.campus-icon-btn--off:hover {
+.canvas-icon-btn--off:hover {
   opacity: 0.75;
 }
 
-.campus-add-btn {
+.canvas-add-btn {
   margin-left: 0.35rem;
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
@@ -71,20 +72,20 @@
   cursor: pointer;
 }
 
-.campus-add-btn:hover {
+.canvas-add-btn:hover {
   background: var(--bg-hover);
 }
 
-.campus-zoom-hint {
+.canvas-zoom-hint {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
 
 /* Fixed dock: starred notes on the current canvas (above canvas, below header) */
-.campus-starred-dock {
+.canvas-starred-dock {
   position: fixed;
   z-index: 25;
-  /* Below sticky header + campus toolbar row */
+  /* Below sticky header + canvas toolbar row */
   top: calc(7.35rem + env(safe-area-inset-top, 0px));
   right: max(0.65rem, env(safe-area-inset-right));
   width: min(16rem, calc(100vw - 1.5rem));
@@ -99,7 +100,7 @@
   pointer-events: auto;
 }
 
-.campus-starred-dock-title {
+.canvas-starred-dock-title {
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -109,7 +110,7 @@
   flex-shrink: 0;
 }
 
-.campus-starred-dock-list {
+.canvas-starred-dock-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -118,7 +119,7 @@
   flex: 1;
 }
 
-.campus-starred-row {
+.canvas-starred-row {
   display: flex;
   align-items: flex-start;
   gap: 0.35rem;
@@ -127,11 +128,11 @@
   cursor: default;
 }
 
-.campus-starred-row:hover {
+.canvas-starred-row:hover {
   background: var(--bg-hover);
 }
 
-.campus-starred-preview {
+.canvas-starred-preview {
   flex: 1;
   min-width: 0;
   font-size: 0.8rem;
@@ -140,7 +141,7 @@
   word-break: break-word;
 }
 
-.campus-starred-unstar {
+.canvas-starred-unstar {
   flex-shrink: 0;
   align-self: flex-start;
   background: none;
@@ -153,18 +154,18 @@
   opacity: 0.9;
 }
 
-.campus-starred-unstar:hover {
+.canvas-starred-unstar:hover {
   opacity: 1;
 }
 
-.campus-starred-dock-empty {
+.canvas-starred-dock-empty {
   margin: 0.25rem 0 0;
   font-size: 0.75rem;
   color: var(--text-muted);
   line-height: 1.35;
 }
 
-.campus-viewport {
+.canvas-viewport {
   flex: 1;
   min-height: 0;
   position: relative;
@@ -176,11 +177,11 @@
   background-size: 24px 24px;
 }
 
-.campus-viewport:active {
+.canvas-viewport:active {
   cursor: grabbing;
 }
 
-.campus-world {
+.canvas-world {
   position: absolute;
   left: 0;
   top: 0;
@@ -189,7 +190,7 @@
   transform-origin: 0 0;
 }
 
-.campus-connectors {
+.canvas-connectors {
   position: absolute;
   left: 0;
   top: 0;
@@ -199,7 +200,7 @@
   overflow: visible;
 }
 
-.campus-card-frame {
+.canvas-card-frame {
   position: absolute;
   z-index: 1;
   display: flex;
@@ -210,11 +211,11 @@
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
 }
 
-.campus-card-frame:focus-within {
+.canvas-card-frame:focus-within {
   z-index: 4;
 }
 
-.campus-card-drag {
+.canvas-card-drag {
   flex-shrink: 0;
   height: 10px;
   cursor: grab;
@@ -222,11 +223,11 @@
   background: linear-gradient(to bottom, var(--border-subtle), transparent);
 }
 
-.campus-card-drag:active {
+.canvas-card-drag:active {
   cursor: grabbing;
 }
 
-.campus-card-inner {
+.canvas-card-inner {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -235,12 +236,12 @@
   border-top: none;
 }
 
-.campus-card-inner .note-card {
+.canvas-card-inner .note-card {
   border-radius: 0;
   box-shadow: none;
 }
 
-.campus-card-resize {
+.canvas-card-resize {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -254,6 +255,6 @@
   border-radius: 0 0 10px 0;
 }
 
-.campus-card-resize:hover {
+.canvas-card-resize:hover {
   opacity: 0.85;
 }

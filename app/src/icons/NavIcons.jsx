@@ -344,8 +344,8 @@ export function NavIconBrain(props) {
   );
 }
 
-/** Grid / infinite campus (assets/grid.svg, themed via currentColor). */
-export function NavIconCampus(props) {
+/** Grid / infinite canvas (assets/grid.svg, themed via currentColor). */
+export function NavIconCanvas(props) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -383,7 +383,7 @@ function navIconForTo(to) {
   if (to === '/tags') return NavIconTag;
   if (to === '/search') return NavIconSearch;
   if (to === '/calendar') return NavIconCalendar;
-  if (to === '/campus') return NavIconCampus;
+  if (to === '/campus') return NavIconCanvas;
   if (to === '/outline' || to.startsWith('/outline')) return NavIconOutline;
   return null;
 }
