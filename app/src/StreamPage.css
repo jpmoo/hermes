@@ -290,21 +290,26 @@
     transform: translateY(0) scale(1);
     filter: blur(0);
   }
-  /* Long visible fall — most travel happens before any fade */
-  68% {
+  /* Most of the path stays opaque so different durations visibly overlap */
+  58% {
     opacity: 1;
-    transform: translateY(132px) scale(0.9);
+    transform: translateY(108px) scale(0.93);
     filter: blur(0);
   }
-  84% {
-    opacity: 0.38;
-    transform: translateY(188px) scale(0.84);
-    filter: blur(5px);
+  76% {
+    opacity: 0.55;
+    transform: translateY(168px) scale(0.87);
+    filter: blur(4px);
+  }
+  90% {
+    opacity: 0.18;
+    transform: translateY(212px) scale(0.8);
+    filter: blur(9px);
   }
   100% {
     opacity: 0;
-    transform: translateY(228px) scale(0.76);
-    filter: blur(14px);
+    transform: translateY(248px) scale(0.74);
+    filter: blur(16px);
   }
 }
 
