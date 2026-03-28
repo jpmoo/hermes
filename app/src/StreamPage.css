@@ -1,5 +1,6 @@
+/* ~2.5× former 640px column — wide reading column for note cards */
 .stream-page {
-  max-width: 640px;
+  max-width: min(1600px, calc(100vw - 2rem));
   margin: 0 auto;
   min-height: calc(100vh - 8rem);
   display: flex;
@@ -206,7 +207,7 @@
 .stream-page-float--move {
   top: 4.25rem;
   left: 50%;
-  width: min(640px, calc(100vw - 2rem));
+  width: min(1600px, calc(100vw - 2rem));
   transform: translateX(-50%);
   transition:
     top 0.44s cubic-bezier(0.22, 1, 0.36, 1),
@@ -519,14 +520,37 @@
 
 .stream-page-list > li,
 .stream-page-replies > li {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .stream-page-root-item {
   scroll-margin-top: 0.5rem;
 }
 
-/* Soft shadow: 4px offset, blur ≤4px, spread keeps falloff tight */
+/* Soft shadow + tighter padding on stream cards */
 .stream-page-scroll article.note-card {
   box-shadow: 4px 4px 4px -4px rgba(28, 27, 24, 0.12);
+  padding: 0.65rem 0.95rem;
+}
+
+.stream-page-scroll .note-card-body {
+  gap: 0.35rem;
+}
+
+.stream-page-scroll .note-card-content {
+  line-height: 1.42;
+}
+
+.stream-page-scroll .note-card-event-range {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+}
+
+.stream-page-scroll .note-card-tags {
+  gap: 0.28rem;
+}
+
+.stream-page-scroll .note-card-meta {
+  gap: 0.2rem;
+  padding-top: 0.2rem;
 }

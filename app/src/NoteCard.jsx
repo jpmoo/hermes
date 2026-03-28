@@ -611,15 +611,6 @@ export default function NoteCard({
           </>
         )}
         <div className="note-card-meta">
-          <time className="note-card-time">
-            Last edited:{' '}
-            {new Date(note.updated_at).toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </time>
           <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
               <>
@@ -697,6 +688,15 @@ export default function NoteCard({
               </button>
             )}
           </div>
+          <time className="note-card-time">
+            Last edited:{' '}
+            {new Date(note.updated_at).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </time>
         </div>
       </div>
     </article>
