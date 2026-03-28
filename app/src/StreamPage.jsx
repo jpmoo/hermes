@@ -33,6 +33,9 @@ import {
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
 import './StreamPage.css';
 
+/** Must cover max `--stream-exit-delay` + `--stream-exit-duration` from exit stagger (see layout effect). */
+const NOTES_EXIT_TO_ROOT_COMMIT_MS = 1550;
+
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
   const roots = [];
@@ -625,7 +628,7 @@ export default function StreamPage() {
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
       clearLevelDropSoon();
       levelNavBusyRef.current = false;
-    }, 560);
+    }, NOTES_EXIT_TO_ROOT_COMMIT_MS);
   }, [threadRootId, focusId, actualRootId, thread, tree, setSearchParams, clearLevelDropSoon]);
 
   const upOneLevel = useCallback(() => {
@@ -683,7 +686,7 @@ export default function StreamPage() {
         d.set(leavingHeadId, 440);
         setLevelDropDelays(d);
         clearLevelDropSoon();
-      }, 560);
+      }, NOTES_EXIT_TO_ROOT_COMMIT_MS);
     } else {
       setFocusId(parentId);
       setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
@@ -718,7 +721,7 @@ export default function StreamPage() {
     } else {
       window.setTimeout(() => {
         levelNavBusyRef.current = false;
-      }, 580);
+      }, NOTES_EXIT_TO_ROOT_COMMIT_MS + 40);
     }
   }, [
     threadRootId,
