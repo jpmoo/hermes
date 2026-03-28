@@ -8,7 +8,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { flushSync } from 'react-dom';
 import {
   fetchHoverInsight,
   fetchLinkedNotesQuick,
@@ -431,26 +430,21 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     (note, anchorEl, depth) => {
       if (depth < 0 || !note?.id || !anchorEl) return;
       if (noteIdSame(activeHoverId.current, note.id)) {
-        flushSync(() => {
-          clearInsightSelection();
-        });
+        clearInsightSelection();
         return;
       }
       if (fetchTimer.current) clearTimeout(fetchTimer.current);
       const id = ++reqId.current;
 
-      /* Commit selection + dim/highlight before async fetches so stream/canvas feel instant. */
-      flushSync(() => {
-        insightAnchorRef.current = anchorEl;
-        setHover({ note });
-        activeHoverId.current = note.id;
-        setDismissedKeys(new Set());
-        setConnectionModal(null);
-        setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
-        setLoading(true);
-        setRagdollDocs([]);
-        setRagdollError(null);
-      });
+      insightAnchorRef.current = anchorEl;
+      setHover({ note });
+      activeHoverId.current = note.id;
+      setDismissedKeys(new Set());
+      setConnectionModal(null);
+      setInsight({ tagSuggestions: [], similarNotes: [], persistedLinks: [] });
+      setLoading(true);
+      setRagdollDocs([]);
+      setRagdollError(null);
 
       /* Min character setting applies only to server-side vector “similar notes” (right panel), not to linked-peer cards. */
 
@@ -527,31 +521,31 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [clearInsightSelection]
   );
 
-  /** Pointer / Escape: dismiss when clicking outside insight UI and any note card. */
+  /**
+   * Dismiss on outside click. Use bubble-phase `click` (not capture `pointerdown`) so delegated note
+   * `click` handlers run before we clear; capture-phase pointer + sync updates raced the card.
+   */
   useEffect(() => {
     if (!hover?.note) return undefined;
-    const onPointerDown = (e) => {
+    const onClickOutside = (e) => {
       const t = pointerEventTargetElement(e);
       if (!t) return;
       if (t.closest?.('[data-insight-ui]')) return;
-      /* Bottom reply/new-thread strip (outside .stream-page-list). */
       if (t.closest?.('[data-stream-compose]')) return;
-      /* Don’t clear while editing a card (mentions @/#, compose, search, etc.). */
       if (t.closest?.('.note-card--editing')) return;
       if (t.closest?.('textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select')) {
         return;
       }
-      /* Stream/canvas: let card clicks handle insight switch / double-click drill; dismiss on empty list/gutter space. */
       if (t.closest?.('.note-card')) return;
       clearInsightSelection();
     };
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
-    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('click', onClickOutside, false);
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('click', onClickOutside, false);
       document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [hover?.note, clearInsightSelection]);

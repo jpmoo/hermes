@@ -25,6 +25,7 @@ import {
 } from './noteEventUtils';
 import { stripHashtagPrefixFromContent } from './noteBodyUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
+import { pointerEventTargetElement } from './pointerEventUtils';
 import { useHoverInsight } from './HoverInsightContext';
 import NoteTypeIcon from './NoteTypeIcon';
 import { NavIconAttach } from './icons/NavIcons';
@@ -360,7 +361,8 @@ export default function NoteCard({
   const handleCardMouseDown = (ev) => {
     if (editing) return;
     if (ev.button !== 0) return;
-    const t = ev.target;
+    const t = pointerEventTargetElement(ev);
+    if (!t) return;
     if (t.closest?.('.note-rich-task-checkbox')) return;
     if (t.closest?.('button, a[href], input, textarea, select, [contenteditable="true"]')) return;
     ev.currentTarget.focus({ preventScroll: true });
@@ -368,7 +370,8 @@ export default function NoteCard({
 
   const handleCardClick = (ev) => {
     if (editing) return;
-    if (ev.target.closest?.('.note-rich-task-checkbox')) return;
+    const t = pointerEventTargetElement(ev);
+    if (t?.closest?.('.note-rich-task-checkbox')) return;
     if (!hoverInsightEnabled) {
       onOpenThread?.(ev);
       return;
@@ -386,7 +389,8 @@ export default function NoteCard({
 
   const handleCardDoubleClick = (ev) => {
     if (editing) return;
-    if (ev.target.closest?.('.note-rich-task-checkbox')) return;
+    const t = pointerEventTargetElement(ev);
+    if (t?.closest?.('.note-rich-task-checkbox')) return;
     if (hoverInsightEnabled) {
       if (skipNextStreamDblClickDrillRef.current) {
         skipNextStreamDblClickDrillRef.current = false;
