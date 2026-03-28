@@ -296,6 +296,25 @@
   z-index: 4;
 }
 
+/* Canvas insight mode: dim non-selected notes (match stream) */
+.canvas-page:has(.note-card--insight-selected) .note-card.note-card--insight-dimmed {
+  opacity: 0.38;
+  filter: brightness(0.88);
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
+}
+
+.canvas-page:has(.note-card--insight-selected) .note-card.note-card--insight-selected {
+  opacity: 1;
+  filter: none;
+  position: relative;
+  transition:
+    opacity 0.2s ease,
+    filter 0.2s ease;
+  box-shadow: none;
+}
+
 /* Tag dropdown is position:absolute upward; overflow on ancestors clips it — undo while open. */
 .canvas-card-frame:has(.note-card-tag-dropdown) {
   z-index: 50;

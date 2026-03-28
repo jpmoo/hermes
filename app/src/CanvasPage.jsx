@@ -195,6 +195,9 @@ function rectOverlapsAny(rect, rects, gap) {
 
 /**
  * Prefer a spot that does not overlap existing cards; overlap only as a last resort (viewport center).
+ * Viewport-relative positions must be tried first: when the user has panned/zoomed, saved cards sit far
+ * from DEFAULT_CARD_START_* — the old order picked the fixed corner when it didn’t overlap anything,
+ * so new notes appeared off-screen.
  */
 function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects) {
   const w = DEFAULT_CARD_W;
@@ -205,17 +208,6 @@ function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects) 
   );
 
   const candidates = [];
-
-  candidates.push(defaultRectForRank(rank));
-
-  let maxBottom = DEFAULT_CARD_START_Y;
-  let maxRight = DEFAULT_CARD_START_X;
-  for (const r of others) {
-    maxBottom = Math.max(maxBottom, r.y + r.h);
-    maxRight = Math.max(maxRight, r.x + r.w);
-  }
-  candidates.push({ x: DEFAULT_CARD_START_X, y: maxBottom + gap, w, h });
-  candidates.push({ x: maxRight + gap, y: DEFAULT_CARD_START_Y, w, h });
 
   const cx = (vw / 2 - tx) / scale;
   const cy = (vh / 2 - ty) / scale;
@@ -239,7 +231,16 @@ function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects) 
     }
   }
 
-  candidates.push(defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh));
+  candidates.push(defaultRectForRank(rank));
+
+  let maxBottom = DEFAULT_CARD_START_Y;
+  let maxRight = DEFAULT_CARD_START_X;
+  for (const r of others) {
+    maxBottom = Math.max(maxBottom, r.y + r.h);
+    maxRight = Math.max(maxRight, r.x + r.w);
+  }
+  candidates.push({ x: DEFAULT_CARD_START_X, y: maxBottom + gap, w, h });
+  candidates.push({ x: maxRight + gap, y: DEFAULT_CARD_START_Y, w, h });
 
   for (const c of candidates) {
     if (!rectOverlapsAny(c, others, gap)) return c;

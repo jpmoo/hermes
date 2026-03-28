@@ -522,23 +522,23 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   );
 
   /**
-   * Dismiss on outside pointerdown (capture). Walk composedPath() so we never clear when the hit
-   * is on a note card or insight/compose chrome — `target.closest` alone was flaky after repeated use.
-   * Do not use bubble `click` here: ordering vs React's root delegation was inconsistent.
+   * Dismiss on outside pointerdown. Use bubble phase (not capture): capture runs before the event
+   * reaches the real target; combined with flaky composedPath in some cases, that cleared insight
+   * before the card’s click could select. `insightPointerPathShouldKeepOpen` uses target+closest.
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
-    const onPointerDownCapture = (e) => {
+    const onPointerDown = (e) => {
       if (insightPointerPathShouldKeepOpen(e)) return;
       clearInsightSelection();
     };
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
-    document.addEventListener('pointerdown', onPointerDownCapture, true);
+    document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('pointerdown', onPointerDownCapture, true);
+      document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [hover?.note, clearInsightSelection]);
