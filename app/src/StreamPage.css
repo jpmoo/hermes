@@ -400,6 +400,8 @@
 .stream-page > .stream-page-compose-wrap {
   position: sticky;
   bottom: 0;
+  /* Above .stream-page-replies (z-index:1) and insight-selected cards (z-index:2) so notes don’t paint over the reply box while scrolling */
+  z-index: 8;
   margin-top: auto;
   padding-top: 1rem;
   padding-bottom: 0.5rem;

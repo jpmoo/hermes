@@ -22,10 +22,9 @@ const INTERACTIVE_FIELD =
   'textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select';
 
 /**
- * True if this pointer event should not dismiss hover-insight (hit on card, panel, compose, etc.).
- * Uses `pointerEventTargetElement` + `closest()` instead of only `composedPath()`: capture-phase
- * listeners and some browsers can expose an incomplete path or a Text node target, which made
- * stream single-clicks feel flaky next to the global dismiss handler.
+ * True if this event target should not dismiss hover-insight (hit on card, panel, compose, etc.).
+ * Uses `pointerEventTargetElement` + `closest()` so Text-node targets and odd `target` values
+ * still resolve to a card or chrome.
  */
 export function insightPointerPathShouldKeepOpen(event) {
   if (event?.pointerType === 'mouse' && event.button !== 0) return true;

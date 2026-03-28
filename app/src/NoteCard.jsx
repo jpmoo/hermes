@@ -374,6 +374,7 @@ export default function NoteCard({
       return;
     }
     hoverInsight?.selectInsightNote?.(note, ev.currentTarget, depth);
+    ev.stopPropagation();
   };
 
   const handleCardDoubleClick = (ev) => {
