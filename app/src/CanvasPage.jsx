@@ -160,6 +160,20 @@ function defaultRectForRank(rank) {
   };
 }
 
+/** New card centered in the current viewport (world coords). `transform` is translate(tx,ty) then scale(scale) at origin 0,0. */
+function defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh) {
+  const w = DEFAULT_CARD_W;
+  const h = DEFAULT_CARD_H;
+  const cx = (vw / 2 - tx) / scale;
+  const cy = (vh / 2 - ty) / scale;
+  return {
+    x: cx - w / 2,
+    y: cy - h / 2,
+    w,
+    h,
+  };
+}
+
 /** Midpoint of a rectangle side (top | right | bottom | left). */
 function sideMidpoint(rect, side) {
   const { x, y, w, h } = rect;
@@ -514,6 +528,11 @@ export default function CanvasPage() {
       setCardRects({});
       return;
     }
+    const vp = viewportRef.current;
+    const vrect = vp?.getBoundingClientRect();
+    const vw = vrect?.width ?? 800;
+    const vh = vrect?.height ?? 600;
+
     setCardRects((prev) => {
       const next = {};
       let saved = {};
@@ -538,13 +557,15 @@ export default function CanvasPage() {
           };
         } else if (!savedIsEmpty && prev[id]) {
           next[id] = prev[id];
-        } else {
+        } else if (savedIsEmpty) {
           next[id] = defaultRectForRank(rankById.get(id) ?? 0);
+        } else {
+          next[id] = defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh);
         }
       });
       return next;
     });
-  }, [canvasNotes, canvasLeadId, layoutStorageKey, fk, savedCardsLayoutSig]);
+  }, [canvasNotes, canvasLeadId, layoutStorageKey, fk, savedCardsLayoutSig, scale, tx, ty]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -1303,7 +1324,6 @@ export default function CanvasPage() {
         <div className="canvas-page">
           <div className="canvas-toolbar">
             <div className="canvas-toolbar-left">
-              {user ? historyControl : null}
               {focusId && !noteIdEq(focusId, actualRootId) ? (
                 <button
                   type="button"
@@ -1326,17 +1346,7 @@ export default function CanvasPage() {
                   <NavIconRootLevel />
                 </button>
               ) : null}
-              {thread.length > 0 ? (
-                <button
-                  type="button"
-                  className="canvas-icon-btn"
-                  onClick={resetCanvasLayout}
-                  aria-label="Reset canvas layout"
-                  title="Reset canvas layout — clear positions and zoom"
-                >
-                  <NavIconRefresh />
-                </button>
-              ) : null}
+              {user ? historyControl : null}
               {threadRootId && summaryIds.length > 0 ? (
                 <button
                   type="button"
@@ -1349,7 +1359,7 @@ export default function CanvasPage() {
                 </button>
               ) : null}
             </div>
-            <div className="canvas-toolbar-zoom">
+            <div className="canvas-toolbar-right">
               <button
                 type="button"
                 className={`canvas-icon-btn${showSequenceLines ? '' : ' canvas-icon-btn--off'}`}
@@ -1360,48 +1370,61 @@ export default function CanvasPage() {
               >
                 <NavIconSequenceLines />
               </button>
-              <button
-                type="button"
-                className="canvas-icon-btn canvas-zoom-step"
-                onClick={() => zoomByFactor(1 / ZOOM_STEP_FACTOR)}
-                aria-label="Zoom out 5 percent"
-                title="Zoom out (5%)"
-              >
-                −
-              </button>
-              <div className="canvas-zoom-field">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className="canvas-zoom-input"
-                  aria-label="Zoom percent"
-                  value={zoomPercentStr}
-                  onChange={(e) => setZoomPercentStr(e.target.value)}
-                  onFocus={() => setZoomFieldFocused(true)}
-                  onBlur={() => {
-                    setZoomFieldFocused(false);
-                    applyZoomPercentField();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      e.currentTarget.blur();
-                    }
-                  }}
-                />
-                <span className="canvas-zoom-unit" aria-hidden>
-                  %
-                </span>
+              <div className="canvas-toolbar-zoom">
+                <button
+                  type="button"
+                  className="canvas-icon-btn canvas-zoom-step"
+                  onClick={() => zoomByFactor(1 / ZOOM_STEP_FACTOR)}
+                  aria-label="Zoom out 5 percent"
+                  title="Zoom out (5%)"
+                >
+                  −
+                </button>
+                <div className="canvas-zoom-field">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="canvas-zoom-input"
+                    aria-label="Zoom percent"
+                    value={zoomPercentStr}
+                    onChange={(e) => setZoomPercentStr(e.target.value)}
+                    onFocus={() => setZoomFieldFocused(true)}
+                    onBlur={() => {
+                      setZoomFieldFocused(false);
+                      applyZoomPercentField();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      }
+                    }}
+                  />
+                  <span className="canvas-zoom-unit" aria-hidden>
+                    %
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="canvas-icon-btn canvas-zoom-step"
+                  onClick={() => zoomByFactor(ZOOM_STEP_FACTOR)}
+                  aria-label="Zoom in 5 percent"
+                  title="Zoom in (5%)"
+                >
+                  +
+                </button>
               </div>
-              <button
-                type="button"
-                className="canvas-icon-btn canvas-zoom-step"
-                onClick={() => zoomByFactor(ZOOM_STEP_FACTOR)}
-                aria-label="Zoom in 5 percent"
-                title="Zoom in (5%)"
-              >
-                +
-              </button>
+              {thread.length > 0 ? (
+                <button
+                  type="button"
+                  className="canvas-icon-btn"
+                  onClick={resetCanvasLayout}
+                  aria-label="Reset canvas layout"
+                  title="Reset canvas layout — clear positions and zoom"
+                >
+                  <NavIconRefresh />
+                </button>
+              ) : null}
             </div>
           </div>
 

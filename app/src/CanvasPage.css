@@ -80,6 +80,15 @@
   opacity: 0.75;
 }
 
+.canvas-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
 .canvas-toolbar-zoom {
   display: flex;
   flex-wrap: wrap;

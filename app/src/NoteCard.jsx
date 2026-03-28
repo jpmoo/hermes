@@ -371,13 +371,18 @@ export default function NoteCard({
       onOpenThread?.(ev);
       return;
     }
-    /* Rely on the 2nd click of a double-click (detail===2) for drill: nested rows often miss `dblclick`
-     * on the <article>, and the 2nd single-click was restarting the insight delay timer. */
+    /* Second click of a double-click: clear insight timer only; drill already ran on detail===1.
+     * (Nested rows often miss `dblclick` on the <article>, so we cannot rely on dblclick alone.) */
     if (ev.detail === 2) {
       skipNextStreamDblClickDrillRef.current = true;
-      runStreamDrillOpen(ev);
+      if (insightClickTimerRef.current) {
+        clearTimeout(insightClickTimerRef.current);
+        insightClickTimerRef.current = null;
+      }
+      hoverInsight?.clearInsightSelection?.();
       return;
     }
+    onOpenThread?.(ev);
     const anchorEl = ev.currentTarget;
     if (insightClickTimerRef.current) clearTimeout(insightClickTimerRef.current);
     insightClickTimerRef.current = setTimeout(() => {
