@@ -95,11 +95,11 @@ function flattenCanvasNotes(displayTree) {
   return out;
 }
 
-const DEFAULT_CARD_W = 170;
-const DEFAULT_CARD_H = 110;
-const DEFAULT_CARD_GAP_Y = 18;
-const DEFAULT_CARD_START_X = 24;
-const DEFAULT_CARD_START_Y = 24;
+const DEFAULT_CARD_W = 340;
+const DEFAULT_CARD_H = 220;
+const DEFAULT_CARD_GAP_Y = 36;
+const DEFAULT_CARD_START_X = 48;
+const DEFAULT_CARD_START_Y = 48;
 
 /** Sort key: event start (when set), else note creation time. */
 function noteTimelineMs(n) {
@@ -232,9 +232,8 @@ function isCanvasDragInteractiveTarget(target) {
 
 const SAVE_DEBOUNCE_MS = 200;
 /** Room for Edit / Delete / + Tag / star without wrapping at narrow widths. */
-const MIN_W = 140;
-/** Server rejects card heights below 64px. */
-const MIN_H = 64;
+const MIN_W = 280;
+const MIN_H = 120;
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;

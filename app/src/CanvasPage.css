@@ -269,8 +269,8 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  min-width: 140px;
-  min-height: 64px;
+  min-width: 280px;
+  min-height: 120px;
   border-radius: 10px;
   /* Visual chrome lives on .note-card; frame is positioning + hit area only */
   box-shadow: none;

@@ -47,11 +47,8 @@ html {
   --note-type-bg-person-hover: color-mix(in srgb, #d8e8f5 21%, var(--bg-card-hover));
   --note-type-bg-event: color-mix(in srgb, #e6f4ec 26%, var(--bg-card));
   --note-type-bg-event-hover: color-mix(in srgb, #dcefe6 22%, var(--bg-card-hover));
-  /*
-   * Stream + shared compose width cap (half of prior 2240px max).
-   * Capped by viewport so small screens still get full width minus margin.
-   */
-  --hermes-stream-column-max: min(1120px, calc(100vw - 2rem));
+  /* Stream note column + stream/canvas compose: 45% of viewport width (never wider than full width minus margin). */
+  --hermes-stream-column-max: min(45vw, calc(100vw - 2rem));
   --hermes-compose-inset-x: 0.75rem;
 }
 
