@@ -201,6 +201,18 @@
   height: 4000px;
   pointer-events: none;
   overflow: visible;
+  color: var(--text-muted);
+  opacity: 0.65;
+}
+
+.canvas-connector-line {
+  stroke: currentColor;
+  fill: none;
+}
+
+.canvas-connector-arrowhead {
+  fill: currentColor;
+  stroke: none;
 }
 
 .canvas-card-frame {

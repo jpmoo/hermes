@@ -985,17 +985,34 @@ export default function CanvasPage() {
               >
                 {showSequenceLines ? (
                   <svg className="canvas-connectors" aria-hidden>
+                    <defs>
+                      <marker
+                        id="canvas-sequence-arrow"
+                        markerUnits="userSpaceOnUse"
+                        refX={10}
+                        refY={5}
+                        markerWidth={10}
+                        markerHeight={10}
+                        orient="auto"
+                        viewBox="0 0 10 10"
+                      >
+                        <path
+                          d="M0,0 L10,5 L0,10 z"
+                          className="canvas-connector-arrowhead"
+                        />
+                      </marker>
+                    </defs>
                     {connectorPoints.map((seg, i) => (
                       <line
                         key={i}
+                        className="canvas-connector-line"
                         x1={seg.x1}
                         y1={seg.y1}
                         x2={seg.x2}
                         y2={seg.y2}
-                        stroke="var(--text-muted)"
                         strokeWidth={2}
                         strokeDasharray="5 8"
-                        opacity={0.65}
+                        markerEnd="url(#canvas-sequence-arrow)"
                       />
                     ))}
                   </svg>
