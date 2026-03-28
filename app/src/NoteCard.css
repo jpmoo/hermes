@@ -1,5 +1,8 @@
 .note-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent-dim);
@@ -162,6 +165,8 @@
 .note-card-body {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   gap: 0.5rem;
 }
 
@@ -184,15 +189,27 @@
 
 .note-card-meta {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+  flex-shrink: 0;
+  padding-top: 0.35rem;
 }
 
 .note-card-time {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
   font-size: 0.75rem;
+  line-height: 1.35;
   color: var(--text-muted);
   font-family: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .note-card-star {
@@ -540,7 +557,8 @@
 
 .note-card-tag-dropdown {
   position: absolute;
-  left: 0;
+  left: 50%;
+  right: auto;
   bottom: 100%;
   margin: 0 0 0.25rem;
   padding: 0.25rem 0;
@@ -552,6 +570,7 @@
   max-height: 200px;
   overflow-y: auto;
   z-index: 5;
+  transform: translateX(-50%);
 }
 
 .note-card-tag-dropdown li button {
@@ -615,7 +634,10 @@
 .note-card-actions {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  width: 100%;
 }
 
 .note-card-btn {
