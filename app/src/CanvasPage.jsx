@@ -101,16 +101,40 @@ function noteTimelineMs(n) {
   return Number.isFinite(ms) ? ms : 0;
 }
 
-/** Map note id -> rank 0..n-1 earliest→latest (for default positions when nothing is saved). */
-function chronologicalRankById(notes) {
-  const items = notes.map((n, streamIdx) => ({
-    id: String(n.id),
-    t: noteTimelineMs(n),
-    streamIdx,
-  }));
-  items.sort((a, b) => (a.t !== b.t ? a.t - b.t : a.streamIdx - b.streamIdx));
+/** Thread root, focused note (subtree), or first stream root — always first in sequence / default stack. */
+function canvasLeadNoteId(displayTree, focusId, threadRootId) {
+  const flat = flattenCanvasNotes(displayTree);
+  if (flat.length === 0) return null;
+  if (threadRootId && focusId && !noteIdEq(focusId, threadRootId)) {
+    return String(focusId);
+  }
+  if (threadRootId) {
+    return String(threadRootId);
+  }
+  return String(flat[0].id);
+}
+
+/** Lead note first; others by timeline. */
+function orderNotesLeadThenTimeline(notes, leadId) {
+  if (notes.length === 0) return [];
+  const ids = new Set(notes.map((n) => String(n.id)));
+  const effectiveLead = leadId && ids.has(String(leadId)) ? String(leadId) : null;
+  const rest = effectiveLead
+    ? notes.filter((n) => String(n.id) !== effectiveLead)
+    : [...notes];
+  rest.sort((a, b) => {
+    const d = noteTimelineMs(a) - noteTimelineMs(b);
+    return d !== 0 ? d : String(a.id).localeCompare(String(b.id));
+  });
+  if (!effectiveLead) return rest;
+  const lead = notes.find((n) => String(n.id) === effectiveLead);
+  return lead ? [lead, ...rest] : rest;
+}
+
+function layoutRankByLeadThenTimeline(notes, leadId) {
+  const ordered = orderNotesLeadThenTimeline(notes, leadId);
   const m = new Map();
-  items.forEach((item, rank) => m.set(item.id, rank));
+  ordered.forEach((n, rank) => m.set(String(n.id), rank));
   return m;
 }
 
@@ -299,7 +323,18 @@ export default function CanvasPage() {
   }, [pinnedTree, focusId, actualRootId]);
 
   const canvasNotes = useMemo(() => flattenCanvasNotes(displayTree), [displayTree]);
-  const canvasChronoRankById = useMemo(() => chronologicalRankById(canvasNotes), [canvasNotes]);
+  const canvasLeadId = useMemo(
+    () => canvasLeadNoteId(displayTree, focusId, threadRootId),
+    [displayTree, focusId, threadRootId]
+  );
+  const layoutRankById = useMemo(
+    () => layoutRankByLeadThenTimeline(canvasNotes, canvasLeadId),
+    [canvasNotes, canvasLeadId]
+  );
+  const sequenceOrderedNotes = useMemo(
+    () => orderNotesLeadThenTimeline(canvasNotes, canvasLeadId),
+    [canvasNotes, canvasLeadId]
+  );
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
   const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
@@ -332,7 +367,7 @@ export default function CanvasPage() {
       return;
     }
     setCardRects((prev) => {
-      const next = { ...prev };
+      const next = {};
       let saved = {};
       try {
         if (savedCardsLayoutSig && savedCardsLayoutSig !== 'null') {
@@ -342,7 +377,8 @@ export default function CanvasPage() {
       } catch {
         saved = {};
       }
-      const rankById = chronologicalRankById(canvasNotes);
+      const savedIsEmpty = Object.keys(saved).length === 0;
+      const rankById = layoutRankByLeadThenTimeline(canvasNotes, canvasLeadId);
       canvasNotes.forEach((n) => {
         const id = String(n.id);
         if (saved[id] && typeof saved[id].x === 'number') {
@@ -352,16 +388,15 @@ export default function CanvasPage() {
             w: saved[id].w,
             h: saved[id].h,
           };
-        } else if (!next[id]) {
+        } else if (!savedIsEmpty && prev[id]) {
+          next[id] = prev[id];
+        } else {
           next[id] = defaultRectForRank(rankById.get(id) ?? 0);
         }
       });
-      Object.keys(next).forEach((id) => {
-        if (!canvasNotes.some((n) => String(n.id) === id)) delete next[id];
-      });
       return next;
     });
-  }, [canvasNotes, layoutStorageKey, fk, savedCardsLayoutSig]);
+  }, [canvasNotes, canvasLeadId, layoutStorageKey, fk, savedCardsLayoutSig]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -601,6 +636,10 @@ export default function CanvasPage() {
     ) {
       return;
     }
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
     const emptyBlock = {
       view: { scale: 1, tx: 0, ty: 0, showSequenceLines: true },
       cards: {},
@@ -786,14 +825,14 @@ export default function CanvasPage() {
 
   const connectorPoints = useMemo(() => {
     const pts = [];
-    for (let i = 0; i < canvasNotes.length - 1; i++) {
-      const a = cardRects[String(canvasNotes[i].id)];
-      const b = cardRects[String(canvasNotes[i + 1].id)];
+    for (let i = 0; i < sequenceOrderedNotes.length - 1; i++) {
+      const a = cardRects[String(sequenceOrderedNotes[i].id)];
+      const b = cardRects[String(sequenceOrderedNotes[i + 1].id)];
       if (!a || !b) continue;
       pts.push(connectorBetweenRects(a, b));
     }
     return pts;
-  }, [canvasNotes, cardRects]);
+  }, [sequenceOrderedNotes, cardRects]);
 
   pointerMoveInnerRef.current = (e) => {
     if (!viewportRef.current) return;
@@ -932,37 +971,6 @@ export default function CanvasPage() {
             <p className="canvas-muted">{threadRootId ? 'Thread not found.' : 'No notes yet.'}</p>
           ) : (
             <>
-            <aside className="canvas-starred-dock" aria-label="Starred notes">
-              <div className="canvas-starred-dock-title">Starred</div>
-              <ul className="canvas-starred-dock-list">
-                {starredOnCanvas.map((n) => (
-                  <li key={String(n.id)}>
-                    <div
-                      className="canvas-starred-row"
-                      onDoubleClick={() => zoomToCard(n.id)}
-                      title="Double-click to zoom to this note on the canvas"
-                    >
-                      <span className="canvas-starred-preview">{notePreview(n.content)}</span>
-                      <button
-                        type="button"
-                        className="canvas-starred-unstar"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          unstarFromDock(n.id);
-                        }}
-                        aria-label="Remove star"
-                        title="Remove star"
-                      >
-                        ★
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              {starredOnCanvas.length === 0 ? (
-                <p className="canvas-starred-dock-empty">No starred notes in this view.</p>
-              ) : null}
-            </aside>
             <div
               className="canvas-viewport"
               ref={viewportRef}
@@ -992,11 +1000,10 @@ export default function CanvasPage() {
                     ))}
                   </svg>
                 ) : null}
-                {canvasNotes.map((n) => {
+                {sequenceOrderedNotes.map((n) => {
                   const id = String(n.id);
                   const r =
-                    cardRects[id] ||
-                    defaultRectForRank(canvasChronoRankById.get(id) ?? 0);
+                    cardRects[id] || defaultRectForRank(layoutRankById.get(id) ?? 0);
                   const topIds = new Set(displayTree.map((x) => String(x.id)));
                   const depth = topIds.has(id) ? 0 : 1;
                   const parentTagsForInherit =
@@ -1049,6 +1056,37 @@ export default function CanvasPage() {
                 })}
               </div>
             </div>
+            <aside className="canvas-starred-dock" aria-label="Starred notes">
+              <div className="canvas-starred-dock-title">Starred</div>
+              <ul className="canvas-starred-dock-list">
+                {starredOnCanvas.map((n) => (
+                  <li key={String(n.id)}>
+                    <div
+                      className="canvas-starred-row"
+                      onDoubleClick={() => zoomToCard(n.id)}
+                      title="Double-click to zoom to this note on the canvas"
+                    >
+                      <span className="canvas-starred-preview">{notePreview(n.content)}</span>
+                      <button
+                        type="button"
+                        className="canvas-starred-unstar"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unstarFromDock(n.id);
+                        }}
+                        aria-label="Remove star"
+                        title="Remove star"
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {starredOnCanvas.length === 0 ? (
+                <p className="canvas-starred-dock-empty">No starred notes in this view.</p>
+              ) : null}
+            </aside>
             </>
           )}
 
