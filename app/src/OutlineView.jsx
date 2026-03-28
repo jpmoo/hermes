@@ -638,6 +638,7 @@ export default function OutlineView() {
       onLogout={logout}
       viewLinks={[
         { to: '/', label: 'Stream' },
+        { to: '/campus', label: 'Campus' },
         { to: '/outline', label: 'Outline' },
         { to: '/calendar', label: 'Calendar' },
         { to: '/search', label: 'Search' },

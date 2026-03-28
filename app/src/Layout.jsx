@@ -73,19 +73,24 @@ export default function Layout({
           <div className="layout-header-middle">
             <nav className="layout-nav" aria-label="Main views">
               {viewLinks?.map(({ to, label, tooltip }) =>
-                to === '/' ? (
+                to === '/' || to === '/campus' ? (
                   <Link
                     key={to}
-                    to="/"
+                    to={to}
                     className={`layout-nav-link ${
-                      location.pathname === '/' ? 'layout-nav-link--active' : ''
+                      location.pathname === to ? 'layout-nav-link--active' : ''
                     }`}
                     aria-label={label}
-                    title={tooltip ?? 'Return to last Stream level'}
+                    title={
+                      tooltip ??
+                      (to === '/'
+                        ? 'Return to last Stream level'
+                        : 'Infinite campus — last thread')
+                    }
                     onClick={(e) => {
                       e.preventDefault();
                       const s = getLastStreamSearch();
-                      navigate(s ? { pathname: '/', search: s } : { pathname: '/' });
+                      navigate(s ? { pathname: to, search: s } : { pathname: to });
                     }}
                   >
                     {hasLayoutNavIcon(to) ? <LayoutNavIcon to={to} /> : label}

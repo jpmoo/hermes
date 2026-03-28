@@ -7,6 +7,7 @@ import OutlineView from './OutlineView';
 import SearchView from './SearchView';
 import OrphanFilesView from './OrphanFilesView';
 import CalendarView from './CalendarView';
+import CampusPage from './CampusPage';
 import { NoteTypeFilterProvider } from './NoteTypeFilterContext';
 import { NoteTypeColorProvider } from './NoteTypeColorContext';
 
@@ -51,6 +52,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <OutlineView />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/campus"
+        element={
+          <PrivateRoute>
+            <CampusPage />
           </PrivateRoute>
         }
       />

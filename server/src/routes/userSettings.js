@@ -65,6 +65,54 @@ function sanitizeNoteHistory(input) {
   return out;
 }
 
+/** Campus infinite canvas: per-thread, per-focus view + card rects (stored in settings_json). */
+function sanitizeCampusLayouts(input) {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) return {};
+  const out = {};
+  for (const tid of Object.keys(input).slice(0, 48)) {
+    if (typeof tid !== 'string' || tid.length > 96) continue;
+    const ctx = input[tid];
+    if (!ctx || typeof ctx !== 'object' || Array.isArray(ctx)) continue;
+    out[tid] = {};
+    for (const fk of Object.keys(ctx).slice(0, 32)) {
+      if (typeof fk !== 'string' || fk.length > 128) continue;
+      const block = ctx[fk];
+      if (!block || typeof block !== 'object') continue;
+      const view = {};
+      if (block.view && typeof block.view === 'object') {
+        const sc = Number(block.view.scale);
+        const tx = Number(block.view.tx);
+        const ty = Number(block.view.ty);
+        if (Number.isFinite(sc) && sc >= 0.08 && sc <= 12) view.scale = sc;
+        if (Number.isFinite(tx) && Math.abs(tx) < 5e6) view.tx = tx;
+        if (Number.isFinite(ty) && Math.abs(ty) < 5e6) view.ty = ty;
+        if (typeof block.view.showSequenceLines === 'boolean') {
+          view.showSequenceLines = block.view.showSequenceLines;
+        }
+      }
+      const cards = {};
+      if (block.cards && typeof block.cards === 'object' && !Array.isArray(block.cards)) {
+        let n = 0;
+        for (const [nid, rect] of Object.entries(block.cards)) {
+          if (n++ >= 240) break;
+          if (typeof nid !== 'string' || nid.length > 96) continue;
+          if (!rect || typeof rect !== 'object') continue;
+          const x = Number(rect.x);
+          const y = Number(rect.y);
+          const w = Number(rect.w);
+          const h = Number(rect.h);
+          if (![x, y, w, h].every((v) => Number.isFinite(v))) continue;
+          if (w < 100 || w > 2400 || h < 64 || h > 3200) continue;
+          if (Math.abs(x) > 1e7 || Math.abs(y) > 1e7) continue;
+          cards[nid] = { x, y, w, h };
+        }
+      }
+      out[tid][fk] = { view, cards };
+    }
+  }
+  return out;
+}
+
 router.get('/settings', requireAuth, async (req, res) => {
   try {
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
@@ -74,12 +122,14 @@ router.get('/settings', requireAuth, async (req, res) => {
     const similarStored = sanitizeSimilarNotesMinChars(raw.similarNotesMinChars);
     const noteHistory = sanitizeNoteHistory(raw.noteHistory);
     const similarLimitResults = raw.similarNotesLimitResultsToMinChars === true;
+    const campusLayouts = sanitizeCampusLayouts(raw.campusLayouts);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
       similarNotesLimitResultsToMinChars: similarLimitResults,
       noteHistory,
+      campusLayouts,
     });
   } catch (err) {
     console.error(err);
@@ -89,8 +139,13 @@ router.get('/settings', requireAuth, async (req, res) => {
 
 router.patch('/settings', requireAuth, async (req, res) => {
   try {
-    const { noteTypeColors, similarNotesMinChars, similarNotesLimitResultsToMinChars, noteHistory } =
-      req.body ?? {};
+    const {
+      noteTypeColors,
+      similarNotesMinChars,
+      similarNotesLimitResultsToMinChars,
+      noteHistory,
+      campusLayouts,
+    } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
       ? { ...r.rows[0].settings_json }
@@ -142,6 +197,14 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (campusLayouts !== undefined) {
+      if (campusLayouts === null) {
+        delete cur.campusLayouts;
+      } else {
+        cur.campusLayouts = sanitizeCampusLayouts(campusLayouts);
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -150,12 +213,14 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outSimilar = sanitizeSimilarNotesMinChars(cur.similarNotesMinChars);
     const outHistory = sanitizeNoteHistory(cur.noteHistory);
     const outLimitResults = cur.similarNotesLimitResultsToMinChars === true;
+    const outCampus = sanitizeCampusLayouts(cur.campusLayouts);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
       similarNotesLimitResultsToMinChars: outLimitResults,
       noteHistory: outHistory,
+      campusLayouts: outCampus,
     });
   } catch (err) {
     console.error(err);

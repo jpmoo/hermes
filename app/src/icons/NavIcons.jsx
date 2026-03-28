@@ -344,12 +344,46 @@ export function NavIconBrain(props) {
   );
 }
 
+/** Grid / infinite campus (assets/grid.svg, themed via currentColor). */
+export function NavIconCampus(props) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...common}
+      {...props}
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+/** Vertical dots — matches assets/dotted.svg; themed via currentColor. */
+export function NavIconSequenceLines(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...common} {...props}>
+      <circle cx="12" cy="4" r="1" transform="rotate(90 12 4)" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="1" transform="rotate(90 12 12)" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="20" r="1" transform="rotate(90 12 20)" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
 function navIconForTo(to) {
   if (!to) return null;
   if (to === '/') return NavIconStream;
   if (to === '/tags') return NavIconTag;
   if (to === '/search') return NavIconSearch;
   if (to === '/calendar') return NavIconCalendar;
+  if (to === '/campus') return NavIconCampus;
   if (to === '/outline' || to.startsWith('/outline')) return NavIconOutline;
   return null;
 }
