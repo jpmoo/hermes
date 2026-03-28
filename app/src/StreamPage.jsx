@@ -37,7 +37,7 @@ import './StreamPage.css';
  * Must exceed max `--stream-exit-delay` + `--stream-exit-duration` from exit stagger
  * (see useLayoutEffect on thread list when branchHeadExiting).
  */
-const NOTES_EXIT_TO_ROOT_COMMIT_MS = 2500;
+const NOTES_EXIT_TO_ROOT_COMMIT_MS = 2900;
 
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
@@ -251,14 +251,23 @@ function StreamList({
   levelDropDelays,
   parentTags = [],
   threadById,
+  /** When true, up-to-root exit owns motion — inline stagger delays must not override it. */
+  exitToRoot = false,
 }) {
   return (
     <>
       {nodes.map((n) => {
-        const levelDropMs = levelDropDelays?.get(n.id);
-        const replyMs = !levelDropMs && depth > 0 && staggerDelays?.get(n.id);
+        const levelDropMs = exitToRoot ? undefined : levelDropDelays?.get(n.id);
+        const replyMs =
+          exitToRoot ? undefined : !levelDropMs && depth > 0 ? staggerDelays?.get(n.id) : undefined;
         const delayMs = levelDropMs ?? replyMs;
-        const animClass = levelDropMs != null ? 'stream-page-level-drop' : replyMs != null ? 'stream-page-reply-stagger' : undefined;
+        const animClass = exitToRoot
+          ? undefined
+          : levelDropMs != null
+            ? 'stream-page-level-drop'
+            : replyMs != null
+              ? 'stream-page-reply-stagger'
+              : undefined;
         const parentTagsForInherit =
           depth > 0
             ? parentTags
@@ -270,7 +279,9 @@ function StreamList({
             key={n.id}
             data-stream-note={n.id}
             className={animClass}
-            style={delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined}
+            style={
+              !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined
+            }
           >
             <NoteCard
               note={n}
@@ -297,6 +308,7 @@ function StreamList({
                   onNoteDelete={onNoteDelete}
                   staggerDelays={staggerDelays}
                   levelDropDelays={levelDropDelays}
+                  exitToRoot={exitToRoot}
                 />
               </ul>
             )}
@@ -362,16 +374,32 @@ export default function StreamPage() {
     const listEl = threadListRef.current;
     if (!branchHeadExiting || !listEl) return;
     const lis = [...listEl.querySelectorAll('li[data-stream-note]')];
+    const easings = [
+      'cubic-bezier(0.22, 0.65, 0.35, 1)',
+      'cubic-bezier(0.33, 0, 0.2, 1)',
+      'cubic-bezier(0.2, 0.9, 0.3, 1)',
+      'cubic-bezier(0.4, 0, 0.6, 1)',
+      'cubic-bezier(0.25, 0.5, 0.4, 1)',
+    ];
     lis.forEach((li, i) => {
-      const delay = Math.min(i, 16) * 52 + (i % 5) * 28;
-      const duration = 920 + (i % 9) * 78;
+      const delay = Math.min(i, 18) * 44 + (i % 5) * 32;
+      const duration = 720 + (i % 12) * 105;
+      const ease = easings[i % easings.length];
       li.style.setProperty('--stream-exit-delay', `${delay}ms`);
       li.style.setProperty('--stream-exit-duration', `${duration}ms`);
+      li.style.setProperty('--stream-exit-ease', ease);
+      li.style.setProperty('animation-delay', `${delay}ms`);
+      li.style.setProperty('animation-duration', `${duration}ms`);
+      li.style.setProperty('animation-timing-function', ease);
     });
     return () => {
       lis.forEach((li) => {
         li.style.removeProperty('--stream-exit-delay');
         li.style.removeProperty('--stream-exit-duration');
+        li.style.removeProperty('--stream-exit-ease');
+        li.style.removeProperty('animation-delay');
+        li.style.removeProperty('animation-duration');
+        li.style.removeProperty('animation-timing-function');
       });
     };
   }, [branchHeadExiting]);
@@ -1248,6 +1276,7 @@ export default function StreamPage() {
                       }}
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
+                      exitToRoot={branchHeadExiting}
                     />
                   </ul>
                 </div>

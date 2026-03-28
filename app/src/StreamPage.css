@@ -313,8 +313,7 @@
   animation-name: streamNotesExitToRoot;
   animation-duration: var(--stream-exit-duration, 1100ms);
   animation-delay: var(--stream-exit-delay, 0ms);
-  /* Ease-in so the drop accelerates like gravity; stagger + duration vars differentiate cards */
-  animation-timing-function: cubic-bezier(0.32, 0.02, 0.67, 1);
+  animation-timing-function: var(--stream-exit-ease, cubic-bezier(0.32, 0.02, 0.67, 1));
   animation-fill-mode: forwards;
   pointer-events: none;
   transform-origin: 50% 0;
