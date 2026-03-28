@@ -1,6 +1,5 @@
-/* ~2.5× former 640px column — wide reading column for note cards */
 .stream-page {
-  max-width: min(1600px, calc(100vw - 2rem));
+  max-width: var(--hermes-stream-column-max);
   margin: 0 auto;
   min-height: calc(100vh - 8rem);
   display: flex;
@@ -207,7 +206,7 @@
 .stream-page-float--move {
   top: 4.25rem;
   left: 50%;
-  width: min(1600px, calc(100vw - 2rem));
+  width: var(--hermes-stream-column-max);
   transform: translateX(-50%);
   transition:
     top 0.44s cubic-bezier(0.22, 1, 0.36, 1),
@@ -370,16 +369,15 @@
 }
 
 .stream-page-compose-wrap {
+  box-sizing: border-box;
   position: sticky;
   bottom: 0;
   margin-top: auto;
   padding-top: 1rem;
   padding-bottom: 0.5rem;
   background: linear-gradient(to top, var(--bg) 85%, transparent);
-  margin-left: -0.25rem;
-  margin-right: -0.25rem;
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
+  padding-left: var(--hermes-compose-inset-x, 0.75rem);
+  padding-right: var(--hermes-compose-inset-x, 0.75rem);
 }
 
 /* Same pattern as edit: type button sibling + plain mentions wrap (better WebKit behavior than nesting). */

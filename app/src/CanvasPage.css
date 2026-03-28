@@ -15,15 +15,13 @@
   position: relative;
 }
 
-/* Match stream compose width; stream-page-compose-wrap styles come from StreamPage.css */
+/* Same column width + horizontal inset as stream (see Layout.css --hermes-*). */
 .canvas-page-compose-wrap {
   flex-shrink: 0;
-  max-width: min(1600px, calc(100vw - 2rem));
+  max-width: var(--hermes-stream-column-max);
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
   box-sizing: border-box;
 }
 
