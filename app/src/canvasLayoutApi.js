@@ -32,3 +32,18 @@ export function mergeCanvasLayoutPatch(prevLayouts, threadRootId, focusKey, part
     },
   };
 }
+
+/** Replace the entire layout block for one focus (e.g. clear all card positions without merging old keys). */
+export function replaceCanvasLayoutFocusBlock(prevLayouts, layoutStorageKey, focusKey, block) {
+  const tid = String(layoutStorageKey);
+  const fk = String(focusKey);
+  const prev = prevLayouts && typeof prevLayouts === 'object' ? prevLayouts : {};
+  const threadBlock = { ...(prev[tid] && typeof prev[tid] === 'object' ? prev[tid] : {}) };
+  return {
+    ...prev,
+    [tid]: {
+      ...threadBlock,
+      [fk]: block && typeof block === 'object' ? block : {},
+    },
+  };
+}

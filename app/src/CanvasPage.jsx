@@ -17,10 +17,16 @@ import {
   patchUserSettings,
   unstarNote,
 } from './api';
-import { canvasFocusKey, canvasLayoutThreadKey, mergeCanvasLayoutPatch } from './canvasLayoutApi';
+import {
+  canvasFocusKey,
+  canvasLayoutThreadKey,
+  mergeCanvasLayoutPatch,
+  replaceCanvasLayoutFocusBlock,
+} from './canvasLayoutApi';
 import {
   NavIconUpOneLevel,
   NavIconRootLevel,
+  NavIconRefresh,
   NavIconBrain,
   NavIconSequenceLines,
 } from './icons/NavIcons';
@@ -116,6 +122,45 @@ function defaultRectForRank(rank) {
     w: DEFAULT_CARD_W,
     h: DEFAULT_CARD_H,
   };
+}
+
+/** Midpoint of a rectangle side (top | right | bottom | left). */
+function sideMidpoint(rect, side) {
+  const { x, y, w, h } = rect;
+  switch (side) {
+    case 'top':
+      return { x: x + w / 2, y };
+    case 'bottom':
+      return { x: x + w / 2, y: y + h };
+    case 'left':
+      return { x, y: y + h / 2 };
+    case 'right':
+      return { x: x + w, y: y + h / 2 };
+    default:
+      return { x: x + w / 2, y: y + h / 2 };
+  }
+}
+
+/** Connect consecutive cards via midpoints of the sides that face each other. */
+function connectorBetweenRects(a, b) {
+  const cax = a.x + a.w / 2;
+  const cay = a.y + a.h / 2;
+  const cbx = b.x + b.w / 2;
+  const cby = b.y + b.h / 2;
+  const dx = cbx - cax;
+  const dy = cby - cay;
+  let sideA;
+  let sideB;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    sideA = dx >= 0 ? 'right' : 'left';
+    sideB = dx >= 0 ? 'left' : 'right';
+  } else {
+    sideA = dy >= 0 ? 'bottom' : 'top';
+    sideB = dy >= 0 ? 'top' : 'bottom';
+  }
+  const p1 = sideMidpoint(a, sideA);
+  const p2 = sideMidpoint(b, sideB);
+  return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
 }
 
 function notePreview(content, max = 72) {
@@ -525,7 +570,8 @@ export default function CanvasPage() {
   );
 
   const toggleSequenceLines = useCallback(async () => {
-    const next = !showSequenceLines;
+    const prev = showSequenceLinesRef.current;
+    const next = !prev;
     setShowSequenceLines(next);
     showSequenceLinesRef.current = next;
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, layoutStorageKey, fk, {
@@ -542,8 +588,39 @@ export default function CanvasPage() {
       setCanvasLayouts(patchLayouts);
     } catch (e) {
       console.error(e);
-      setShowSequenceLines(!next);
-      showSequenceLinesRef.current = !next;
+      setShowSequenceLines(prev);
+      showSequenceLinesRef.current = prev;
+    }
+  }, [layoutStorageKey, fk]);
+
+  const resetCanvasLayout = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Clear saved card positions and view (zoom/pan) for this canvas? Starred notes are not changed.'
+      )
+    ) {
+      return;
+    }
+    const emptyBlock = {
+      view: { scale: 1, tx: 0, ty: 0, showSequenceLines: true },
+      cards: {},
+    };
+    const patchLayouts = replaceCanvasLayoutFocusBlock(
+      canvasLayoutsRef.current,
+      layoutStorageKey,
+      fk,
+      emptyBlock
+    );
+    try {
+      await patchUserSettings({ campusLayouts: patchLayouts });
+      setCanvasLayouts(patchLayouts);
+      setScale(1);
+      setTx(0);
+      setTy(0);
+      setShowSequenceLines(true);
+      showSequenceLinesRef.current = true;
+    } catch (e) {
+      console.error(e);
     }
   }, [layoutStorageKey, fk]);
 
@@ -713,12 +790,7 @@ export default function CanvasPage() {
       const a = cardRects[String(canvasNotes[i].id)];
       const b = cardRects[String(canvasNotes[i + 1].id)];
       if (!a || !b) continue;
-      pts.push({
-        x1: a.x + a.w / 2,
-        y1: a.y + a.h,
-        x2: b.x + b.w / 2,
-        y2: b.y,
-      });
+      pts.push(connectorBetweenRects(a, b));
     }
     return pts;
   }, [canvasNotes, cardRects]);
@@ -815,6 +887,17 @@ export default function CanvasPage() {
               >
                 <NavIconRootLevel />
               </button>
+              {thread.length > 0 ? (
+                <button
+                  type="button"
+                  className="canvas-icon-btn"
+                  onClick={resetCanvasLayout}
+                  aria-label="Reset canvas layout"
+                  title="Reset canvas layout — clear positions and zoom"
+                >
+                  <NavIconRefresh />
+                </button>
+              ) : null}
               {threadRootId && summaryIds.length > 0 ? (
                 <button
                   type="button"
