@@ -232,6 +232,15 @@ const SAVE_DEBOUNCE_MS = 450;
 const MIN_W = 280;
 const MIN_H = 120;
 
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 4;
+/** Each +/- applies a 5% multiplicative step (×1.05 / ÷1.05). */
+const ZOOM_STEP_FACTOR = 1.05;
+/** Trackpad ctrl/meta + wheel zoom sensitivity (higher = faster). */
+const WHEEL_ZOOM_SENS = 0.009;
+/** Pinch exponent >1 makes pinch-zoom respond faster. */
+const PINCH_ZOOM_EXP = 1.22;
+
 export default function CanvasPage() {
   const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -259,6 +268,8 @@ export default function CanvasPage() {
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
+  const [zoomPercentStr, setZoomPercentStr] = useState('100');
+  const [zoomFieldFocused, setZoomFieldFocused] = useState(false);
   const [cardRects, setCardRects] = useState({});
 
   const cardRectsRef = useRef(cardRects);
@@ -491,6 +502,60 @@ export default function CanvasPage() {
   tyRef.current = ty;
   scheduleSaveRef.current = scheduleSave;
 
+  useEffect(() => {
+    if (!zoomFieldFocused) {
+      setZoomPercentStr(String(Math.round(scale * 100)));
+    }
+  }, [scale, zoomFieldFocused]);
+
+  const zoomByFactor = useCallback(
+    (factor) => {
+      const vp = viewportRef.current;
+      if (!vp) return;
+      const { width: vw, height: vh } = vp.getBoundingClientRect();
+      const cx = vw / 2;
+      const cy = vh / 2;
+      setScale((s) => {
+        const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * factor));
+        const f = next / s;
+        setTx((t) => cx - f * (cx - t));
+        setTy((t) => cy - f * (cy - t));
+        return next;
+      });
+      scheduleSave();
+    },
+    [scheduleSave]
+  );
+
+  const applyZoomPercentField = useCallback(() => {
+    const raw = zoomPercentStr.replace(/%/g, '').trim();
+    const pct = parseFloat(raw);
+    if (!Number.isFinite(pct)) {
+      setZoomPercentStr(String(Math.round(scale * 100)));
+      return;
+    }
+    const clampedPct = Math.min(400, Math.max(20, Math.round(pct)));
+    const next = clampedPct / 100;
+    const vp = viewportRef.current;
+    if (!vp) {
+      setScale(next);
+      setZoomPercentStr(String(clampedPct));
+      scheduleSave();
+      return;
+    }
+    const { width: vw, height: vh } = vp.getBoundingClientRect();
+    const cx = vw / 2;
+    const cy = vh / 2;
+    setScale((s) => {
+      const f = next / s;
+      setTx((t) => cx - f * (cx - t));
+      setTy((t) => cy - f * (cy - t));
+      return next;
+    });
+    setZoomPercentStr(String(clampedPct));
+    scheduleSave();
+  }, [zoomPercentStr, scale, scheduleSave]);
+
   const fitAllCardsInView = useCallback(() => {
     const vp = viewportRef.current;
     const notes = canvasNotes;
@@ -566,9 +631,9 @@ export default function CanvasPage() {
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       if (e.ctrlKey || e.metaKey) {
-        const delta = -e.deltaY * 0.002;
+        const delta = -e.deltaY * WHEEL_ZOOM_SENS;
         setScale((s) => {
-          const next = Math.min(4, Math.max(0.2, s + delta));
+          const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s + delta));
           const f = next / s;
           setTx((t) => cx - f * (cx - t));
           setTy((t) => cy - f * (cy - t));
@@ -1015,8 +1080,9 @@ export default function CanvasPage() {
       const rect = viewportRef.current.getBoundingClientRect();
       const mx = (pts[0].x + pts[1].x) / 2 - rect.left;
       const my = (pts[0].y + pts[1].y) / 2 - rect.top;
-      let nextScale = pinch.startScale * (d / pinch.startDist);
-      nextScale = Math.min(4, Math.max(0.2, nextScale));
+      const stretch = d / pinch.startDist;
+      let nextScale = pinch.startScale * stretch ** PINCH_ZOOM_EXP;
+      nextScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, nextScale));
       setScale((s) => {
         const f = nextScale / s;
         setTx((t) => mx - f * (mx - t));
@@ -1120,6 +1186,8 @@ export default function CanvasPage() {
                   <NavIconBrain />
                 </button>
               ) : null}
+            </div>
+            <div className="canvas-toolbar-zoom">
               <button
                 type="button"
                 className={`canvas-icon-btn${showSequenceLines ? '' : ' canvas-icon-btn--off'}`}
@@ -1130,8 +1198,49 @@ export default function CanvasPage() {
               >
                 <NavIconSequenceLines />
               </button>
+              <button
+                type="button"
+                className="canvas-icon-btn canvas-zoom-step"
+                onClick={() => zoomByFactor(1 / ZOOM_STEP_FACTOR)}
+                aria-label="Zoom out 5 percent"
+                title="Zoom out (5%)"
+              >
+                −
+              </button>
+              <div className="canvas-zoom-field">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="canvas-zoom-input"
+                  aria-label="Zoom percent"
+                  value={zoomPercentStr}
+                  onChange={(e) => setZoomPercentStr(e.target.value)}
+                  onFocus={() => setZoomFieldFocused(true)}
+                  onBlur={() => {
+                    setZoomFieldFocused(false);
+                    applyZoomPercentField();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                  }}
+                />
+                <span className="canvas-zoom-unit" aria-hidden>
+                  %
+                </span>
+              </div>
+              <button
+                type="button"
+                className="canvas-icon-btn canvas-zoom-step"
+                onClick={() => zoomByFactor(ZOOM_STEP_FACTOR)}
+                aria-label="Zoom in 5 percent"
+                title="Zoom in (5%)"
+              >
+                +
+              </button>
             </div>
-            <div className="canvas-zoom-hint">Pinch/zoom to adjust magnification</div>
           </div>
 
           <div className="canvas-page-main">

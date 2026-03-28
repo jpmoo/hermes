@@ -44,7 +44,8 @@
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
+  /* --bg-elevated is undefined in theme tokens; use solid card bg so panels are not transparent */
+  background: var(--bg-card);
   flex-shrink: 0;
 }
 
@@ -81,15 +82,59 @@
   opacity: 0.75;
 }
 
-.canvas-zoom-hint {
+.canvas-toolbar-zoom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.canvas-zoom-step {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.canvas-zoom-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.canvas-zoom-input {
+  width: 3.25rem;
+  padding: 0.2rem 0.15rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.canvas-zoom-input:focus {
+  outline: none;
+}
+
+.canvas-zoom-field:focus-within {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+}
+
+.canvas-zoom-unit {
   font-size: 0.75rem;
   color: var(--text-muted);
+  user-select: none;
 }
 
 /* Fixed dock: starred notes (after viewport in DOM + high z-index so canvas never paints over it) */
 .canvas-starred-dock {
   position: fixed;
-  z-index: 100;
   /* Below sticky header + canvas toolbar row */
   top: calc(7.35rem + env(safe-area-inset-top, 0px));
   right: max(0.65rem, env(safe-area-inset-right));
@@ -100,11 +145,12 @@
   padding: 0.5rem 0.6rem;
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
-  background-color: var(--bg-elevated);
-  background-image: none;
+  background: var(--bg-card);
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.14);
   pointer-events: auto;
   isolation: isolate;
+  /* Paint above transformed canvas content; solid bg so cards do not show through */
+  z-index: 200;
 }
 
 .canvas-starred-dock-title {
