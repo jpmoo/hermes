@@ -357,17 +357,6 @@ export default function NoteCard({
     onOpenThread?.(ev);
   };
 
-  /** Focus the card on primary button mousedown so the first tap/click activates reliably (custom role=button + tabindex). */
-  const handleCardMouseDown = (ev) => {
-    if (editing) return;
-    if (ev.button !== 0) return;
-    const t = pointerEventTargetElement(ev);
-    if (!t) return;
-    if (t.closest?.('.note-rich-task-checkbox')) return;
-    if (t.closest?.('button, a[href], input, textarea, select, [contenteditable="true"]')) return;
-    ev.currentTarget.focus({ preventScroll: true });
-  };
-
   const handleCardClick = (ev) => {
     if (editing) return;
     const t = pointerEventTargetElement(ev);
@@ -486,7 +475,6 @@ export default function NoteCard({
         ...linkedBorderVars,
       }}
       onClick={editing ? undefined : handleCardClick}
-      onMouseDown={editing ? undefined : handleCardMouseDown}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
       role={editing ? undefined : 'button'}
       tabIndex={editing ? undefined : 0}

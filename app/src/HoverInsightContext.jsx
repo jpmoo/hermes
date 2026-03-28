@@ -23,7 +23,7 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
-import { pointerEventTargetElement } from './pointerEventUtils';
+import { insightPointerPathShouldKeepOpen } from './pointerEventUtils';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -522,30 +522,23 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   );
 
   /**
-   * Dismiss on outside click. Use bubble-phase `click` (not capture `pointerdown`) so delegated note
-   * `click` handlers run before we clear; capture-phase pointer + sync updates raced the card.
+   * Dismiss on outside pointerdown (capture). Walk composedPath() so we never clear when the hit
+   * is on a note card or insight/compose chrome — `target.closest` alone was flaky after repeated use.
+   * Do not use bubble `click` here: ordering vs React's root delegation was inconsistent.
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
-    const onClickOutside = (e) => {
-      const t = pointerEventTargetElement(e);
-      if (!t) return;
-      if (t.closest?.('[data-insight-ui]')) return;
-      if (t.closest?.('[data-stream-compose]')) return;
-      if (t.closest?.('.note-card--editing')) return;
-      if (t.closest?.('textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select')) {
-        return;
-      }
-      if (t.closest?.('.note-card')) return;
+    const onPointerDownCapture = (e) => {
+      if (insightPointerPathShouldKeepOpen(e)) return;
       clearInsightSelection();
     };
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
-    document.addEventListener('click', onClickOutside, false);
+    document.addEventListener('pointerdown', onPointerDownCapture, true);
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('click', onClickOutside, false);
+      document.removeEventListener('pointerdown', onPointerDownCapture, true);
       document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [hover?.note, clearInsightSelection]);

@@ -174,6 +174,79 @@ function defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh) {
   };
 }
 
+const NEW_CARD_GAP = 12;
+
+function rectsOverlap(a, b, gap = 0) {
+  return !(
+    a.x + a.w + gap <= b.x ||
+    b.x + b.w + gap <= a.x ||
+    a.y + a.h + gap <= b.y ||
+    b.y + b.h + gap <= a.y
+  );
+}
+
+function rectOverlapsAny(rect, rects, gap) {
+  for (const r of rects) {
+    if (!r || typeof r.x !== 'number') continue;
+    if (rectsOverlap(rect, r, gap)) return true;
+  }
+  return false;
+}
+
+/**
+ * Prefer a spot that does not overlap existing cards; overlap only as a last resort (viewport center).
+ */
+function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects) {
+  const w = DEFAULT_CARD_W;
+  const h = DEFAULT_CARD_H;
+  const gap = NEW_CARD_GAP;
+  const others = existingRects.filter(
+    (r) => r && typeof r.x === 'number' && typeof r.w === 'number' && typeof r.h === 'number'
+  );
+
+  const candidates = [];
+
+  candidates.push(defaultRectForRank(rank));
+
+  let maxBottom = DEFAULT_CARD_START_Y;
+  let maxRight = DEFAULT_CARD_START_X;
+  for (const r of others) {
+    maxBottom = Math.max(maxBottom, r.y + r.h);
+    maxRight = Math.max(maxRight, r.x + r.w);
+  }
+  candidates.push({ x: DEFAULT_CARD_START_X, y: maxBottom + gap, w, h });
+  candidates.push({ x: maxRight + gap, y: DEFAULT_CARD_START_Y, w, h });
+
+  const cx = (vw / 2 - tx) / scale;
+  const cy = (vh / 2 - ty) / scale;
+  const stepX = w + gap;
+  const stepY = h + gap;
+  for (let ring = 0; ring <= 8; ring += 1) {
+    if (ring === 0) {
+      candidates.push({ x: cx - w / 2, y: cy - h / 2, w, h });
+      continue;
+    }
+    for (let dx = -ring; dx <= ring; dx += 1) {
+      for (let dy = -ring; dy <= ring; dy += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+        candidates.push({
+          x: cx - w / 2 + dx * stepX,
+          y: cy - h / 2 + dy * stepY,
+          w,
+          h,
+        });
+      }
+    }
+  }
+
+  candidates.push(defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh));
+
+  for (const c of candidates) {
+    if (!rectOverlapsAny(c, others, gap)) return c;
+  }
+  return defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh);
+}
+
 /** Midpoint of a rectangle side (top | right | bottom | left). */
 function sideMidpoint(rect, side) {
   const { x, y, w, h } = rect;
@@ -546,6 +619,7 @@ export default function CanvasPage() {
       }
       const savedIsEmpty = Object.keys(saved).length === 0;
       const rankById = layoutRankByLeadThenTimeline(canvasNotes, canvasLeadId);
+
       canvasNotes.forEach((n) => {
         const id = String(n.id);
         if (saved[id] && typeof saved[id].x === 'number') {
@@ -555,14 +629,35 @@ export default function CanvasPage() {
             w: saved[id].w,
             h: saved[id].h,
           };
-        } else if (!savedIsEmpty && prev[id]) {
-          next[id] = prev[id];
-        } else if (savedIsEmpty) {
-          next[id] = defaultRectForRank(rankById.get(id) ?? 0);
-        } else {
-          next[id] = defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh);
         }
       });
+
+      canvasNotes.forEach((n) => {
+        const id = String(n.id);
+        if (next[id]) return;
+        if (!savedIsEmpty && prev[id]) {
+          next[id] = prev[id];
+        }
+      });
+
+      canvasNotes.forEach((n) => {
+        const id = String(n.id);
+        if (next[id]) return;
+        if (savedIsEmpty) {
+          next[id] = defaultRectForRank(rankById.get(id) ?? 0);
+        }
+      });
+
+      canvasNotes.forEach((n) => {
+        const id = String(n.id);
+        if (next[id]) return;
+        const existingRects = Object.entries(next)
+          .filter(([oid]) => oid !== id)
+          .map(([, r]) => r);
+        const rank = rankById.get(id) ?? 0;
+        next[id] = rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects);
+      });
+
       return next;
     });
   }, [canvasNotes, canvasLeadId, layoutStorageKey, fk, savedCardsLayoutSig, scale, tx, ty]);
