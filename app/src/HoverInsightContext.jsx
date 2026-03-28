@@ -28,6 +28,12 @@ import './HoverInsight.css';
 const CONFIRM_UNLINK =
   'Remove the link between these two notes? The notes are not deleted—only the connection is removed.';
 
+/** Compare note ids from API vs tree (string vs number). */
+function noteIdSame(a, b) {
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
 const SIMILAR_MIN_LS_KEY = 'hermes.insightSimilarMinPct';
 const SIMILAR_TYPES_LS_KEY = 'hermes.insightSimilarVisibleTypes';
 const RAGDOLL_CONTEXT_LS_KEY = 'hermes.ragdollContextOptions';
@@ -422,7 +428,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const selectInsightNote = useCallback(
     (note, anchorEl, depth) => {
       if (depth < 0 || !note?.id || !anchorEl) return;
-      if (activeHoverId.current === note.id) {
+      if (noteIdSame(activeHoverId.current, note.id)) {
         clearInsightSelection();
         return;
       }
@@ -513,7 +519,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [clearInsightSelection]
   );
 
-  /** Pointer / Escape: dismiss when clicking outside insight UI and the selected card. */
+  /** Pointer / Escape: dismiss when clicking outside insight UI and any note card. */
   useEffect(() => {
     if (!hover?.note) return undefined;
     const onPointerDown = (e) => {
@@ -526,9 +532,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       if (t.closest?.('textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select')) {
         return;
       }
-      if (t.closest?.('.note-card--insight-selected')) return;
-      /* Replies sit in sibling <li>s, not inside the selected root <article>; clearing here broke double-click drill. */
-      if (t.closest?.('.stream-page-list')) return;
+      /* Stream/canvas: let card clicks handle insight switch / double-click drill; dismiss on empty list/gutter space. */
+      if (t.closest?.('.note-card')) return;
       clearInsightSelection();
     };
     const onKeyDown = (e) => {

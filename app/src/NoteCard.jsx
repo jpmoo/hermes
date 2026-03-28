@@ -123,7 +123,11 @@ export default function NoteCard({
 
   const insightSelectedId = hoverInsightEnabled ? hoverInsight?.hover?.note?.id : null;
   const insightActive = Boolean(insightSelectedId);
-  const isInsightSelected = insightActive && insightSelectedId === note.id;
+  const isInsightSelected =
+    insightActive &&
+    insightSelectedId != null &&
+    note.id != null &&
+    String(insightSelectedId) === String(note.id);
 
   const openLinkedNote = useCallback(
     async (linkedId) => {
