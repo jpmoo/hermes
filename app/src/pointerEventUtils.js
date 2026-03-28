@@ -22,8 +22,8 @@ const INTERACTIVE_FIELD =
   'textarea, input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]), select';
 
 /**
- * True if `el` (e.g. from document.elementFromPoint) is inside insight UI, a note card, compose, etc.
- * Used for deferred “click outside to close” so we never race React’s delegated click handlers.
+ * True if `el` is inside insight UI, a note card, compose, etc.
+ * Used for document “click outside” dismiss (`insightPointerPathShouldKeepOpen` on the event path).
  */
 export function insightElementKeepsHoverOpen(el) {
   if (!el || el.nodeType !== 1 || typeof el.closest !== 'function') return false;
@@ -33,4 +33,20 @@ export function insightElementKeepsHoverOpen(el) {
   if (el.matches?.(INTERACTIVE_FIELD)) return true;
   if (el.closest('.note-card')) return true;
   return false;
+}
+
+/**
+ * True if this click should not dismiss stream insight (same regions as insightElementKeepsHoverOpen).
+ */
+export function insightPointerPathShouldKeepOpen(event) {
+  if (typeof event?.button === 'number' && event.button !== 0) return true;
+  if (typeof event?.composedPath === 'function') {
+    const path = event.composedPath();
+    for (let i = 0; i < path.length; i += 1) {
+      const n = path[i];
+      if (n && n.nodeType === 1 && insightElementKeepsHoverOpen(n)) return true;
+    }
+  }
+  const t = pointerEventTargetElement(event);
+  return t ? insightElementKeepsHoverOpen(t) : false;
 }

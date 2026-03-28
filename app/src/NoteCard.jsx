@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   starNote,
@@ -49,6 +49,7 @@ export default function NoteCard({
   const hoverInsight = useHoverInsight();
   /** Second click of a double-click runs drill in `click` (detail===2); skip duplicate work in `dblclick`. */
   const skipNextStreamDblClickDrillRef = useRef(false);
+  const articleRef = useRef(null);
   const tagDropdownRef = useRef(null);
   const editFileInputRef = useRef(null);
   const [editing, setEditing] = useState(false);
@@ -350,30 +351,64 @@ export default function NoteCard({
     }
   };
 
-  const runStreamDrillOpen = (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    hoverInsight?.clearInsightSelection?.();
-    onOpenThread?.(ev);
-  };
+  const runStreamDrillOpen = useCallback(
+    (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      hoverInsight?.clearInsightSelection?.();
+      onOpenThread?.(ev);
+    },
+    [hoverInsight, onOpenThread]
+  );
+
+  /** Keep latest values for the native listener so we do not rebind on every parent re-render. */
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const hoverInsightRef = useRef(hoverInsight);
+  hoverInsightRef.current = hoverInsight;
+  const runStreamDrillOpenRef = useRef(runStreamDrillOpen);
+  runStreamDrillOpenRef.current = runStreamDrillOpen;
+
+  /**
+   * Stream insight: React’s delegated `onClick` races the document dismiss listener. Use a native
+   * **bubble** listener on `<article>` so interactive children run first; then we select / drill
+   * and `stopPropagation()` so the document dismiss does not run for in-card “chrome” clicks.
+   */
+  useLayoutEffect(() => {
+    if (!hoverInsightEnabled || editing) return undefined;
+    const el = articleRef.current;
+    if (!el) return undefined;
+
+    const onArticleClick = (e) => {
+      if (e.type !== 'click') return;
+      const t = pointerEventTargetElement(e);
+      if (!t) return;
+      if (t.closest?.('.note-rich-task-checkbox')) return;
+      if (t.closest?.('a.note-rich-link')) return;
+      if (t.closest?.('button.note-rich-mention')) return;
+      if (t.closest?.('.note-card-actions')) return;
+      if (t.closest?.('.note-card-type-cycle-btn') || t.closest?.('.note-card-edit')) return;
+      if (t.closest?.('.note-card-tag-remove')) return;
+      if (t.closest?.('.note-attachment-item')) return;
+      if (e.detail === 2) {
+        skipNextStreamDblClickDrillRef.current = true;
+        runStreamDrillOpenRef.current(e);
+        e.stopPropagation();
+        return;
+      }
+      hoverInsightRef.current?.selectInsightNote?.(noteRef.current, el, depth);
+      e.stopPropagation();
+    };
+
+    el.addEventListener('click', onArticleClick, false);
+    return () => el.removeEventListener('click', onArticleClick, false);
+  }, [hoverInsightEnabled, editing, depth]);
 
   const handleCardClick = (ev) => {
     if (editing) return;
     const t = pointerEventTargetElement(ev);
     if (t?.closest?.('.note-rich-task-checkbox')) return;
-    if (!hoverInsightEnabled) {
-      onOpenThread?.(ev);
-      return;
-    }
-    /* Double-click drill: use the 2nd click (detail===2) so drill fires even when `dblclick` misses
-     * the <article> (nested stream rows). Single click selects insight immediately (no delay — delayed
-     * open felt like missed clicks and lagged highlight when switching notes). */
-    if (ev.detail === 2) {
-      skipNextStreamDblClickDrillRef.current = true;
-      runStreamDrillOpen(ev);
-      return;
-    }
-    hoverInsight?.selectInsightNote?.(note, ev.currentTarget, depth);
+    onOpenThread?.(ev);
   };
 
   const handleCardDoubleClick = (ev) => {
@@ -469,12 +504,13 @@ export default function NoteCard({
 
   return (
     <article
+      ref={articleRef}
       className={cardClassNames}
       style={{
         borderLeftWidth: borderWidth,
         ...linkedBorderVars,
       }}
-      onClick={editing ? undefined : handleCardClick}
+      onClick={editing ? undefined : hoverInsightEnabled ? undefined : handleCardClick}
       onDoubleClick={editing ? undefined : handleCardDoubleClick}
       role={editing ? undefined : 'button'}
       tabIndex={editing ? undefined : 0}

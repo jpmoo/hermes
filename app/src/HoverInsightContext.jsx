@@ -23,7 +23,7 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
-import { insightElementKeepsHoverOpen } from './pointerEventUtils';
+import { insightPointerPathShouldKeepOpen } from './pointerEventUtils';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -529,8 +529,9 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   }, [hover?.note]);
 
   /**
-   * Click outside to exit: schedule `elementFromPoint` after the current click stack so React’s
-   * `onClick` on note cards runs first — synchronous document listeners raced `selectInsightNote`.
+   * Click outside to exit (bubble on document). Stream note cards register a native **bubble**
+   * `click` on `<article>` that calls `stopPropagation()` for handled card-body clicks so this
+   * listener does not run for those.
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
@@ -538,19 +539,9 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       if (e.key === 'Escape') clearInsightSelection();
     };
     const onDocumentClick = (e) => {
-      if (typeof e.button === 'number' && e.button !== 0) return;
-      const x = e.clientX;
-      const y = e.clientY;
-      window.setTimeout(() => {
-        if (!hoverNoteRef.current) return;
-        const topEl = document.elementFromPoint(x, y);
-        if (!topEl) {
-          clearInsightSelection();
-          return;
-        }
-        if (insightElementKeepsHoverOpen(topEl)) return;
-        clearInsightSelection();
-      }, 0);
+      if (!hoverNoteRef.current) return;
+      if (insightPointerPathShouldKeepOpen(e)) return;
+      clearInsightSelection();
     };
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('click', onDocumentClick, false);
