@@ -90,6 +90,30 @@ function notePreview(content, max = 72) {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
+/** True if the event target should not start a canvas drag (controls, links, editing). */
+function isCanvasDragInteractiveTarget(target) {
+  if (!target || typeof target.closest !== 'function') return true;
+  return Boolean(
+    target.closest(
+      [
+        '.canvas-card-resize',
+        'button',
+        'a[href]',
+        'textarea',
+        'input',
+        'select',
+        '[contenteditable="true"]',
+        '.note-card--editing',
+        '.note-card-actions',
+        '.note-rich-task-checkbox',
+        '.note-card-tag-dropdown',
+        '[data-insight-ui]',
+        'label',
+      ].join(', ')
+    )
+  );
+}
+
 const SAVE_DEBOUNCE_MS = 450;
 const MIN_W = 200;
 const MIN_H = 120;
@@ -508,33 +532,68 @@ export default function CanvasPage() {
     }
   }, [threadRootId, replyParentId, refreshThread]);
 
-  const startDrag = useCallback(
+  /** Drag from anywhere on the card (not just a strip). Uses a small move threshold so clicks / insight still work. */
+  const onCanvasCardPointerDown = useCallback(
     (noteId, e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (isCanvasDragInteractiveTarget(e.target)) return;
+
       const id = String(noteId);
-      const start = cardRects[id];
-      if (!start) return;
+      const startRect = cardRectsRef.current[id];
+      if (!startRect) return;
+
       const ox = e.clientX;
       const oy = e.clientY;
-      const base = { ...start };
+      const base = { ...startRect };
+      const frameEl = e.currentTarget;
+      const DRAG_THRESHOLD_PX = 5;
+      let dragging = false;
+
       const move = (ev) => {
-        const dx = (ev.clientX - ox) / scale;
-        const dy = (ev.clientY - oy) / scale;
+        if (!dragging) {
+          if (Math.hypot(ev.clientX - ox, ev.clientY - oy) < DRAG_THRESHOLD_PX) return;
+          dragging = true;
+          try {
+            frameEl.setPointerCapture(ev.pointerId);
+          } catch {
+            /* ignore */
+          }
+        }
+        const sc = scaleRef.current;
+        const dx = (ev.clientX - ox) / sc;
+        const dy = (ev.clientY - oy) / sc;
         setCardRects((prev) => ({
           ...prev,
           [id]: { ...base, x: base.x + dx, y: base.y + dy },
         }));
       };
-      const up = () => {
+
+      const up = (ev) => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
-        scheduleSave();
+        window.removeEventListener('pointercancel', up);
+        try {
+          if (dragging && frameEl.releasePointerCapture) {
+            frameEl.releasePointerCapture(ev.pointerId);
+          }
+        } catch {
+          /* ignore */
+        }
+        if (dragging) {
+          scheduleSave();
+          const swallowClick = (ce) => {
+            ce.preventDefault();
+            ce.stopPropagation();
+          };
+          document.addEventListener('click', swallowClick, { capture: true, once: true });
+        }
       };
+
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
     },
-    [cardRects, scale, scheduleSave]
+    [scheduleSave]
   );
 
   const startResize = useCallback(
@@ -542,14 +601,15 @@ export default function CanvasPage() {
       e.preventDefault();
       e.stopPropagation();
       const id = String(noteId);
-      const start = cardRects[id];
+      const start = cardRectsRef.current[id];
       if (!start) return;
       const ox = e.clientX;
       const oy = e.clientY;
       const base = { ...start };
       const move = (ev) => {
-        const dx = (ev.clientX - ox) / scale;
-        const dy = (ev.clientY - oy) / scale;
+        const sc = scaleRef.current;
+        const dx = (ev.clientX - ox) / sc;
+        const dy = (ev.clientY - oy) / sc;
         setCardRects((prev) => ({
           ...prev,
           [id]: {
@@ -567,7 +627,7 @@ export default function CanvasPage() {
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
     },
-    [cardRects, scale, scheduleSave]
+    [scheduleSave]
   );
 
   const starredOnCanvas = useMemo(
@@ -834,13 +894,10 @@ export default function CanvasPage() {
                         width: r.w,
                         height: r.h,
                       }}
+                      onPointerDown={(e) => onCanvasCardPointerDown(n.id, e)}
+                      title="Drag to move · use corner to resize"
                     >
-                      <div
-                        className="canvas-card-drag"
-                        onPointerDown={(e) => startDrag(n.id, e)}
-                        title="Drag to move"
-                      />
-                      <div className="canvas-card-inner">
+                      <div className="canvas-card-body">
                         <NoteCard
                           note={n}
                           depth={depth}
@@ -861,7 +918,10 @@ export default function CanvasPage() {
                         type="button"
                         className="canvas-card-resize"
                         aria-label="Resize card"
-                        onPointerDown={(e) => startResize(n.id, e)}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          startResize(n.id, e);
+                        }}
                       />
                     </div>
                   );

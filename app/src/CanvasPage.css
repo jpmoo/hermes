@@ -208,37 +208,58 @@
   min-width: 200px;
   min-height: 120px;
   border-radius: 10px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  /* Visual chrome lives on .note-card; frame is positioning + hit area only */
+  box-shadow: none;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvas-card-frame:active {
+  cursor: grabbing;
 }
 
 .canvas-card-frame:focus-within {
   z-index: 4;
 }
 
-.canvas-card-drag {
-  flex-shrink: 0;
-  height: 10px;
-  cursor: grab;
-  border-radius: 10px 10px 0 0;
-  background: linear-gradient(to bottom, var(--border-subtle), transparent);
+.canvas-card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.canvas-card-drag:active {
+.canvas-card-body .note-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  cursor: grab;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.canvas-card-body .note-card:active {
   cursor: grabbing;
 }
 
-.canvas-card-inner {
+.canvas-card-body .note-card-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-top: none;
 }
 
-.canvas-card-inner .note-card {
-  border-radius: 0;
-  box-shadow: none;
+.canvas-card-body .note-card textarea,
+.canvas-card-body .note-card input:not([type='checkbox']) {
+  cursor: text;
+}
+
+.canvas-card-body .note-card a[href],
+.canvas-card-body .note-card button {
+  cursor: pointer;
 }
 
 .canvas-card-resize {
