@@ -23,7 +23,6 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
-import { insightPointerPathShouldKeepOpen } from './pointerEventUtils';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -523,23 +522,17 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   );
 
   /**
-   * Dismiss on outside **click** (bubble on `document`). Runs after React’s root listener, so
-   * `NoteCard` runs first and calls `stopPropagation()` when it handles the click — the document
-   * listener then never fires for that gesture. No capture/mousedown phase (those raced React).
+   * No global `click` / `mousedown` listener for “outside” dismiss — those always raced React’s
+   * delegated handlers and broke single-click insight no matter the phase or stopPropagation.
+   * Dismiss: Escape, navigate away (clearAll), or click the same note again (toggle in selectInsightNote).
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
-    const onDocumentClick = (e) => {
-      if (insightPointerPathShouldKeepOpen(e)) return;
-      clearInsightSelection();
-    };
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
-    document.addEventListener('click', onDocumentClick);
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('click', onDocumentClick);
       document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [hover?.note, clearInsightSelection]);

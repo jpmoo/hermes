@@ -374,8 +374,8 @@ export default function NoteCard({
       return;
     }
     hoverInsight?.selectInsightNote?.(note, ev.currentTarget, depth);
-    /* Stop document-level insight dismiss from seeing this click (same pattern as linked-note links). */
     ev.stopPropagation();
+    ev.nativeEvent?.stopPropagation?.();
   };
 
   const handleCardDoubleClick = (ev) => {
