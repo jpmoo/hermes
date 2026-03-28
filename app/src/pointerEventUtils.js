@@ -33,11 +33,11 @@ function elementKeepsInsightOpen(el) {
 
 /**
  * True if this event should not dismiss hover-insight (hit on card, panel, compose, etc.).
- * Walks composedPath when available so capture-phase listeners still see the full hit path; also
- * uses pointerEventTargetElement for target/closest.
+ * Walks composedPath when available; uses pointerEventTargetElement as fallback.
+ * Do not gate on `pointerType` — MouseEvent (mousedown/click) has no pointerType.
  */
 export function insightPointerPathShouldKeepOpen(event) {
-  if (event?.pointerType === 'mouse' && event.button !== 0) return true;
+  if (typeof event?.button === 'number' && event.button !== 0) return true;
   if (typeof event?.composedPath === 'function') {
     const path = event.composedPath();
     for (let i = 0; i < path.length; i += 1) {
