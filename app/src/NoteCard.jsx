@@ -371,18 +371,13 @@ export default function NoteCard({
       onOpenThread?.(ev);
       return;
     }
-    /* Second click of a double-click: clear insight timer only; drill already ran on detail===1.
-     * (Nested rows often miss `dblclick` on the <article>, so we cannot rely on dblclick alone.) */
+    /* Double-click drill: use the 2nd click (detail===2) so drill fires even when `dblclick` misses
+     * the <article> (nested stream rows). Single click only opens insight after a short delay. */
     if (ev.detail === 2) {
       skipNextStreamDblClickDrillRef.current = true;
-      if (insightClickTimerRef.current) {
-        clearTimeout(insightClickTimerRef.current);
-        insightClickTimerRef.current = null;
-      }
-      hoverInsight?.clearInsightSelection?.();
+      runStreamDrillOpen(ev);
       return;
     }
-    onOpenThread?.(ev);
     const anchorEl = ev.currentTarget;
     if (insightClickTimerRef.current) clearTimeout(insightClickTimerRef.current);
     insightClickTimerRef.current = setTimeout(() => {
