@@ -184,7 +184,8 @@ function noteIdAttrEq(attr, noteId) {
 /** Live <article> for Stream insight layout after React replaces nodes (focus / animations). */
 function findInsightArticleEl(noteId) {
   if (noteId == null) return null;
-  const lists = document.querySelectorAll('ul.stream-page-list');
+  const scope = document.querySelector('.stream-page-scroll') ?? document;
+  const lists = scope.querySelectorAll('ul.stream-page-list');
   for (const list of lists) {
     for (const li of list.querySelectorAll('li[data-stream-note]')) {
       if (!noteIdAttrEq(li.getAttribute('data-stream-note'), noteId)) continue;
@@ -1267,6 +1268,7 @@ function HoverInsightPanels() {
           data-insight-ui
           style={connectionLayout.stackStyle}
         >
+          <div className="hover-insight-connection-stack-inner">
           {connectionStackPeers.map((pn) => {
             const body = pn.content != null ? String(pn.content).trim() : '';
             const tagNames = Array.isArray(pn.tags) ? pn.tags.map((t) => t.name || t) : [];
@@ -1350,6 +1352,7 @@ function HoverInsightPanels() {
             </div>
             );
           })}
+          </div>
         </div>
         </>
       )}

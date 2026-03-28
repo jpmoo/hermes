@@ -519,14 +519,31 @@
   position: fixed;
   z-index: 270;
   box-sizing: border-box;
-  overflow-y: auto;
+  /* Outer pass-through: tall stack overlapped thread notes below; full-rect pointer-events:auto stole clicks */
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+  padding-right: 2px;
+  animation: hover-insight-connect 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hover-insight-connection-stack-inner {
   pointer-events: auto;
+  box-sizing: border-box;
+  min-height: 0;
+  /* Don’t grow to fill outer max-height — empty flex area was stealing clicks on notes below */
+  flex: 0 1 auto;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.45rem;
-  padding-right: 2px;
-  animation: hover-insight-connect 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes hover-insight-connect {
