@@ -23,6 +23,7 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
+import { insightElementKeepsHoverOpen } from './pointerEventUtils';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -521,19 +522,41 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     [clearInsightSelection]
   );
 
+  /** Ref so deferred outside-dismiss sees current insight without stale closures. */
+  const hoverNoteRef = useRef(null);
+  useLayoutEffect(() => {
+    hoverNoteRef.current = hover?.note ?? null;
+  }, [hover?.note]);
+
   /**
-   * No global `click` / `mousedown` listener for “outside” dismiss — those always raced React’s
-   * delegated handlers and broke single-click insight no matter the phase or stopPropagation.
-   * Dismiss: Escape, navigate away (clearAll), or click the same note again (toggle in selectInsightNote).
+   * Click outside to exit: schedule `elementFromPoint` after the current click stack so React’s
+   * `onClick` on note cards runs first — synchronous document listeners raced `selectInsightNote`.
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
+    const onDocumentClick = (e) => {
+      if (typeof e.button === 'number' && e.button !== 0) return;
+      const x = e.clientX;
+      const y = e.clientY;
+      window.setTimeout(() => {
+        if (!hoverNoteRef.current) return;
+        const topEl = document.elementFromPoint(x, y);
+        if (!topEl) {
+          clearInsightSelection();
+          return;
+        }
+        if (insightElementKeepsHoverOpen(topEl)) return;
+        clearInsightSelection();
+      }, 0);
+    };
     document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('click', onDocumentClick, false);
     return () => {
       document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('click', onDocumentClick, false);
     };
   }, [hover?.note, clearInsightSelection]);
 
