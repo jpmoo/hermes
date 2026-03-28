@@ -10,6 +10,8 @@
   padding: 1rem 1.25rem;
   cursor: pointer;
   transition: background 0.15s;
+  /* Avoid double-tap zoom delay on touch; improves first-tap reliability on mobile. */
+  touch-action: manipulation;
 }
 
 .note-card-type-icon {

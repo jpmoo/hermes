@@ -24,6 +24,7 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
+import { pointerEventTargetElement } from './pointerEventUtils';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -530,7 +531,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   useEffect(() => {
     if (!hover?.note) return undefined;
     const onPointerDown = (e) => {
-      const t = e.target;
+      const t = pointerEventTargetElement(e);
+      if (!t) return;
       if (t.closest?.('[data-insight-ui]')) return;
       /* Bottom reply/new-thread strip (outside .stream-page-list). */
       if (t.closest?.('[data-stream-compose]')) return;
