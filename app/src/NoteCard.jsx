@@ -629,7 +629,12 @@ export default function NoteCard({
                 </button>
                 <div className="note-card-tag-add" ref={tagDropdownRef}>
                   {addingTag ? (
-                    <ul className="note-card-tag-dropdown" role="listbox" aria-label="Add tag">
+                    <ul
+                      id={`note-tag-menu-${note.id}`}
+                      className="note-card-tag-dropdown"
+                      role="listbox"
+                      aria-label="Add tag"
+                    >
                       {dropdownParentTags.length > 0 && (
                         <li className="note-card-tag-inherit">
                           <button
@@ -667,9 +672,17 @@ export default function NoteCard({
                         </form>
                       </li>
                     </ul>
-                  ) : (
-                    <button type="button" className="note-card-tag-add-btn" onClick={openTagDropdown}>+ Tag</button>
-                  )}
+                  ) : null}
+                  <button
+                    type="button"
+                    className="note-card-tag-add-btn"
+                    onClick={openTagDropdown}
+                    aria-expanded={addingTag}
+                    aria-haspopup="listbox"
+                    aria-controls={addingTag ? `note-tag-menu-${note.id}` : undefined}
+                  >
+                    + Tag
+                  </button>
                 </div>
               </>
             )}

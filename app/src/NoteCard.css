@@ -534,6 +534,10 @@
   color: var(--accent);
 }
 
+.note-card-tag-add-btn[aria-expanded='true'] {
+  color: var(--accent);
+}
+
 .note-card-tag-dropdown {
   position: absolute;
   left: 0;
