@@ -113,6 +113,13 @@ export default function CanvasPage() {
   const [ty, setTy] = useState(0);
   const [cardRects, setCardRects] = useState({});
 
+  const cardRectsRef = useRef(cardRects);
+  const canvasLayoutsRef = useRef(canvasLayouts);
+  const showSequenceLinesRef = useRef(showSequenceLines);
+  cardRectsRef.current = cardRects;
+  canvasLayoutsRef.current = canvasLayouts;
+  showSequenceLinesRef.current = showSequenceLines;
+
   const viewportRef = useRef(null);
   const viewportPointersRef = useRef(new Map());
   const pinchSessionRef = useRef(null);
@@ -193,9 +200,11 @@ export default function CanvasPage() {
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
 
   const fk = canvasFocusKey(focusId);
-  const layoutBlock = useMemo(() => {
-    const t = canvasLayouts[String(layoutStorageKey)];
-    return t && typeof t === 'object' ? t[fk] : null;
+
+  /** Only changes when saved card JSON for this view changes — avoids re-hydrating rects on every save echo (which broke drag). */
+  const savedCardsLayoutSig = useMemo(() => {
+    const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
+    return JSON.stringify(block?.cards ?? null);
   }, [canvasLayouts, layoutStorageKey, fk]);
 
   useEffect(() => {
@@ -219,7 +228,15 @@ export default function CanvasPage() {
     }
     setCardRects((prev) => {
       const next = { ...prev };
-      const saved = layoutBlock?.cards && typeof layoutBlock.cards === 'object' ? layoutBlock.cards : {};
+      let saved = {};
+      try {
+        if (savedCardsLayoutSig && savedCardsLayoutSig !== 'null') {
+          const p = JSON.parse(savedCardsLayoutSig);
+          if (p && typeof p === 'object' && !Array.isArray(p)) saved = p;
+        }
+      } catch {
+        saved = {};
+      }
       canvasNotes.forEach((n, i) => {
         const id = String(n.id);
         if (saved[id] && typeof saved[id].x === 'number') {
@@ -238,7 +255,7 @@ export default function CanvasPage() {
       });
       return next;
     });
-  }, [canvasNotes, layoutBlock, layoutStorageKey, fk]);
+  }, [canvasNotes, layoutStorageKey, fk, savedCardsLayoutSig]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -260,9 +277,14 @@ export default function CanvasPage() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       saveTimerRef.current = null;
-      const cards = { ...cardRects };
-      const patchLayouts = mergeCanvasLayoutPatch(canvasLayouts, layoutStorageKey, fk, {
-        view: { scale, tx, ty, showSequenceLines },
+      const cards = { ...cardRectsRef.current };
+      const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, layoutStorageKey, fk, {
+        view: {
+          scale: scaleRef.current,
+          tx: txRef.current,
+          ty: tyRef.current,
+          showSequenceLines: showSequenceLinesRef.current,
+        },
         cards,
       });
       try {
@@ -272,7 +294,7 @@ export default function CanvasPage() {
         console.error(e);
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [layoutStorageKey, fk, canvasLayouts, cardRects, scale, tx, ty, showSequenceLines]);
+  }, [layoutStorageKey, fk]);
 
   scaleRef.current = scale;
   txRef.current = tx;
@@ -444,9 +466,15 @@ export default function CanvasPage() {
   const toggleSequenceLines = useCallback(async () => {
     const next = !showSequenceLines;
     setShowSequenceLines(next);
-    const patchLayouts = mergeCanvasLayoutPatch(canvasLayouts, layoutStorageKey, fk, {
-      view: { scale, tx, ty, showSequenceLines: next },
-      cards: { ...cardRects },
+    showSequenceLinesRef.current = next;
+    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, layoutStorageKey, fk, {
+      view: {
+        scale: scaleRef.current,
+        tx: txRef.current,
+        ty: tyRef.current,
+        showSequenceLines: next,
+      },
+      cards: { ...cardRectsRef.current },
     });
     try {
       await patchUserSettings({ campusLayouts: patchLayouts });
@@ -454,17 +482,9 @@ export default function CanvasPage() {
     } catch (e) {
       console.error(e);
       setShowSequenceLines(!next);
+      showSequenceLinesRef.current = !next;
     }
-  }, [
-    layoutStorageKey,
-    showSequenceLines,
-    canvasLayouts,
-    fk,
-    scale,
-    tx,
-    ty,
-    cardRects,
-  ]);
+  }, [layoutStorageKey, fk]);
 
   const handleAddCard = useCallback(async () => {
     try {
