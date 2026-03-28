@@ -1087,15 +1087,17 @@ export default function CanvasPage() {
                   <NavIconUpOneLevel />
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="canvas-icon-btn"
-                onClick={goToCanvasRoot}
-                aria-label="Canvas root — all threads"
-                title="Canvas root — all threads"
-              >
-                <NavIconRootLevel />
-              </button>
+              {threadRootId ? (
+                <button
+                  type="button"
+                  className="canvas-icon-btn"
+                  onClick={goToCanvasRoot}
+                  aria-label="Canvas root — all threads"
+                  title="Canvas root — all threads"
+                >
+                  <NavIconRootLevel />
+                </button>
+              ) : null}
               {thread.length > 0 ? (
                 <button
                   type="button"
