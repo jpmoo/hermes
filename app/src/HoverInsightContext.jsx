@@ -523,25 +523,23 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   );
 
   /**
-   * Dismiss on outside **mousedown** (bubble, default). Runs after the mousedown reaches the target
-   * node but **before** the separate `click` event — so React’s `onClick` on note cards still fires
-   * later and calls `selectInsightNote` without competing with dismiss in one `click` handler chain.
-   * Document `click` capture/bubble both raced React and made single-click insight unreliable.
+   * Dismiss on outside **click** (bubble on `document`). Runs after React’s root listener, so
+   * `NoteCard` runs first and calls `stopPropagation()` when it handles the click — the document
+   * listener then never fires for that gesture. No capture/mousedown phase (those raced React).
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
-    const onDocumentMouseDown = (e) => {
-      if (e.button !== 0) return;
+    const onDocumentClick = (e) => {
       if (insightPointerPathShouldKeepOpen(e)) return;
       clearInsightSelection();
     };
     const onKeyDown = (e) => {
       if (e.key === 'Escape') clearInsightSelection();
     };
-    document.addEventListener('mousedown', onDocumentMouseDown);
+    document.addEventListener('click', onDocumentClick);
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('mousedown', onDocumentMouseDown);
+      document.removeEventListener('click', onDocumentClick);
       document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [hover?.note, clearInsightSelection]);
