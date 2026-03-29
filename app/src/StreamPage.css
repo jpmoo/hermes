@@ -620,4 +620,11 @@
     padding-right: max(0.25rem, env(safe-area-inset-right, 0px));
     box-sizing: border-box;
   }
+
+  /* Focus / drill float lands at column width — match 90% cards, not --hermes-stream-column-max (50vw) */
+  .stream-page-float--move {
+    width: 90%;
+    max-width: 90%;
+    box-sizing: border-box;
+  }
 }
