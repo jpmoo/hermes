@@ -349,6 +349,7 @@ export default function CanvasPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [showSequenceLines, setShowSequenceLines] = useState(true);
+  const [starredDockExpanded, setStarredDockExpanded] = useState(false);
 
   const [composeNoteType, setComposeNoteType] = useState('note');
   const [composeStartDate, setComposeStartDate] = useState('');
@@ -1632,7 +1633,6 @@ export default function CanvasPage() {
                             (typeof n.reply_count === 'number' && n.reply_count > 0)
                           }
                           hoverInsightEnabled
-                          showFocusButton={depth > 0}
                           parentTagsForInherit={parentTagsForInherit}
                           onOpenThread={makeOpenThread(n.id)}
                           onStarredChange={refreshThread}
@@ -1654,36 +1654,64 @@ export default function CanvasPage() {
                 })}
               </div>
             </div>
-            <aside className="canvas-starred-dock" aria-label="Starred notes">
-              <div className="canvas-starred-dock-title">Starred</div>
-              <ul className="canvas-starred-dock-list">
-                {starredOnCanvas.map((n) => (
-                  <li key={String(n.id)}>
-                    <div
-                      className="canvas-starred-row"
-                      onDoubleClick={() => zoomToCard(n.id)}
-                      title="Double-click to zoom to this note on the canvas"
-                    >
-                      <span className="canvas-starred-preview">{notePreview(n.content)}</span>
-                      <button
-                        type="button"
-                        className="canvas-starred-unstar"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          unstarFromDock(n.id);
-                        }}
-                        aria-label="Remove star"
-                        title="Remove star"
+            <aside
+              className={`canvas-starred-dock${starredDockExpanded ? ' canvas-starred-dock--expanded' : ''}`}
+              aria-label="Starred notes"
+            >
+              <button
+                type="button"
+                className="canvas-starred-dock-toggle"
+                onClick={() => setStarredDockExpanded((v) => !v)}
+                aria-expanded={starredDockExpanded}
+                aria-controls="canvas-starred-dock-body"
+                id="canvas-starred-dock-heading"
+              >
+                <span className="canvas-starred-dock-title">Starred</span>
+                <span className="canvas-starred-dock-toggle-meta">
+                  {starredOnCanvas.length > 0 ? (
+                    <span className="canvas-starred-dock-badge">{starredOnCanvas.length}</span>
+                  ) : null}
+                  <span className="canvas-starred-dock-chevron" aria-hidden>
+                    {starredDockExpanded ? '▼' : '▶'}
+                  </span>
+                </span>
+              </button>
+              <div
+                id="canvas-starred-dock-body"
+                className="canvas-starred-dock-body"
+                role="region"
+                aria-labelledby="canvas-starred-dock-heading"
+                hidden={!starredDockExpanded}
+              >
+                <ul className="canvas-starred-dock-list">
+                  {starredOnCanvas.map((n) => (
+                    <li key={String(n.id)}>
+                      <div
+                        className="canvas-starred-row"
+                        onDoubleClick={() => zoomToCard(n.id)}
+                        title="Double-click to zoom to this note on the canvas"
                       >
-                        ★
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              {starredOnCanvas.length === 0 ? (
-                <p className="canvas-starred-dock-empty">No starred notes in this view.</p>
-              ) : null}
+                        <span className="canvas-starred-preview">{notePreview(n.content)}</span>
+                        <button
+                          type="button"
+                          className="canvas-starred-unstar"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            unstarFromDock(n.id);
+                          }}
+                          aria-label="Remove star"
+                          title="Remove star"
+                        >
+                          ★
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {starredOnCanvas.length === 0 ? (
+                  <p className="canvas-starred-dock-empty">No starred notes in this view.</p>
+                ) : null}
+              </div>
             </aside>
             </>
           )}

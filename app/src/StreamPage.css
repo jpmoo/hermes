@@ -377,10 +377,10 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .stream-page-nav-row {
-    /* Taller header when nav wraps under logo (see Layout.css) */
-    top: var(--stream-nav-sticky-top-mobile, 6.85rem);
+    /* Below single-row sticky header (see Layout.css --stream-nav-sticky-top-mobile) */
+    top: var(--stream-nav-sticky-top-mobile, 3.65rem);
   }
 }
 
@@ -606,6 +606,18 @@
     max-width: 90%;
     margin-left: auto;
     margin-right: auto;
+    box-sizing: border-box;
+  }
+
+  /* Match note cards: reply / new-thread composer width on Stream + Canvas */
+  .stream-page-compose-wrap,
+  .canvas-page-compose-wrap {
+    width: 90%;
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: max(0.25rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.25rem, env(safe-area-inset-right, 0px));
     box-sizing: border-box;
   }
 }
