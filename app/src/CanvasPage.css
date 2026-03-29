@@ -165,6 +165,54 @@
   max-height: min(40vh, 18rem);
 }
 
+.canvas-starred-dock-toolbar {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.canvas-starred-dock-drag-handle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.canvas-starred-dock-drag-handle:active {
+  cursor: grabbing;
+}
+
+.canvas-starred-dock-drag-handle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.canvas-starred-dock-drag-grip {
+  font-size: 1rem;
+  letter-spacing: -0.12em;
+  user-select: none;
+}
+
+.canvas-starred-dock-toolbar .canvas-starred-dock-toggle {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
 .canvas-starred-dock-toggle {
   display: flex;
   align-items: center;
@@ -252,8 +300,8 @@
   flex: 1;
 }
 
-/* iOS phones: clear status bar / toolbar overlap — shift dock down */
-@media (max-width: 767px) {
+/* iOS phones: clear status bar / toolbar overlap — shift dock down (landscape: same compact query as Stream) */
+@media (max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px) {
   @supports (-webkit-touch-callout: none) {
     .canvas-starred-dock {
       top: calc(7.35rem + env(safe-area-inset-top, 0px) + 30px);

@@ -1,7 +1,14 @@
 /** Merge canvas layout for one thread/focus context into settings patch payload (stored as `campusLayouts` in settings JSON). */
 
-/** Phones use `viewMobile`; desktop and iPad use `view`. Match Stream/Hover insight breakpoint. */
-export const CANVAS_MOBILE_MEDIA_QUERY = '(max-width: 767px)';
+/**
+ * Narrow UI: portrait phones, or phone landscape (short viewport) so iOS landscape keeps mobile layout.
+ * Also drives Canvas viewMobile vs view and Stream insight sheet vs side panels.
+ */
+export const HERMES_COMPACT_VIEWPORT_QUERY =
+  '(max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px)';
+
+/** Same as HERMES_COMPACT_VIEWPORT_QUERY — Canvas view vs viewMobile. */
+export const CANVAS_MOBILE_MEDIA_QUERY = HERMES_COMPACT_VIEWPORT_QUERY;
 
 /** Settings key for Canvas at Stream root (no `thread=` in URL). */
 export const CANVAS_LAYOUT_STREAM_ROOT = '__stream_root__';
@@ -62,6 +69,12 @@ export function mergeCanvasLayoutPatch(prevLayouts, threadRootId, focusKey, part
         ? { ...(cur.viewMobile || {}), ...partial.viewMobile }
         : cur.viewMobile || {},
     cards: { ...(cur.cards || {}), ...(partial.cards || {}) },
+    starredDock:
+      partial.starredDock !== undefined
+        ? partial.starredDock && typeof partial.starredDock === 'object'
+          ? { ...(cur.starredDock || {}), ...partial.starredDock }
+          : cur.starredDock
+        : cur.starredDock,
   };
   return {
     ...prev,

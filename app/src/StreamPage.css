@@ -377,7 +377,7 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px) {
   .stream-page-nav-row {
     /* Below single-row sticky header (see Layout.css --stream-nav-sticky-top-mobile) */
     top: var(--stream-nav-sticky-top-mobile, 3.65rem);
@@ -593,8 +593,8 @@
   padding-top: 0.2rem;
 }
 
-/* Phones: full-width column, cards slightly inset (iPad ≥768px keeps desktop stream width) */
-@media (max-width: 767px) {
+/* Compact: full-width column, cards slightly inset; phone landscape width often >767px (iPad landscape excluded by height) */
+@media (max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px) {
   .stream-page {
     max-width: 100%;
     padding-left: max(0.25rem, env(safe-area-inset-left, 0px));

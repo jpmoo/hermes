@@ -96,6 +96,21 @@ function sanitizeCampusLayouts(input) {
       if (!block || typeof block !== 'object') continue;
       const view = sanitizeCanvasViewSlice(block.view);
       const viewMobile = sanitizeCanvasViewSlice(block.viewMobile);
+      let starredDock;
+      if (block.starredDock && typeof block.starredDock === 'object') {
+        const top = Number(block.starredDock.top);
+        const right = Number(block.starredDock.right);
+        if (
+          Number.isFinite(top) &&
+          Number.isFinite(right) &&
+          top >= 0 &&
+          top < 4000 &&
+          right >= 0 &&
+          right < 4000
+        ) {
+          starredDock = { top, right };
+        }
+      }
       const cards = {};
       if (block.cards && typeof block.cards === 'object' && !Array.isArray(block.cards)) {
         let n = 0;
@@ -113,7 +128,9 @@ function sanitizeCampusLayouts(input) {
           cards[nid] = { x, y, w, h };
         }
       }
-      out[tid][fk] = { view, viewMobile, cards };
+      const blockOut = { view, viewMobile, cards };
+      if (starredDock) blockOut.starredDock = starredDock;
+      out[tid][fk] = blockOut;
     }
   }
   return out;

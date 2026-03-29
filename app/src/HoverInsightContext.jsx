@@ -24,6 +24,7 @@ import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
 import { insightPointerPathShouldKeepOpen, pointerEventTargetElement } from './pointerEventUtils';
+import { HERMES_COMPACT_VIEWPORT_QUERY } from './canvasLayoutApi';
 import { useMediaQuery } from './useMediaQuery';
 import HoverInsightMobileSheet from './HoverInsightMobileSheet';
 import './HoverInsight.css';
@@ -814,7 +815,7 @@ function HoverInsightPanels() {
     onNoteUpdated,
   } = ctx;
 
-  const isNarrowStream = useMediaQuery('(max-width: 767px)');
+  const isNarrowStream = useMediaQuery(HERMES_COMPACT_VIEWPORT_QUERY);
 
   const openRagdollDoc = useCallback(async (sourcePath, label) => {
     try {

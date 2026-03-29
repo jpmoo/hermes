@@ -350,6 +350,8 @@ export default function CanvasPage() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [showSequenceLines, setShowSequenceLines] = useState(true);
   const [starredDockExpanded, setStarredDockExpanded] = useState(false);
+  /** Fixed px position; null = use CSS default placement */
+  const [starredDockPos, setStarredDockPos] = useState(null);
 
   const [composeNoteType, setComposeNoteType] = useState('note');
   const [composeStartDate, setComposeStartDate] = useState('');
@@ -401,6 +403,7 @@ export default function CanvasPage() {
   /** Avoid repeated fit while saved layout is still empty (e.g. before first save completes). */
   const fitAppliedForEmptyRef = useRef(false);
   const canvasViewKeyRef = useRef('');
+  const starredDockPosRef = useRef(null);
   const isCanvasMobileViewportRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
   const isCanvasMobileViewport = useMediaQuery(CANVAS_MOBILE_MEDIA_QUERY);
@@ -678,6 +681,23 @@ export default function CanvasPage() {
     setShowSequenceLines(v.showSequenceLines);
   }, [layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
 
+  useEffect(() => {
+    const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
+    const sd = block?.starredDock;
+    if (
+      sd &&
+      typeof sd === 'object' &&
+      typeof sd.top === 'number' &&
+      typeof sd.right === 'number' &&
+      Number.isFinite(sd.top) &&
+      Number.isFinite(sd.right)
+    ) {
+      setStarredDockPos({ top: sd.top, right: sd.right });
+    } else {
+      setStarredDockPos(null);
+    }
+  }, [layoutStorageKey, fk, canvasLayouts]);
+
   const persistCanvasLayoutNow = useCallback(async () => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
@@ -702,6 +722,12 @@ export default function CanvasPage() {
     } else {
       partial.view = pos;
       partial.viewMobile = { ...(curBlock.viewMobile || {}), showSequenceLines: pos.showSequenceLines };
+    }
+    if (starredDockPosRef.current != null) {
+      partial.starredDock = {
+        top: starredDockPosRef.current.top,
+        right: starredDockPosRef.current.right,
+      };
     }
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
@@ -739,6 +765,7 @@ export default function CanvasPage() {
   scaleRef.current = scale;
   txRef.current = tx;
   tyRef.current = ty;
+  starredDockPosRef.current = starredDockPos;
   isCanvasMobileViewportRef.current = isCanvasMobileViewport;
   scheduleSaveRef.current = scheduleSave;
 
@@ -1090,6 +1117,7 @@ export default function CanvasPage() {
       setCanvasLayouts(patchLayouts);
       setShowSequenceLines(true);
       showSequenceLinesRef.current = true;
+      setStarredDockPos(null);
     } catch (e) {
       console.error(e);
     }
@@ -1308,6 +1336,44 @@ export default function CanvasPage() {
     },
     [refreshThread]
   );
+
+  const onStarredDockDragPointerDown = useCallback((e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const aside = e.currentTarget.closest('.canvas-starred-dock');
+    if (!aside) return;
+    const rect = aside.getBoundingClientRect();
+    const originTop = starredDockPosRef.current?.top ?? rect.top;
+    const originRight = starredDockPosRef.current?.right ?? window.innerWidth - rect.right;
+    const session = {
+      startX: e.clientX,
+      startY: e.clientY,
+      originTop,
+      originRight,
+      w: rect.width,
+      h: rect.height,
+    };
+    const onMove = (ev) => {
+      const dx = ev.clientX - session.startX;
+      const dy = ev.clientY - session.startY;
+      const m = 6;
+      let top = session.originTop + dy;
+      let right = session.originRight - dx;
+      const maxT = window.innerHeight - session.h - m;
+      const maxR = window.innerWidth - session.w - m;
+      top = Math.min(maxT, Math.max(m, top));
+      right = Math.min(maxR, Math.max(m, right));
+      setStarredDockPos({ top, right });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      scheduleSaveRef.current();
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, []);
 
   const connectorPoints = useMemo(() => {
     const pts = [];
@@ -1633,6 +1699,7 @@ export default function CanvasPage() {
                             (typeof n.reply_count === 'number' && n.reply_count > 0)
                           }
                           hoverInsightEnabled
+                          showFocusButton={!threadRootId || depth > 0}
                           parentTagsForInherit={parentTagsForInherit}
                           onOpenThread={makeOpenThread(n.id)}
                           onStarredChange={refreshThread}
@@ -1657,25 +1724,47 @@ export default function CanvasPage() {
             <aside
               className={`canvas-starred-dock${starredDockExpanded ? ' canvas-starred-dock--expanded' : ''}`}
               aria-label="Starred notes"
+              style={
+                starredDockPos
+                  ? {
+                      top: starredDockPos.top,
+                      right: starredDockPos.right,
+                      left: 'auto',
+                    }
+                  : undefined
+              }
             >
-              <button
-                type="button"
-                className="canvas-starred-dock-toggle"
-                onClick={() => setStarredDockExpanded((v) => !v)}
-                aria-expanded={starredDockExpanded}
-                aria-controls="canvas-starred-dock-body"
-                id="canvas-starred-dock-heading"
-              >
-                <span className="canvas-starred-dock-title">Starred</span>
-                <span className="canvas-starred-dock-toggle-meta">
-                  {starredOnCanvas.length > 0 ? (
-                    <span className="canvas-starred-dock-badge">{starredOnCanvas.length}</span>
-                  ) : null}
-                  <span className="canvas-starred-dock-chevron" aria-hidden>
-                    {starredDockExpanded ? '▼' : '▶'}
+              <div className="canvas-starred-dock-toolbar">
+                <button
+                  type="button"
+                  className="canvas-starred-dock-drag-handle"
+                  aria-label="Move starred panel"
+                  title="Drag to move"
+                  onPointerDown={onStarredDockDragPointerDown}
+                >
+                  <span className="canvas-starred-dock-drag-grip" aria-hidden>
+                    ⋮
                   </span>
-                </span>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  className="canvas-starred-dock-toggle"
+                  onClick={() => setStarredDockExpanded((v) => !v)}
+                  aria-expanded={starredDockExpanded}
+                  aria-controls="canvas-starred-dock-body"
+                  id="canvas-starred-dock-heading"
+                >
+                  <span className="canvas-starred-dock-title">Starred</span>
+                  <span className="canvas-starred-dock-toggle-meta">
+                    {starredOnCanvas.length > 0 ? (
+                      <span className="canvas-starred-dock-badge">{starredOnCanvas.length}</span>
+                    ) : null}
+                    <span className="canvas-starred-dock-chevron" aria-hidden>
+                      {starredDockExpanded ? '▼' : '▶'}
+                    </span>
+                  </span>
+                </button>
+              </div>
               <div
                 id="canvas-starred-dock-body"
                 className="canvas-starred-dock-body"

@@ -952,7 +952,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Full-screen insight sheet (phones ≤767px); iPad uses fixed side panels */
+/* Full-screen insight sheet when compact viewport (see HERMES_COMPACT_VIEWPORT_QUERY); iPad uses fixed side panels */
 .hover-insight-mobile-root {
   position: fixed;
   inset: 0;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 /**
- * Subscribe to a CSS media query (e.g. `(max-width: 767px)` for phone vs tablet/desktop).
+ * Subscribe to a CSS media query (e.g. `HERMES_COMPACT_VIEWPORT_QUERY` in `canvasLayoutApi.js`).
  */
 export function useMediaQuery(query) {
   const getMatches = () => {
