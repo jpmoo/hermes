@@ -49,6 +49,8 @@ export default function NoteCard({
   parentTagsForInherit,
   /** Stream/canvas/search: show insight action; insight panels use HoverInsightProvider */
   hoverInsightEnabled = false,
+  /** Hide “Focus in Stream” on the thread head when viewing a thread; root-level list keeps it. */
+  showFocusButton = true,
   hideStar = false,
 }) {
   const navigate = useNavigate();
@@ -547,15 +549,17 @@ export default function NoteCard({
           <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
               <>
-                <button
-                  type="button"
-                  className="note-card-icon-btn"
-                  onClick={handleFocusNote}
-                  title="Focus this note in Stream"
-                  aria-label="Focus this note in Stream"
-                >
-                  <NoteCardIconFocus className="note-card-icon-btn__svg" />
-                </button>
+                {showFocusButton ? (
+                  <button
+                    type="button"
+                    className="note-card-icon-btn"
+                    onClick={handleFocusNote}
+                    title="Focus this note in Stream"
+                    aria-label="Focus this note in Stream"
+                  >
+                    <NoteCardIconFocus className="note-card-icon-btn__svg" />
+                  </button>
+                ) : null}
                 {hoverInsightEnabled ? (
                   <button
                     type="button"

@@ -1614,6 +1614,7 @@ export default function CanvasPage() {
                             (typeof n.reply_count === 'number' && n.reply_count > 0)
                           }
                           hoverInsightEnabled
+                          showFocusButton={depth > 0}
                           parentTagsForInherit={parentTagsForInherit}
                           onOpenThread={makeOpenThread(n.id)}
                           onStarredChange={refreshThread}

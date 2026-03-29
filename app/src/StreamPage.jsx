@@ -272,6 +272,7 @@ function StreamList({
               hideStar={depth === 0}
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
+              showFocusButton={depth > 0}
               parentTagsForInherit={parentTagsForInherit}
               onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
               onStarredChange={onStarredChange}
@@ -1197,6 +1198,7 @@ export default function StreamPage() {
               depth={0}
               hideStar
               hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
+              showFocusButton={false}
               onOpenThread={() => {}}
               onStarredChange={() => {}}
               onNoteUpdate={() => {}}
