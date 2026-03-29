@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   starNote,
@@ -25,10 +25,16 @@ import {
 } from './noteEventUtils';
 import { stripHashtagPrefixFromContent } from './noteBodyUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
-import { pointerEventTargetElement } from './pointerEventUtils';
 import { useHoverInsight } from './HoverInsightContext';
 import NoteTypeIcon from './NoteTypeIcon';
 import { NavIconAttach } from './icons/NavIcons';
+import {
+  NoteCardIconDelete,
+  NoteCardIconEdit,
+  NoteCardIconFocus,
+  NoteCardIconInsight,
+  NoteCardIconTag,
+} from './icons/NoteCardActionIcons';
 import './NoteCard.css';
 
 export default function NoteCard({
@@ -41,14 +47,12 @@ export default function NoteCard({
   hasReplies,
   /** When set, parent’s tags for inherit (stream). Omit to load parent tags via API when note has parent_id. */
   parentTagsForInherit,
-  /** Stream: single-click insight; double-click drills focus (nested rows use immediate focus, no animation) */
+  /** Stream/canvas/search: show insight action; insight panels use HoverInsightProvider */
   hoverInsightEnabled = false,
   hideStar = false,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
-  /** Second click of a double-click runs drill in `click` (detail===2); skip duplicate work in `dblclick`. */
-  const skipNextStreamDblClickDrillRef = useRef(false);
   const articleRef = useRef(null);
   const tagDropdownRef = useRef(null);
   const editFileInputRef = useRef(null);
@@ -351,84 +355,29 @@ export default function NoteCard({
     }
   };
 
-  const runStreamDrillOpen = useCallback(
-    (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+  /** Focus note in stream (same as previous double-click / drill). */
+  const handleFocusNote = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       hoverInsight?.clearInsightSelection?.();
-      onOpenThread?.(ev);
+      onOpenThread?.(e);
     },
     [hoverInsight, onOpenThread]
   );
 
-  /** Keep latest values for the native listener so we do not rebind on every parent re-render. */
-  const noteRef = useRef(note);
-  noteRef.current = note;
-  const hoverInsightRef = useRef(hoverInsight);
-  hoverInsightRef.current = hoverInsight;
-  const runStreamDrillOpenRef = useRef(runStreamDrillOpen);
-  runStreamDrillOpenRef.current = runStreamDrillOpen;
-
-  /**
-   * Stream insight: native **bubble** `click` on `<article>` so rich-text controls run first;
-   * then select / drill. Outside-dismiss uses **capture** on `document` + `composedPath()` (see
-   * HoverInsightContext) — `stopPropagation()` here only reduces noise to parents / React root.
-   */
-  useLayoutEffect(() => {
-    if (!hoverInsightEnabled || editing) return undefined;
-    const el = articleRef.current;
-    if (!el) return undefined;
-
-    const onArticleClick = (e) => {
-      if (e.type !== 'click') return;
-      const t = pointerEventTargetElement(e);
-      if (!t) return;
-      if (t.closest?.('.note-rich-task-checkbox')) return;
-      if (t.closest?.('a.note-rich-link')) return;
-      if (t.closest?.('button.note-rich-mention')) return;
-      if (t.closest?.('.note-card-actions')) return;
-      if (t.closest?.('.note-card-type-cycle-btn') || t.closest?.('.note-card-edit')) return;
-      if (t.closest?.('.note-card-tag-remove')) return;
-      if (t.closest?.('.note-attachment-item')) return;
-      if (e.detail === 2) {
-        skipNextStreamDblClickDrillRef.current = true;
-        runStreamDrillOpenRef.current(e);
-        e.stopPropagation();
-        return;
-      }
-      hoverInsightRef.current?.selectInsightNote?.(noteRef.current, el, depth);
+  const handleInsightClick = useCallback(
+    (e) => {
+      e.preventDefault();
       e.stopPropagation();
-    };
-
-    el.addEventListener('click', onArticleClick, false);
-    return () => el.removeEventListener('click', onArticleClick, false);
-  }, [hoverInsightEnabled, editing, depth]);
-
-  const handleCardClick = (ev) => {
-    if (editing) return;
-    const t = pointerEventTargetElement(ev);
-    if (t?.closest?.('.note-rich-task-checkbox')) return;
-    onOpenThread?.(ev);
-  };
-
-  const handleCardDoubleClick = (ev) => {
-    if (editing) return;
-    const t = pointerEventTargetElement(ev);
-    if (t?.closest?.('.note-rich-task-checkbox')) return;
-    if (hoverInsightEnabled) {
-      if (skipNextStreamDblClickDrillRef.current) {
-        skipNextStreamDblClickDrillRef.current = false;
-        ev.preventDefault();
-        ev.stopPropagation();
-        return;
-      }
-      runStreamDrillOpen(ev);
-      return;
-    }
-    ev.preventDefault();
-    ev.stopPropagation();
-    onOpenThread?.(ev);
-  };
+      const el = articleRef.current;
+      if (!el || note?.id == null) return;
+      const selectedId = hoverInsight?.hover?.note?.id;
+      if (selectedId != null && String(selectedId) === String(note.id)) return;
+      hoverInsight?.selectInsightNote?.(note, el, depth);
+    },
+    [hoverInsight, note, depth]
+  );
 
   const editTypeLabel =
     NOTE_TYPE_OPTIONS.find((o) => o.value === editNoteType)?.label ?? editNoteType;
@@ -442,17 +391,6 @@ export default function NoteCard({
   ]
     .filter(Boolean)
     .join(' ');
-
-  const streamTitle =
-    hoverInsightEnabled && !editing
-      ? depth > 0
-        ? `Click: tag & connection suggestions · Double-click to focus this note here${
-            hasConnections ? ` · ${connectionCount} linked note${connectionCount === 1 ? '' : 's'}` : ''
-          }`
-        : `Click: tag & connection suggestions · Double-click a reply to focus it here${
-            hasConnections ? ` · ${connectionCount} linked note${connectionCount === 1 ? '' : 's'}` : ''
-          }`
-      : undefined;
 
   const taskUpdateChainRef = useRef(Promise.resolve());
   const handleToggleTask = useCallback(
@@ -510,34 +448,6 @@ export default function NoteCard({
         borderLeftWidth: borderWidth,
         ...linkedBorderVars,
       }}
-      onClick={editing ? undefined : hoverInsightEnabled ? undefined : handleCardClick}
-      onDoubleClick={editing ? undefined : handleCardDoubleClick}
-      role={editing ? undefined : 'button'}
-      tabIndex={editing ? undefined : 0}
-      aria-pressed={hoverInsightEnabled && isInsightSelected ? true : undefined}
-      title={streamTitle}
-      onKeyDown={
-        editing
-          ? undefined
-          : (e) => {
-              if (!hoverInsightEnabled) {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  onOpenThread?.(e);
-                }
-                return;
-              }
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                hoverInsight?.clearInsightSelection?.();
-                onOpenThread?.(e);
-              }
-              if (e.key === ' ') {
-                e.preventDefault();
-                hoverInsight?.selectInsightNote?.(note, e.currentTarget, depth);
-              }
-            }
-      }
     >
       {editing ? (
         <button
@@ -637,9 +547,44 @@ export default function NoteCard({
           <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
               <>
-                <button type="button" className="note-card-btn" onClick={beginEdit}>Edit</button>
-                <button type="button" className="note-card-btn note-card-btn-delete" onClick={handleDelete}>
-                  Delete
+                <button
+                  type="button"
+                  className="note-card-icon-btn"
+                  onClick={handleFocusNote}
+                  title="Focus this note in Stream"
+                  aria-label="Focus this note in Stream"
+                >
+                  <NoteCardIconFocus className="note-card-icon-btn__svg" />
+                </button>
+                {hoverInsightEnabled ? (
+                  <button
+                    type="button"
+                    className={`note-card-icon-btn${isInsightSelected ? ' note-card-icon-btn--active' : ''}`}
+                    onClick={handleInsightClick}
+                    title="Tag and connection suggestions"
+                    aria-label="Tag and connection suggestions"
+                    aria-pressed={isInsightSelected ? true : undefined}
+                  >
+                    <NoteCardIconInsight className="note-card-icon-btn__svg" />
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="note-card-icon-btn"
+                  onClick={beginEdit}
+                  title="Edit"
+                  aria-label="Edit"
+                >
+                  <NoteCardIconEdit className="note-card-icon-btn__svg" />
+                </button>
+                <button
+                  type="button"
+                  className="note-card-icon-btn note-card-icon-btn--danger"
+                  onClick={handleDelete}
+                  title="Delete"
+                  aria-label="Delete"
+                >
+                  <NoteCardIconDelete className="note-card-icon-btn__svg" />
                 </button>
                 <div className="note-card-tag-add" ref={tagDropdownRef}>
                   {addingTag ? (
@@ -689,13 +634,15 @@ export default function NoteCard({
                   ) : null}
                   <button
                     type="button"
-                    className="note-card-tag-add-btn"
+                    className="note-card-icon-btn note-card-tag-add-btn"
                     onClick={openTagDropdown}
                     aria-expanded={addingTag}
                     aria-haspopup="listbox"
                     aria-controls={addingTag ? `note-tag-menu-${note.id}` : undefined}
+                    title="Add tag"
+                    aria-label="Add tag"
                   >
-                    + Tag
+                    <NoteCardIconTag className="note-card-icon-btn__svg" />
                   </button>
                 </div>
               </>

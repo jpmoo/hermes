@@ -23,7 +23,7 @@ import ConnectionNoteModal from './ConnectionNoteModal';
 import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
-import { insightPointerPathShouldKeepOpen } from './pointerEventUtils';
+import { insightPointerPathShouldKeepOpen, pointerEventTargetElement } from './pointerEventUtils';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -427,14 +427,14 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   }, [clearInsightSelection]);
 
   /**
-   * Single-click: show tag / connection UI for this note. Click again on the same note to dismiss.
+   * Single-click: show tag / connection UI for this note. Dismiss only via outside click (see
+   * `insightPointerPathShouldKeepOpen`) — not by clicking this note again.
    * @param {number} depth Stream depth (≥ 0 for insight-enabled cards).
    */
   const selectInsightNote = useCallback(
     (note, anchorEl, depth) => {
       if (depth < 0 || !note?.id || !anchorEl) return;
       if (noteIdSame(activeHoverId.current, note.id)) {
-        clearInsightSelection();
         return;
       }
       if (fetchTimer.current) clearTimeout(fetchTimer.current);
@@ -527,10 +527,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   );
 
   /**
-   * Outside dismiss: **capture** on `document` runs before the event reaches the note card, so we
-   * decide from `composedPath()` alone — no reliance on `stopPropagation()` from the card (fragile
-   * with React roots, extensions, retargeting). Clicks whose path includes `.note-card`, insight
-   * UI, compose, etc. return early; the bubble handler on `<article>` then runs `selectInsightNote`.
+   * Outside dismiss: **capture** on `document`. Only the selected card (`.note-card--insight-selected`),
+   * insight UI, and compose keep insight open — clicks on other notes dismiss first.
    */
   useEffect(() => {
     if (!hover?.note) return undefined;
@@ -541,6 +539,11 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       if (!hoverNoteRef.current) return;
       if (insightPointerPathShouldKeepOpen(e)) return;
       clearInsightSelection();
+      const t = pointerEventTargetElement(e);
+      const card = t?.closest?.('.note-card');
+      if (card && !card.classList.contains('note-card--insight-selected')) {
+        e.stopImmediatePropagation();
+      }
     };
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('click', onDocumentClickCapture, true);

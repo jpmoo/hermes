@@ -542,15 +542,6 @@
   position: relative;
 }
 
-.note-card-tag-add-btn {
-  padding: 0.2rem 0.4rem;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-
 .note-card-tag-add-btn:hover {
   color: var(--accent);
 }
@@ -640,8 +631,54 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0.35rem 0.5rem;
+  gap: 0.25rem 0.35rem;
   width: 100%;
+}
+
+/* Smaller than layout header nav icons (~2.35rem); themed via --text / --accent */
+.note-card-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.note-card-icon-btn:hover {
+  color: var(--text);
+  background: var(--bg-card-hover);
+}
+
+.note-card-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.note-card-icon-btn__svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.note-card-icon-btn--active {
+  color: var(--accent);
+}
+
+.note-card-icon-btn--active:hover {
+  color: var(--accent-dim);
+}
+
+.note-card-icon-btn--danger:hover {
+  color: var(--status-danger-text, #c44);
+  background: var(--status-danger-bg, rgba(160, 45, 45, 0.08));
 }
 
 .note-card-btn {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { getTags, searchByTags, searchSemantic, searchContent } from './api';
 import Layout from './Layout';
+import { HoverInsightProvider } from './HoverInsightContext';
 import NoteCard from './NoteCard';
 import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 import { filterNotesByVisibleNoteTypes } from './noteTypeFilter';
@@ -140,6 +141,15 @@ function SearchViewInner() {
   const hasQ = q.trim().length > 0;
 
   return (
+    <HoverInsightProvider
+      onNoteUpdated={refreshAfterNoteChange}
+      onGoToNote={({ noteId, threadRootId }) => {
+        navigate({
+          pathname: '/',
+          search: `?thread=${encodeURIComponent(threadRootId)}&focus=${encodeURIComponent(noteId)}`,
+        });
+      }}
+    >
     <div className="search-view">
         {searchError && (
           <p className="search-view-error" role="alert">
@@ -259,6 +269,7 @@ function SearchViewInner() {
                   note={n}
                   depth={0}
                   hasReplies={(n.reply_count ?? 0) > 0}
+                  hoverInsightEnabled
                   onOpenThread={() => {
                     const root = n.root_id || n.id;
                     const search =
@@ -293,6 +304,7 @@ function SearchViewInner() {
           </p>
         )}
       </div>
+    </HoverInsightProvider>
   );
 }
 
