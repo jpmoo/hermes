@@ -1,5 +1,8 @@
 /** Merge canvas layout for one thread/focus context into settings patch payload (stored as `campusLayouts` in settings JSON). */
 
+/** Phones use `viewMobile`; desktop and iPad use `view`. Match Stream/Hover insight breakpoint. */
+export const CANVAS_MOBILE_MEDIA_QUERY = '(max-width: 767px)';
+
 /** Settings key for Canvas at Stream root (no `thread=` in URL). */
 export const CANVAS_LAYOUT_STREAM_ROOT = '__stream_root__';
 
@@ -12,6 +15,37 @@ export function canvasLayoutThreadKey(threadRootId) {
   return threadRootId ? String(threadRootId) : CANVAS_LAYOUT_STREAM_ROOT;
 }
 
+/**
+ * Resolve pan/zoom (+ sequence lines) for the current viewport.
+ * Uses `view` for wide, `viewMobile` for narrow; if the active bucket has no saved zoom/pan, falls back to the other.
+ * Legacy layouts only have `view` — mobile will adopt it until a mobile-specific save exists.
+ */
+export function resolveCanvasView(block, isMobile) {
+  const wide = block?.view;
+  const mobile = block?.viewMobile;
+  const primary = isMobile ? mobile : wide;
+  const fallback = isMobile ? wide : mobile;
+
+  function pickPanZoom(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    const sc = obj.scale;
+    if (typeof sc !== 'number' || sc < 0.1 || sc > 10) return null;
+    return {
+      scale: sc,
+      tx: typeof obj.tx === 'number' ? obj.tx : 0,
+      ty: typeof obj.ty === 'number' ? obj.ty : 0,
+    };
+  }
+
+  const panZoom = pickPanZoom(primary) ?? pickPanZoom(fallback) ?? { scale: 1, tx: 0, ty: 0 };
+  const seqPrimary = primary?.showSequenceLines;
+  const seqFallback = fallback?.showSequenceLines;
+  const showSequenceLines =
+    seqPrimary !== undefined ? seqPrimary !== false : seqFallback !== undefined ? seqFallback !== false : true;
+
+  return { ...panZoom, showSequenceLines };
+}
+
 export function mergeCanvasLayoutPatch(prevLayouts, threadRootId, focusKey, partial) {
   const tid = String(threadRootId);
   const fk = String(focusKey);
@@ -21,7 +55,12 @@ export function mergeCanvasLayoutPatch(prevLayouts, threadRootId, focusKey, part
   const next = {
     ...cur,
     ...partial,
-    view: { ...(cur.view || {}), ...(partial.view || {}) },
+    view:
+      partial.view !== undefined ? { ...(cur.view || {}), ...partial.view } : cur.view || {},
+    viewMobile:
+      partial.viewMobile !== undefined
+        ? { ...(cur.viewMobile || {}), ...partial.viewMobile }
+        : cur.viewMobile || {},
     cards: { ...(cur.cards || {}), ...(partial.cards || {}) },
   };
   return {

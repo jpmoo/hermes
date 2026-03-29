@@ -65,7 +65,23 @@ function sanitizeNoteHistory(input) {
   return out;
 }
 
-/** Canvas layouts (stored as campusLayouts in settings_json): per-thread, per-focus view + card rects. */
+function sanitizeCanvasViewSlice(input) {
+  const view = {};
+  if (input && typeof input === 'object') {
+    const sc = Number(input.scale);
+    const tx = Number(input.tx);
+    const ty = Number(input.ty);
+    if (Number.isFinite(sc) && sc >= 0.08 && sc <= 12) view.scale = sc;
+    if (Number.isFinite(tx) && Math.abs(tx) < 5e6) view.tx = tx;
+    if (Number.isFinite(ty) && Math.abs(ty) < 5e6) view.ty = ty;
+    if (typeof input.showSequenceLines === 'boolean') {
+      view.showSequenceLines = input.showSequenceLines;
+    }
+  }
+  return view;
+}
+
+/** Canvas layouts (stored as campusLayouts in settings_json): per-thread, per-focus view(s) + card rects. */
 function sanitizeCampusLayouts(input) {
   if (input == null || typeof input !== 'object' || Array.isArray(input)) return {};
   const out = {};
@@ -78,18 +94,8 @@ function sanitizeCampusLayouts(input) {
       if (typeof fk !== 'string' || fk.length > 128) continue;
       const block = ctx[fk];
       if (!block || typeof block !== 'object') continue;
-      const view = {};
-      if (block.view && typeof block.view === 'object') {
-        const sc = Number(block.view.scale);
-        const tx = Number(block.view.tx);
-        const ty = Number(block.view.ty);
-        if (Number.isFinite(sc) && sc >= 0.08 && sc <= 12) view.scale = sc;
-        if (Number.isFinite(tx) && Math.abs(tx) < 5e6) view.tx = tx;
-        if (Number.isFinite(ty) && Math.abs(ty) < 5e6) view.ty = ty;
-        if (typeof block.view.showSequenceLines === 'boolean') {
-          view.showSequenceLines = block.view.showSequenceLines;
-        }
-      }
+      const view = sanitizeCanvasViewSlice(block.view);
+      const viewMobile = sanitizeCanvasViewSlice(block.viewMobile);
       const cards = {};
       if (block.cards && typeof block.cards === 'object' && !Array.isArray(block.cards)) {
         let n = 0;
@@ -107,7 +113,7 @@ function sanitizeCampusLayouts(input) {
           cards[nid] = { x, y, w, h };
         }
       }
-      out[tid][fk] = { view, cards };
+      out[tid][fk] = { view, viewMobile, cards };
     }
   }
   return out;

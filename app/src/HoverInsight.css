@@ -952,3 +952,152 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Full-screen insight sheet (phones ≤767px); iPad uses fixed side panels */
+.hover-insight-mobile-root {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.hover-insight-mobile-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hover-insight-mobile-sheet {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0;
+  background: var(--bg);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.hover-insight-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.hover-insight-mobile-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.hover-insight-mobile-close {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.hover-insight-mobile-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  padding: 0.35rem 0.5rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  scrollbar-width: none;
+}
+
+.hover-insight-mobile-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.hover-insight-mobile-tab {
+  flex: 1 1 0;
+  min-width: min-content;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hover-insight-mobile-tab:hover {
+  color: var(--text);
+}
+
+.hover-insight-mobile-tab--active {
+  color: var(--text);
+  background: var(--bg);
+  box-shadow: 0 -1px 0 0 var(--border);
+}
+
+.hover-insight-mobile-tab-panel[hidden] {
+  display: none !important;
+}
+
+.hover-insight-mobile-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.65rem 0.75rem 1rem;
+  box-sizing: border-box;
+}
+
+.hover-insight-mobile-section {
+  margin-bottom: 0.85rem;
+}
+
+.hover-insight-mobile-section:last-child {
+  margin-bottom: 0;
+}
+
+.hover-insight-mobile-sheet .hover-insight-panel {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+}
+
+.hover-insight-mobile-connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+

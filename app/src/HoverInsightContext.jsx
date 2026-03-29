@@ -24,6 +24,8 @@ import NoteRichText from './NoteRichText';
 import NoteTypeIcon from './NoteTypeIcon';
 import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
 import { insightPointerPathShouldKeepOpen, pointerEventTargetElement } from './pointerEventUtils';
+import { useMediaQuery } from './useMediaQuery';
+import HoverInsightMobileSheet from './HoverInsightMobileSheet';
 import './HoverInsight.css';
 
 const CONFIRM_UNLINK =
@@ -795,6 +797,7 @@ function HoverInsightPanels() {
     navigateToConnection,
     openNoteFromRichText,
     connectSimilarNote,
+    clearInsightSelection,
     insightAnchorRef,
     ragdollEnabled,
     ragdollLoading,
@@ -810,6 +813,8 @@ function HoverInsightPanels() {
     setRagdollIncludeConnected,
     onNoteUpdated,
   } = ctx;
+
+  const isNarrowStream = useMediaQuery('(max-width: 767px)');
 
   const openRagdollDoc = useCallback(async (sourcePath, label) => {
     try {
@@ -861,6 +866,15 @@ function HoverInsightPanels() {
       /* ignore */
     }
   }, [similarVisibleTypes]);
+
+  useEffect(() => {
+    if (!hover?.note || !isNarrowStream) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [hover?.note, isNarrowStream]);
 
   useEffect(() => {
     if (!hover?.note) return undefined;
@@ -994,7 +1008,49 @@ function HoverInsightPanels() {
 
   return (
     <>
-      {hover && rect && (
+      {hover && isNarrowStream && note && (
+        <HoverInsightMobileSheet
+          onClose={clearInsightSelection}
+          note={note}
+          loading={loading}
+          tags={tags}
+          neighborTags={neighborTags}
+          connectedTags={connectedTags}
+          novelTags={novelTags}
+          addTag={addTag}
+          addingKey={addingKey}
+          ragdollEnabled={ragdollEnabled}
+          ragdollLoading={ragdollLoading}
+          ragdollDocs={ragdollDocs}
+          ragdollError={ragdollError}
+          ragdollByCollection={ragdollByCollection}
+          openRagdollDoc={openRagdollDoc}
+          ragdollIncludeParent={ragdollIncludeParent}
+          setRagdollIncludeParent={setRagdollIncludeParent}
+          ragdollIncludeSiblings={ragdollIncludeSiblings}
+          setRagdollIncludeSiblings={setRagdollIncludeSiblings}
+          ragdollIncludeChildren={ragdollIncludeChildren}
+          setRagdollIncludeChildren={setRagdollIncludeChildren}
+          ragdollIncludeConnected={ragdollIncludeConnected}
+          setRagdollIncludeConnected={setRagdollIncludeConnected}
+          similarMinPct={similarMinPct}
+          setSimilarMinPct={setSimilarMinPct}
+          similarVisibleTypes={similarVisibleTypes}
+          toggleSimilarVisibleNoteType={toggleSimilarVisibleNoteType}
+          similarNotes={similarNotes}
+          filteredSimilarNotes={filteredSimilarNotes}
+          similarNotesAfterSimilarity={similarNotesAfterSimilarity}
+          insight={insight}
+          connectSimilarNote={connectSimilarNote}
+          openNoteFromRichText={openNoteFromRichText}
+          connectionStackPeers={connectionStackPeers}
+          persistedIdSet={persistedIdSet}
+          setConnectionModal={setConnectionModal}
+          unlinkPersisted={unlinkPersisted}
+        />
+      )}
+
+      {hover && rect && !isNarrowStream && (
         <>
           <div
             className={`hover-insight-margin hover-insight-margin--left ${ragdollEnabled ? 'hover-insight-margin--left-with-ragdoll' : ''}`}
@@ -1270,7 +1326,7 @@ function HoverInsightPanels() {
         </>
       )}
 
-      {hover && rect && connectionStackPeers.length > 0 && connectionLayout && note && (
+      {hover && rect && !isNarrowStream && connectionStackPeers.length > 0 && connectionLayout && note && (
         <>
         <div
           className="hover-insight-connection-stack"

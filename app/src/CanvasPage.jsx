@@ -27,11 +27,14 @@ import NoteTypeIcon from './NoteTypeIcon';
 import { eventFieldsToPayload, NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
+  CANVAS_MOBILE_MEDIA_QUERY,
   canvasFocusKey,
   canvasLayoutThreadKey,
   mergeCanvasLayoutPatch,
   replaceCanvasLayoutFocusBlock,
+  resolveCanvasView,
 } from './canvasLayoutApi';
+import { useMediaQuery } from './useMediaQuery';
 import {
   NavIconAttach,
   NavIconHistory,
@@ -397,7 +400,9 @@ export default function CanvasPage() {
   /** Avoid repeated fit while saved layout is still empty (e.g. before first save completes). */
   const fitAppliedForEmptyRef = useRef(false);
   const canvasViewKeyRef = useRef('');
+  const isCanvasMobileViewportRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
+  const isCanvasMobileViewport = useMediaQuery(CANVAS_MOBILE_MEDIA_QUERY);
 
   useEffect(() => {
     setLastStreamSearchFromParams(searchParams);
@@ -665,18 +670,12 @@ export default function CanvasPage() {
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
-    const v = block?.view;
-    const hasView = v && typeof v === 'object';
-    const nextScale =
-      hasView && typeof v.scale === 'number' && v.scale >= 0.1 && v.scale <= 10 ? v.scale : 1;
-    const nextTx = hasView && typeof v.tx === 'number' ? v.tx : 0;
-    const nextTy = hasView && typeof v.ty === 'number' ? v.ty : 0;
-    const nextSeq = !hasView || v.showSequenceLines !== false;
-    setScale(nextScale);
-    setTx(nextTx);
-    setTy(nextTy);
-    setShowSequenceLines(nextSeq);
-  }, [layoutStorageKey, fk, canvasLayouts]);
+    const v = resolveCanvasView(block, isCanvasMobileViewport);
+    setScale(v.scale);
+    setTx(v.tx);
+    setTy(v.ty);
+    setShowSequenceLines(v.showSequenceLines);
+  }, [layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
 
   const persistCanvasLayoutNow = useCallback(async () => {
     if (saveTimerRef.current) {
@@ -686,15 +685,24 @@ export default function CanvasPage() {
     const tid = layoutStorageKeyRef.current;
     const focusKey = fkRef.current;
     const cards = { ...cardRectsRef.current };
-    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, {
-      view: {
-        scale: scaleRef.current,
-        tx: txRef.current,
-        ty: tyRef.current,
-        showSequenceLines: showSequenceLinesRef.current,
-      },
-      cards,
-    });
+    const curRaw = canvasLayoutsRef.current[tid]?.[focusKey];
+    const curBlock = curRaw && typeof curRaw === 'object' ? curRaw : {};
+    const pos = {
+      scale: scaleRef.current,
+      tx: txRef.current,
+      ty: tyRef.current,
+      showSequenceLines: showSequenceLinesRef.current,
+    };
+    const mobile = isCanvasMobileViewportRef.current;
+    const partial = { cards };
+    if (mobile) {
+      partial.viewMobile = pos;
+      partial.view = { ...(curBlock.view || {}), showSequenceLines: pos.showSequenceLines };
+    } else {
+      partial.view = pos;
+      partial.viewMobile = { ...(curBlock.viewMobile || {}), showSequenceLines: pos.showSequenceLines };
+    }
+    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
       await patchUserSettings({ campusLayouts: patchLayouts });
       setCanvasLayouts(patchLayouts);
@@ -730,6 +738,7 @@ export default function CanvasPage() {
   scaleRef.current = scale;
   txRef.current = tx;
   tyRef.current = ty;
+  isCanvasMobileViewportRef.current = isCanvasMobileViewport;
   scheduleSaveRef.current = scheduleSave;
 
   useEffect(() => {
@@ -1021,15 +1030,23 @@ export default function CanvasPage() {
     const next = !prev;
     setShowSequenceLines(next);
     showSequenceLinesRef.current = next;
-    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, {
-      view: {
-        scale: scaleRef.current,
-        tx: txRef.current,
-        ty: tyRef.current,
-        showSequenceLines: next,
-      },
-      cards: { ...cardRectsRef.current },
-    });
+    const curBlock = canvasLayoutsRef.current[tid]?.[focusKey];
+    const cur = curBlock && typeof curBlock === 'object' ? curBlock : {};
+    const pos = {
+      scale: scaleRef.current,
+      tx: txRef.current,
+      ty: tyRef.current,
+      showSequenceLines: next,
+    };
+    const partial = { cards: { ...cardRectsRef.current } };
+    if (isCanvasMobileViewport) {
+      partial.viewMobile = pos;
+      partial.view = { ...(cur.view || {}), showSequenceLines: next };
+    } else {
+      partial.view = pos;
+      partial.viewMobile = { ...(cur.viewMobile || {}), showSequenceLines: next };
+    }
+    const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
       await patchUserSettings({ campusLayouts: patchLayouts });
       setCanvasLayouts(patchLayouts);
@@ -1038,7 +1055,7 @@ export default function CanvasPage() {
       setShowSequenceLines(prev);
       showSequenceLinesRef.current = prev;
     }
-  }, [layoutStorageKey, fk]);
+  }, [layoutStorageKey, fk, isCanvasMobileViewport]);
 
   const resetCanvasLayout = useCallback(async () => {
     if (
@@ -1056,6 +1073,7 @@ export default function CanvasPage() {
     }
     const emptyBlock = {
       view: { scale: 1, tx: 0, ty: 0, showSequenceLines: true },
+      viewMobile: { scale: 1, tx: 0, ty: 0, showSequenceLines: true },
       cards: {},
     };
     const patchLayouts = replaceCanvasLayoutFocusBlock(
