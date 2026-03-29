@@ -189,6 +189,10 @@
   flex-shrink: 0;
 }
 
+.canvas-starred-dock-toggle:hover {
+  color: var(--text);
+}
+
 .canvas-starred-dock-toggle:focus-visible {
   outline: 2px solid var(--accent-dim);
   outline-offset: 2px;
@@ -219,6 +223,11 @@
   font-size: 0.65rem;
   color: var(--text-muted);
   line-height: 1;
+}
+
+/* Author `display: flex` must not beat the HTML hidden="" presentational hint (desktop broke collapse). */
+.canvas-starred-dock-body[hidden] {
+  display: none !important;
 }
 
 .canvas-starred-dock-body {
