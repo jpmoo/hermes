@@ -358,14 +358,28 @@ export default function NoteCard({
   };
 
   /** Focus note in stream (same as previous double-click / drill). */
+  const focusNoteInStream = useCallback(() => {
+    hoverInsight?.clearInsightSelection?.();
+    onOpenThread?.();
+  }, [hoverInsight, onOpenThread]);
+
   const handleFocusNote = useCallback(
     (e) => {
       e.preventDefault();
       e.stopPropagation();
-      hoverInsight?.clearInsightSelection?.();
-      onOpenThread?.(e);
+      focusNoteInStream();
     },
-    [hoverInsight, onOpenThread]
+    [focusNoteInStream]
+  );
+
+  const handleNoteDoubleClick = useCallback(
+    (e) => {
+      if (!showFocusButton || editing) return;
+      e.preventDefault();
+      e.stopPropagation();
+      focusNoteInStream();
+    },
+    [showFocusButton, editing, focusNoteInStream]
   );
 
   const handleInsightClick = useCallback(
@@ -520,7 +534,10 @@ export default function NoteCard({
           </form>
         ) : (
           <>
-            <div className="note-card-content">
+            <div
+              className="note-card-content"
+              onDoubleClick={showFocusButton && !editing ? handleNoteDoubleClick : undefined}
+            >
               {renderedContent?.trim() ? (
                 <NoteRichText
                   text={renderedContent}
