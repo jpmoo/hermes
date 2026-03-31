@@ -56,6 +56,7 @@ export default function NoteCard({
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
   const articleRef = useRef(null);
+  const dblLaunchAtRef = useRef(0);
   const tagDropdownRef = useRef(null);
   const editFileInputRef = useRef(null);
   const [editing, setEditing] = useState(false);
@@ -391,6 +392,17 @@ export default function NoteCard({
     [showFocusButton, editing, focusNoteInStream]
   );
 
+  const handleNoteClickCapture = useCallback(
+    (e) => {
+      if (e.detail < 2) return;
+      const now = Date.now();
+      if (now - dblLaunchAtRef.current < 250) return;
+      dblLaunchAtRef.current = now;
+      handleNoteDoubleClick(e);
+    },
+    [handleNoteDoubleClick]
+  );
+
   const handleInsightClick = useCallback(
     (e) => {
       e.preventDefault();
@@ -474,6 +486,7 @@ export default function NoteCard({
         ...linkedBorderVars,
       }}
       onDoubleClickCapture={showFocusButton && !editing ? handleNoteDoubleClick : undefined}
+      onClickCapture={showFocusButton && !editing ? handleNoteClickCapture : undefined}
     >
       {editing ? (
         <button
