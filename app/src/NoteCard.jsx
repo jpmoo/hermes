@@ -473,7 +473,7 @@ export default function NoteCard({
         borderLeftWidth: borderWidth,
         ...linkedBorderVars,
       }}
-      onDoubleClick={showFocusButton && !editing ? handleNoteDoubleClick : undefined}
+      onDoubleClickCapture={showFocusButton && !editing ? handleNoteDoubleClick : undefined}
     >
       {editing ? (
         <button
