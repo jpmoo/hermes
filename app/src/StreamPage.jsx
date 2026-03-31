@@ -1330,6 +1330,7 @@ export default function StreamPage() {
                   onChange={setReplyContent}
                   rows={2}
                   disabled={submitting}
+                  allowMentionCreate
                   mentionCreateParentId={replyParentId}
                 />
               </div>
@@ -1399,6 +1400,8 @@ export default function StreamPage() {
                   onChange={setNewRootContent}
                   rows={2}
                   disabled={submitting}
+                  allowMentionCreate
+                  mentionCreateParentId={null}
                 />
               </div>
               <NoteTypeEventFields

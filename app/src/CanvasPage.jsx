@@ -1831,6 +1831,7 @@ export default function CanvasPage() {
                       onChange={setReplyContent}
                       rows={2}
                       disabled={submitting}
+                      allowMentionCreate
                       mentionCreateParentId={replyParentId}
                     />
                   </div>
@@ -1900,6 +1901,8 @@ export default function CanvasPage() {
                       onChange={setNewRootContent}
                       rows={2}
                       disabled={submitting}
+                      allowMentionCreate
+                      mentionCreateParentId={null}
                     />
                   </div>
                   <NoteTypeEventFields

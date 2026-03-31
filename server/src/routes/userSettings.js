@@ -10,6 +10,7 @@ const router = Router();
 
 const NOTE_TYPES = ['note', 'event', 'person', 'organization'];
 const NOTE_HISTORY_MAX = 20;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeHex(v) {
   if (typeof v !== 'string') return null;
@@ -63,6 +64,14 @@ function sanitizeNoteHistory(input) {
     if (out.length >= NOTE_HISTORY_MAX) break;
   }
   return out;
+}
+
+function sanitizeInboxThreadRootId(input) {
+  if (input == null) return undefined;
+  if (typeof input !== 'string') return undefined;
+  const v = input.trim();
+  if (!v) return null;
+  return UUID_RE.test(v) ? v : undefined;
 }
 
 function sanitizeCanvasViewSlice(input) {
@@ -146,6 +155,7 @@ router.get('/settings', requireAuth, async (req, res) => {
     const noteHistory = sanitizeNoteHistory(raw.noteHistory);
     const similarLimitResults = raw.similarNotesLimitResultsToMinChars === true;
     const campusLayouts = sanitizeCampusLayouts(raw.campusLayouts);
+    const inboxThreadRootId = sanitizeInboxThreadRootId(raw.inboxThreadRootId);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
@@ -153,6 +163,7 @@ router.get('/settings', requireAuth, async (req, res) => {
       similarNotesLimitResultsToMinChars: similarLimitResults,
       noteHistory,
       campusLayouts,
+      inboxThreadRootId: inboxThreadRootId === undefined ? null : inboxThreadRootId,
     });
   } catch (err) {
     console.error(err);
@@ -168,6 +179,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       similarNotesLimitResultsToMinChars,
       noteHistory,
       campusLayouts,
+      inboxThreadRootId,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -228,6 +240,29 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (inboxThreadRootId !== undefined) {
+      if (inboxThreadRootId === null) {
+        delete cur.inboxThreadRootId;
+      } else {
+        const cleanedInbox = sanitizeInboxThreadRootId(inboxThreadRootId);
+        if (cleanedInbox === undefined) {
+          return res.status(400).json({ error: 'inboxThreadRootId must be a UUID string or null' });
+        }
+        if (cleanedInbox === null) {
+          delete cur.inboxThreadRootId;
+        } else {
+          const rootCheck = await pool.query(
+            'SELECT 1 FROM notes WHERE id = $1 AND user_id = $2 AND parent_id IS NULL',
+            [cleanedInbox, req.userId]
+          );
+          if (rootCheck.rows.length === 0) {
+            return res.status(400).json({ error: 'inboxThreadRootId must reference one of your root threads' });
+          }
+          cur.inboxThreadRootId = cleanedInbox;
+        }
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -237,6 +272,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outHistory = sanitizeNoteHistory(cur.noteHistory);
     const outLimitResults = cur.similarNotesLimitResultsToMinChars === true;
     const outCampus = sanitizeCampusLayouts(cur.campusLayouts);
+    const outInbox = sanitizeInboxThreadRootId(cur.inboxThreadRootId);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
@@ -244,6 +280,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       similarNotesLimitResultsToMinChars: outLimitResults,
       noteHistory: outHistory,
       campusLayouts: outCampus,
+      inboxThreadRootId: outInbox === undefined ? null : outInbox,
     });
   } catch (err) {
     console.error(err);

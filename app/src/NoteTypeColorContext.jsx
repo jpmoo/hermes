@@ -27,11 +27,14 @@ export function NoteTypeColorProvider({ children }) {
   const [similarNotesMinChars, setSimilarNotesMinChars] = useState(null);
   const [similarNotesLimitResultsToMinChars, setSimilarNotesLimitResultsToMinChars] = useState(false);
   const [similarNotesMinDefault, setSimilarNotesMinDefault] = useState(48);
+  const [inboxThreadRootId, setInboxThreadRootId] = useState('');
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
   const skipSimilarNotesSave = useRef(false);
+  const skipInboxSave = useRef(false);
   const saveTimer = useRef(null);
   const similarSaveTimer = useRef(null);
+  const inboxSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
 
   /* Load from server when logged in (canonical); seed server from this device if account has none yet. */
@@ -58,10 +61,12 @@ export function NoteTypeColorProvider({ children }) {
             : null
         );
         setSimilarNotesLimitResultsToMinChars(data.similarNotesLimitResultsToMinChars === true);
+        setInboxThreadRootId(typeof data.inboxThreadRootId === 'string' ? data.inboxThreadRootId : '');
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
           skipSimilarNotesSave.current = true;
+          skipInboxSave.current = true;
           try {
             await patchUserSettings({ noteTypeColors: local });
           } catch (e) {
@@ -71,11 +76,13 @@ export function NoteTypeColorProvider({ children }) {
           setColors(serverParsed);
           skipNoteTypeColorsSave.current = true;
           skipSimilarNotesSave.current = true;
+          skipInboxSave.current = true;
         }
       } catch (e) {
         console.error(e);
         skipNoteTypeColorsSave.current = true;
         skipSimilarNotesSave.current = true;
+        skipInboxSave.current = true;
       } finally {
         if (!cancelled) setServerReady(true);
       }
@@ -93,8 +100,10 @@ export function NoteTypeColorProvider({ children }) {
       setColors({});
       setSimilarNotesMinChars(null);
       setSimilarNotesLimitResultsToMinChars(false);
+      setInboxThreadRootId('');
       skipNoteTypeColorsSave.current = true;
       skipSimilarNotesSave.current = true;
+      skipInboxSave.current = true;
     }
   }, [user]);
 
@@ -139,6 +148,22 @@ export function NoteTypeColorProvider({ children }) {
     };
   }, [similarNotesMinChars, similarNotesLimitResultsToMinChars, user?.id, serverReady]);
 
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipInboxSave.current) {
+      skipInboxSave.current = false;
+      return;
+    }
+    if (inboxSaveTimer.current) clearTimeout(inboxSaveTimer.current);
+    inboxSaveTimer.current = setTimeout(() => {
+      inboxSaveTimer.current = null;
+      patchUserSettings({ inboxThreadRootId: inboxThreadRootId || null }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (inboxSaveTimer.current) clearTimeout(inboxSaveTimer.current);
+    };
+  }, [inboxThreadRootId, user?.id, serverReady]);
+
   const setTypeColor = useCallback((type, hexOrNull) => {
     if (!NOTE_TYPE_COLOR_KEYS.includes(type)) return;
     setColors((prev) => {
@@ -172,6 +197,14 @@ export function NoteTypeColorProvider({ children }) {
     setSimilarNotesLimitResultsToMinChars(Boolean(on));
   }, []);
 
+  const setInboxThreadRootIdSetting = useCallback((id) => {
+    if (typeof id !== 'string') {
+      setInboxThreadRootId('');
+      return;
+    }
+    setInboxThreadRootId(id.trim());
+  }, []);
+
   const value = useMemo(
     () => ({
       colors,
@@ -182,6 +215,8 @@ export function NoteTypeColorProvider({ children }) {
       similarNotesMinDefault,
       setSimilarNotesMinChars: setSimilarNotesMinCharsSetting,
       setSimilarNotesLimitResultsToMinChars: setSimilarNotesLimitResultsSetting,
+      inboxThreadRootId,
+      setInboxThreadRootId: setInboxThreadRootIdSetting,
     }),
     [
       colors,
@@ -192,6 +227,8 @@ export function NoteTypeColorProvider({ children }) {
       similarNotesMinDefault,
       setSimilarNotesMinCharsSetting,
       setSimilarNotesLimitResultsSetting,
+      inboxThreadRootId,
+      setInboxThreadRootIdSetting,
     ]
   );
 

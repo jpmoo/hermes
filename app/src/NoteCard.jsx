@@ -474,6 +474,8 @@ export default function NoteCard({
               rows={3}
               className="note-card-edit-textarea"
               autoFocus
+              allowMentionCreate
+              mentionCreateParentId={note.parent_id ?? null}
             />
             <NoteTypeEventFields
               idPrefix={`edit-${note.id}`}

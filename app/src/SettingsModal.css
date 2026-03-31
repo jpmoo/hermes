@@ -160,6 +160,25 @@
   font-size: 0.8rem;
 }
 
+.settings-modal-inbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.settings-modal-inbox-select {
+  min-width: 13rem;
+  max-width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
 .settings-modal-similar-notes-checkbox-row {
   display: flex;
   align-items: flex-start;

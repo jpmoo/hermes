@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { NOTE_TYPE_COLOR_DEFAULTS } from './noteTypeColorSettings';
 import { useNoteTypeColors } from './NoteTypeColorContext';
+import { getRoots } from './api';
 import './SettingsModal.css';
 
 export default function SettingsModal({ onClose }) {
@@ -14,7 +15,10 @@ export default function SettingsModal({ onClose }) {
     similarNotesMinDefault,
     setSimilarNotesMinChars,
     setSimilarNotesLimitResultsToMinChars,
+    inboxThreadRootId,
+    setInboxThreadRootId,
   } = useNoteTypeColors();
+  const [rootThreads, setRootThreads] = useState([]);
 
   const effectiveSimilarMin =
     similarNotesMinChars != null ? similarNotesMinChars : similarNotesMinDefault;
@@ -26,6 +30,26 @@ export default function SettingsModal({ onClose }) {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const roots = await getRoots(false);
+        if (!cancelled) setRootThreads(Array.isArray(roots) ? roots : []);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setRootThreads([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const inboxValue = typeof inboxThreadRootId === 'string' ? inboxThreadRootId : '';
+  const hasInboxValue = inboxValue.length > 0;
+  const inboxExistsInRoots = hasInboxValue && rootThreads.some((n) => n.id === inboxValue);
 
   return (
     <div
@@ -158,6 +182,53 @@ export default function SettingsModal({ onClose }) {
                 ? ' Matches are not filtered by length unless the checkbox is on.'
                 : ' With minimum 0, the checkbox has no effect.'}
           </p>
+        </section>
+
+        <section className="settings-modal-section" aria-labelledby="settings-inbox-thread-heading">
+          <h3 id="settings-inbox-thread-heading" className="settings-modal-section-title">
+            Inbox thread for new @ notes
+          </h3>
+          <p className="settings-modal-section-lead">
+            Choose a root thread where auto-created notes from @ mention links should land. Leave blank to keep
+            creating them as replies at the current thread level.
+          </p>
+          <div className="settings-modal-inbox-row">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-inbox-thread-select">
+              Inbox root thread
+            </label>
+            <select
+              id="settings-inbox-thread-select"
+              className="settings-modal-inbox-select"
+              value={inboxExistsInRoots ? inboxValue : hasInboxValue ? '__custom__' : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '' || v === '__custom__') return;
+                setInboxThreadRootId(v);
+              }}
+            >
+              <option value="">(none)</option>
+              {rootThreads.map((n) => {
+                const label =
+                  (n.content || '').split(/\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 72) || 'Untitled thread';
+                return (
+                  <option key={n.id} value={n.id}>
+                    {label}
+                  </option>
+                );
+              })}
+              {!inboxExistsInRoots && hasInboxValue && (
+                <option value="__custom__">Current value is not in root threads list</option>
+              )}
+            </select>
+            <button
+              type="button"
+              className="settings-modal-type-color-reset"
+              disabled={!hasInboxValue}
+              onClick={() => setInboxThreadRootId('')}
+            >
+              Clear
+            </button>
+          </div>
         </section>
 
         <div className="settings-modal-actions">
