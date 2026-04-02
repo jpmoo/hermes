@@ -28,13 +28,17 @@ export function NoteTypeColorProvider({ children }) {
   const [similarNotesLimitResultsToMinChars, setSimilarNotesLimitResultsToMinChars] = useState(false);
   const [similarNotesMinDefault, setSimilarNotesMinDefault] = useState(48);
   const [inboxThreadRootId, setInboxThreadRootId] = useState('');
+  const [spaztickApiUrl, setSpaztickApiUrl] = useState('');
+  const [spaztickApiKeySet, setSpaztickApiKeySet] = useState(false);
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
   const skipSimilarNotesSave = useRef(false);
   const skipInboxSave = useRef(false);
+  const skipSpaztickSave = useRef(false);
   const saveTimer = useRef(null);
   const similarSaveTimer = useRef(null);
   const inboxSaveTimer = useRef(null);
+  const spaztickSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
 
   /* Load from server when logged in (canonical); seed server from this device if account has none yet. */
@@ -62,11 +66,14 @@ export function NoteTypeColorProvider({ children }) {
         );
         setSimilarNotesLimitResultsToMinChars(data.similarNotesLimitResultsToMinChars === true);
         setInboxThreadRootId(typeof data.inboxThreadRootId === 'string' ? data.inboxThreadRootId : '');
+        setSpaztickApiUrl(typeof data.spaztickApiUrl === 'string' ? data.spaztickApiUrl : '');
+        setSpaztickApiKeySet(data.spaztickApiKeySet === true);
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
           skipSimilarNotesSave.current = true;
           skipInboxSave.current = true;
+          skipSpaztickSave.current = true;
           try {
             await patchUserSettings({ noteTypeColors: local });
           } catch (e) {
@@ -77,12 +84,14 @@ export function NoteTypeColorProvider({ children }) {
           skipNoteTypeColorsSave.current = true;
           skipSimilarNotesSave.current = true;
           skipInboxSave.current = true;
+          skipSpaztickSave.current = true;
         }
       } catch (e) {
         console.error(e);
         skipNoteTypeColorsSave.current = true;
         skipSimilarNotesSave.current = true;
         skipInboxSave.current = true;
+        skipSpaztickSave.current = true;
       } finally {
         if (!cancelled) setServerReady(true);
       }
@@ -101,9 +110,12 @@ export function NoteTypeColorProvider({ children }) {
       setSimilarNotesMinChars(null);
       setSimilarNotesLimitResultsToMinChars(false);
       setInboxThreadRootId('');
+      setSpaztickApiUrl('');
+      setSpaztickApiKeySet(false);
       skipNoteTypeColorsSave.current = true;
       skipSimilarNotesSave.current = true;
       skipInboxSave.current = true;
+      skipSpaztickSave.current = true;
     }
   }, [user]);
 
@@ -164,6 +176,22 @@ export function NoteTypeColorProvider({ children }) {
     };
   }, [inboxThreadRootId, user?.id, serverReady]);
 
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipSpaztickSave.current) {
+      skipSpaztickSave.current = false;
+      return;
+    }
+    if (spaztickSaveTimer.current) clearTimeout(spaztickSaveTimer.current);
+    spaztickSaveTimer.current = setTimeout(() => {
+      spaztickSaveTimer.current = null;
+      patchUserSettings({ spaztickApiUrl: spaztickApiUrl.trim() || null }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (spaztickSaveTimer.current) clearTimeout(spaztickSaveTimer.current);
+    };
+  }, [spaztickApiUrl, user?.id, serverReady]);
+
   const setTypeColor = useCallback((type, hexOrNull) => {
     if (!NOTE_TYPE_COLOR_KEYS.includes(type)) return;
     setColors((prev) => {
@@ -205,6 +233,26 @@ export function NoteTypeColorProvider({ children }) {
     setInboxThreadRootId(id.trim());
   }, []);
 
+  const setSpaztickApiUrlSetting = useCallback((url) => {
+    if (typeof url !== 'string') {
+      setSpaztickApiUrl('');
+      return;
+    }
+    setSpaztickApiUrl(url.trim());
+  }, []);
+
+  const saveSpaztickApiKey = useCallback(async (secretOrNull) => {
+    const data = await patchUserSettings({
+      spaztickApiKey: secretOrNull == null || secretOrNull === '' ? null : String(secretOrNull),
+    });
+    setSpaztickApiKeySet(data.spaztickApiKeySet === true);
+    if (typeof data.spaztickApiUrl === 'string') setSpaztickApiUrl(data.spaztickApiUrl);
+    skipSpaztickSave.current = true;
+  }, []);
+
+  const spaztickReady =
+    Boolean(spaztickApiUrl?.trim()) && spaztickApiKeySet;
+
   const value = useMemo(
     () => ({
       colors,
@@ -217,6 +265,11 @@ export function NoteTypeColorProvider({ children }) {
       setSimilarNotesLimitResultsToMinChars: setSimilarNotesLimitResultsSetting,
       inboxThreadRootId,
       setInboxThreadRootId: setInboxThreadRootIdSetting,
+      spaztickApiUrl,
+      setSpaztickApiUrl: setSpaztickApiUrlSetting,
+      spaztickApiKeySet,
+      saveSpaztickApiKey,
+      spaztickReady,
     }),
     [
       colors,
@@ -229,6 +282,11 @@ export function NoteTypeColorProvider({ children }) {
       setSimilarNotesLimitResultsSetting,
       inboxThreadRootId,
       setInboxThreadRootIdSetting,
+      spaztickApiUrl,
+      setSpaztickApiUrlSetting,
+      spaztickApiKeySet,
+      saveSpaztickApiKey,
+      spaztickReady,
     ]
   );
 

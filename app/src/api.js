@@ -369,4 +369,19 @@ export async function patchUserSettings(patch) {
   return data;
 }
 
+/** Create a Spaztick task from a Hermes note (server uses Ollama for title). Requires Spaztick URL + key in Settings. */
+export async function createSpaztickTaskFromNote(noteId) {
+  const r = await fetch(`${API}/notes/${noteId}/spaztick-task`, {
+    method: 'POST',
+    headers: headers(),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const err = new Error(data.error || 'Failed to create Spaztick task');
+    err.code = data.code;
+    throw err;
+  }
+  return data;
+}
+
 export { getToken };

@@ -12,6 +12,7 @@ import {
   deleteNoteFile,
   uploadNoteFiles,
   getNoteThreadRoot,
+  createSpaztickTaskFromNote,
 } from './api';
 import NoteRichText, { toggleTaskMarkerAtIndex } from './NoteRichText';
 import NoteAttachments from './NoteAttachments';
@@ -26,6 +27,7 @@ import {
 import { stripHashtagPrefixFromContent } from './noteBodyUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { useHoverInsight } from './HoverInsightContext';
+import { useNoteTypeColors } from './NoteTypeColorContext';
 import NoteTypeIcon from './NoteTypeIcon';
 import { NavIconAttach } from './icons/NavIcons';
 import {
@@ -34,6 +36,7 @@ import {
   NoteCardIconFocus,
   NoteCardIconInsight,
   NoteCardIconTag,
+  NoteCardIconSpaztick,
 } from './icons/NoteCardActionIcons';
 import './NoteCard.css';
 
@@ -55,6 +58,7 @@ export default function NoteCard({
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
+  const { spaztickReady } = useNoteTypeColors();
   const articleRef = useRef(null);
   const dblLaunchAtRef = useRef(0);
   const tagDropdownRef = useRef(null);
@@ -73,6 +77,7 @@ export default function NoteCard({
   const [newTagName, setNewTagName] = useState('');
   const [dropdownParentTags, setDropdownParentTags] = useState([]);
   const [inheritLoading, setInheritLoading] = useState(false);
+  const [spaztickBusy, setSpaztickBusy] = useState(false);
 
   const tags = note.tags || [];
   const eventRangeLabel = formatEventRange(note);
@@ -201,6 +206,30 @@ export default function NoteCard({
     setEditContent(note.content || '');
     resetEditMetaFromNote();
     setEditing(true);
+  };
+
+  const handleSpaztickTask = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!spaztickReady || spaztickBusy) return;
+    if (
+      !window.confirm(
+        'Create a task in Spaztick from this note? Hermes will use Ollama to suggest a title and copy the full note into the task notes. No project, tags, or due dates will be set.'
+      )
+    ) {
+      return;
+    }
+    setSpaztickBusy(true);
+    try {
+      const data = await createSpaztickTaskFromNote(note.id);
+      const t = data?.title || 'Task';
+      window.alert(`Spaztick task created: ${t}`);
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || 'Could not create Spaztick task');
+    } finally {
+      setSpaztickBusy(false);
+    }
   };
 
   const handleDelete = async (e) => {
@@ -619,6 +648,20 @@ export default function NoteCard({
                   aria-label="Edit"
                 >
                   <NoteCardIconEdit className="note-card-icon-btn__svg" />
+                </button>
+                <button
+                  type="button"
+                  className="note-card-icon-btn"
+                  disabled={!spaztickReady || spaztickBusy}
+                  onClick={handleSpaztickTask}
+                  title={
+                    spaztickReady
+                      ? 'Create task in Spaztick (Ollama title + note as task notes)'
+                      : 'Configure Spaztick URL and API key in Settings'
+                  }
+                  aria-label="Create task in Spaztick"
+                >
+                  <NoteCardIconSpaztick className="note-card-icon-btn__svg" />
                 </button>
                 <button
                   type="button"

@@ -12,6 +12,10 @@ import { buildThreadAiSummary } from '../services/threadAiSummary.js';
 import { attachBlobListToNotes, MAX_BYTES } from '../services/noteFileBlobs.js';
 import { canAttachTagIdByReference } from '../services/tagAccess.js';
 import { compareNotesSortDesc } from '../utils/noteSortAt.js';
+import {
+  suggestTaskTitleFromNoteContent,
+  createSpaztickExternalTask,
+} from '../services/spaztickTask.js';
 
 const router = Router();
 
@@ -906,6 +910,57 @@ router.get('/:id/linked-notes', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load linked notes' });
+  }
+});
+
+/** Create a Spaztick task from this note (Ollama title + note body as task notes). See API_ACCESS.md. */
+router.post('/:id/spaztick-task', async (req, res) => {
+  try {
+    const { id: noteId } = req.params;
+    const userId = req.userId;
+    const noteR = await pool.query('SELECT id, content FROM notes WHERE id = $1 AND user_id = $2', [
+      noteId,
+      userId,
+    ]);
+    if (noteR.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    const settingsR = await pool.query('SELECT settings_json FROM users WHERE id = $1', [userId]);
+    const raw = settingsR.rows[0]?.settings_json && typeof settingsR.rows[0].settings_json === 'object'
+      ? settingsR.rows[0].settings_json
+      : {};
+    const baseUrl =
+      typeof raw.spaztickApiUrl === 'string' ? raw.spaztickApiUrl.trim().replace(/\/$/, '') : '';
+    const apiKey =
+      typeof raw.spaztickApiKey === 'string' ? raw.spaztickApiKey.trim() : '';
+    if (!baseUrl || !apiKey) {
+      return res.status(400).json({
+        error: 'Configure Spaztick API URL and API key in Settings',
+        code: 'SPAZTICK_NOT_CONFIGURED',
+      });
+    }
+    try {
+      const u = new URL(baseUrl);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Spaztick API URL must be http or https' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'Invalid Spaztick API URL in Settings' });
+    }
+    const content = String(noteR.rows[0].content ?? '');
+    const title = await suggestTaskTitleFromNoteContent(content);
+    const task = await createSpaztickExternalTask({
+      baseUrl,
+      apiKey,
+      title,
+      notes: content,
+    });
+    res.status(201).json({ title, task });
+  } catch (err) {
+    console.error('spaztick-task:', err);
+    const msg = err?.message || 'Failed to create Spaztick task';
+    const code = err?.status;
+    const status =
+      typeof code === 'number' && code >= 400 && code < 600 ? code : 502;
+    res.status(status).json({ error: msg });
   }
 });
 

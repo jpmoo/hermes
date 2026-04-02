@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { NOTE_TYPE_COLOR_DEFAULTS } from './noteTypeColorSettings';
 import { useNoteTypeColors } from './NoteTypeColorContext';
@@ -17,8 +17,13 @@ export default function SettingsModal({ onClose }) {
     setSimilarNotesLimitResultsToMinChars,
     inboxThreadRootId,
     setInboxThreadRootId,
+    spaztickApiUrl,
+    setSpaztickApiUrl,
+    spaztickApiKeySet,
+    saveSpaztickApiKey,
   } = useNoteTypeColors();
   const [rootThreads, setRootThreads] = useState([]);
+  const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
 
   const effectiveSimilarMin =
     similarNotesMinChars != null ? similarNotesMinChars : similarNotesMinDefault;
@@ -50,6 +55,27 @@ export default function SettingsModal({ onClose }) {
   const inboxValue = typeof inboxThreadRootId === 'string' ? inboxThreadRootId : '';
   const hasInboxValue = inboxValue.length > 0;
   const inboxExistsInRoots = hasInboxValue && rootThreads.some((n) => n.id === inboxValue);
+
+  const handleSaveSpaztickKey = useCallback(async () => {
+    try {
+      await saveSpaztickApiKey(spaztickKeyInput.trim() || null);
+      setSpaztickKeyInput('');
+    } catch (e) {
+      console.error(e);
+      window.alert(e?.message || 'Could not save API key');
+    }
+  }, [saveSpaztickApiKey, spaztickKeyInput]);
+
+  const handleClearSpaztickKey = useCallback(async () => {
+    if (!window.confirm('Remove the stored Spaztick API key from Hermes?')) return;
+    try {
+      await saveSpaztickApiKey(null);
+      setSpaztickKeyInput('');
+    } catch (e) {
+      console.error(e);
+      window.alert(e?.message || 'Could not remove API key');
+    }
+  }, [saveSpaztickApiKey]);
 
   return (
     <div
@@ -182,6 +208,65 @@ export default function SettingsModal({ onClose }) {
                 ? ' Matches are not filtered by length unless the checkbox is on.'
                 : ' With minimum 0, the checkbox has no effect.'}
           </p>
+        </section>
+
+        <section className="settings-modal-section" aria-labelledby="settings-spaztick-heading">
+          <h3 id="settings-spaztick-heading" className="settings-modal-section-title">
+            Spaztick
+          </h3>
+          <p className="settings-modal-section-lead">
+            Connect Hermes to your Spaztick instance using the external API (
+            <code className="settings-modal-code">/api/external/...</code>
+            ). Set the base URL (for example <code className="settings-modal-code">http://localhost:8081</code>) and
+            the same API key you configured in Spaztick&apos;s config. See{' '}
+            <code className="settings-modal-code">API_ACCESS.md</code> for details.
+          </p>
+          <div className="settings-modal-spaztick-field">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-spaztick-url">
+              API base URL
+            </label>
+            <input
+              id="settings-spaztick-url"
+              className="settings-modal-spaztick-url-input"
+              type="url"
+              autoComplete="off"
+              placeholder="http://localhost:8081"
+              value={typeof spaztickApiUrl === 'string' ? spaztickApiUrl : ''}
+              onChange={(e) => setSpaztickApiUrl(e.target.value)}
+            />
+          </div>
+          <div className="settings-modal-spaztick-field">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-spaztick-key">
+              API key
+            </label>
+            <input
+              id="settings-spaztick-key"
+              className="settings-modal-spaztick-url-input"
+              type="password"
+              autoComplete="off"
+              placeholder={spaztickApiKeySet ? '•••••••• (enter new key to replace)' : 'Required for /api/external/…'}
+              value={spaztickKeyInput}
+              onChange={(e) => setSpaztickKeyInput(e.target.value)}
+            />
+          </div>
+          <div className="settings-modal-spaztick-actions">
+            <button
+              type="button"
+              className="settings-modal-btn"
+              onClick={handleSaveSpaztickKey}
+              disabled={!spaztickKeyInput.trim()}
+            >
+              Save API key
+            </button>
+            <button
+              type="button"
+              className="settings-modal-type-color-reset"
+              disabled={!spaztickApiKeySet}
+              onClick={handleClearSpaztickKey}
+            >
+              Remove API key
+            </button>
+          </div>
         </section>
 
         <section className="settings-modal-section" aria-labelledby="settings-inbox-thread-heading">

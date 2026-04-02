@@ -74,6 +74,30 @@ function sanitizeInboxThreadRootId(input) {
   return UUID_RE.test(v) ? v : undefined;
 }
 
+/** http(s) base URL for Spaztick external API; trailing slash stripped. */
+function sanitizeSpaztickApiUrl(input) {
+  if (input == null) return undefined;
+  if (typeof input !== 'string') return undefined;
+  const v = input.trim();
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
+    return v.replace(/\/$/, '');
+  } catch {
+    return undefined;
+  }
+}
+
+/** Stored API key for Spaztick X-API-Key; never returned to clients on GET. */
+function sanitizeSpaztickApiKey(input) {
+  if (input == null) return undefined;
+  if (typeof input !== 'string') return undefined;
+  const v = input.trim();
+  if (!v) return null;
+  return v.length > 512 ? v.slice(0, 512) : v;
+}
+
 function sanitizeCanvasViewSlice(input) {
   const view = {};
   if (input && typeof input === 'object') {
@@ -156,6 +180,8 @@ router.get('/settings', requireAuth, async (req, res) => {
     const similarLimitResults = raw.similarNotesLimitResultsToMinChars === true;
     const campusLayouts = sanitizeCampusLayouts(raw.campusLayouts);
     const inboxThreadRootId = sanitizeInboxThreadRootId(raw.inboxThreadRootId);
+    const spUrl = sanitizeSpaztickApiUrl(raw.spaztickApiUrl);
+    const spKeyStored = typeof raw.spaztickApiKey === 'string' && raw.spaztickApiKey.trim().length > 0;
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
@@ -164,6 +190,8 @@ router.get('/settings', requireAuth, async (req, res) => {
       noteHistory,
       campusLayouts,
       inboxThreadRootId: inboxThreadRootId === undefined ? null : inboxThreadRootId,
+      spaztickApiUrl: spUrl === undefined ? null : spUrl,
+      spaztickApiKeySet: spKeyStored,
     });
   } catch (err) {
     console.error(err);
@@ -180,6 +208,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
       noteHistory,
       campusLayouts,
       inboxThreadRootId,
+      spaztickApiUrl,
+      spaztickApiKey,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -263,6 +293,32 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (spaztickApiUrl !== undefined) {
+      if (spaztickApiUrl === null) {
+        delete cur.spaztickApiUrl;
+      } else {
+        const u = sanitizeSpaztickApiUrl(spaztickApiUrl);
+        if (u === undefined) {
+          return res.status(400).json({ error: 'spaztickApiUrl must be a valid http(s) URL or null' });
+        }
+        if (u === null) delete cur.spaztickApiUrl;
+        else cur.spaztickApiUrl = u;
+      }
+    }
+
+    if (spaztickApiKey !== undefined) {
+      if (spaztickApiKey === null) {
+        delete cur.spaztickApiKey;
+      } else {
+        const k = sanitizeSpaztickApiKey(spaztickApiKey);
+        if (k === undefined) {
+          return res.status(400).json({ error: 'spaztickApiKey must be a string or null' });
+        }
+        if (k === null) delete cur.spaztickApiKey;
+        else cur.spaztickApiKey = k;
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -273,6 +329,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outLimitResults = cur.similarNotesLimitResultsToMinChars === true;
     const outCampus = sanitizeCampusLayouts(cur.campusLayouts);
     const outInbox = sanitizeInboxThreadRootId(cur.inboxThreadRootId);
+    const outSpUrl = sanitizeSpaztickApiUrl(cur.spaztickApiUrl);
+    const outSpKeySet = typeof cur.spaztickApiKey === 'string' && cur.spaztickApiKey.trim().length > 0;
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
@@ -281,6 +339,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
       noteHistory: outHistory,
       campusLayouts: outCampus,
       inboxThreadRootId: outInbox === undefined ? null : outInbox,
+      spaztickApiUrl: outSpUrl === undefined ? null : outSpUrl,
+      spaztickApiKeySet: outSpKeySet,
     });
   } catch (err) {
     console.error(err);

@@ -179,6 +179,42 @@
   font-family: inherit;
 }
 
+.settings-modal-code {
+  font-size: 0.8em;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.settings-modal-spaztick-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
+  max-width: 100%;
+}
+
+.settings-modal-spaztick-url-input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.settings-modal-spaztick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
 .settings-modal-similar-notes-checkbox-row {
   display: flex;
   align-items: flex-start;
