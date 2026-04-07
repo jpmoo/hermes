@@ -62,17 +62,23 @@
   padding-right: 2.1rem;
 }
 
-/* Recursive reply count (Stream/Canvas); blank when zero — see NoteCard.jsx */
+/* Recursive reply count (Stream/Canvas); blank when zero — mirrors .note-card-type-icon inset (top/right) */
 .note-card-descendant-count {
   position: absolute;
-  right: 0.7rem;
-  bottom: 0.45rem;
+  right: 0.85rem;
+  bottom: 0.65rem;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+  min-height: 1.2rem;
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  text-align: center;
   color: var(--text-muted);
-  opacity: 0.9;
+  opacity: 0.92;
   pointer-events: none;
   user-select: none;
 }
