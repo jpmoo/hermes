@@ -1182,6 +1182,7 @@ export default function CanvasPage() {
           : {
               ...note,
               reply_count: note.reply_count ?? 0,
+              descendant_count: note.descendant_count ?? 0,
               connection_count: note.connection_count ?? 0,
               attachments: note.attachments || [],
             };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   starNote,
@@ -38,6 +38,7 @@ import {
   NoteCardIconTag,
   NoteCardIconSpaztick,
 } from './icons/NoteCardActionIcons';
+import { effectiveDescendantCount } from './noteDescendantCount';
 import './NoteCard.css';
 
 export default function NoteCard({
@@ -81,6 +82,11 @@ export default function NoteCard({
 
   const tags = note.tags || [];
   const eventRangeLabel = formatEventRange(note);
+
+  const descendantBadge = useMemo(() => {
+    const n = effectiveDescendantCount(note);
+    return n > 0 ? n : null;
+  }, [note]);
 
   useEffect(() => {
     setEditContent(note.content || '');
@@ -755,6 +761,15 @@ export default function NoteCard({
           </time>
         </div>
       </div>
+      {descendantBadge != null ? (
+        <span
+          className="note-card-descendant-count"
+          title={`${descendantBadge} nested ${descendantBadge === 1 ? 'reply' : 'replies'} under this note (all depths)`}
+          aria-label={`${descendantBadge} nested replies under this note`}
+        >
+          {descendantBadge}
+        </span>
+      ) : null}
     </article>
   );
 }

@@ -62,6 +62,21 @@
   padding-right: 2.1rem;
 }
 
+/* Recursive reply count (Stream/Canvas); blank when zero — see NoteCard.jsx */
+.note-card-descendant-count {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.45rem;
+  z-index: 1;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0.9;
+  pointer-events: none;
+  user-select: none;
+}
+
 .note-card:hover {
   background: var(--bg-card-hover);
 }

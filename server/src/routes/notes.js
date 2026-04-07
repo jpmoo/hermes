@@ -27,6 +27,50 @@ router.use(requireAuth);
 const NOTE_RETURNING =
   'id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at';
 
+const NOTE_RETURNING_N = NOTE_RETURNING.split(', ')
+  .map((col) => `n.${col}`)
+  .join(', ');
+
+/** Recursive descendant count (excludes self). Correlated to outer row alias `n`; `userPos` = bind index for `user_id`. */
+function sqlDescendantCountFromN(userPos) {
+  return `(
+  WITH RECURSIVE d AS (
+    SELECT c.id FROM notes c WHERE c.parent_id = n.id AND c.user_id = $${userPos}
+    UNION ALL
+    SELECT c2.id FROM notes c2 JOIN d ON c2.parent_id = d.id WHERE c2.user_id = $${userPos}
+  )
+  SELECT COUNT(*)::int FROM d
+)`;
+}
+
+/** Mutates each row with `descendant_count` from parent_id edges in this flat list (thread snapshot). */
+function addDescendantCountsToNotes(notes) {
+  if (!Array.isArray(notes) || notes.length === 0) return;
+  const key = (id) => (id == null ? '' : String(id));
+  const childrenByParent = new Map();
+  for (const n of notes) {
+    const pid = n.parent_id;
+    if (pid == null) continue;
+    const pk = key(pid);
+    if (!childrenByParent.has(pk)) childrenByParent.set(pk, []);
+    childrenByParent.get(pk).push(n.id);
+  }
+  const memo = new Map();
+  function countDescendants(noteId) {
+    const idKey = key(noteId);
+    if (memo.has(idKey)) return memo.get(idKey);
+    let total = 0;
+    for (const cid of childrenByParent.get(idKey) || []) {
+      total += 1 + countDescendants(cid);
+    }
+    memo.set(idKey, total);
+    return total;
+  }
+  for (const n of notes) {
+    n.descendant_count = countDescendants(n.id);
+  }
+}
+
 const NOTE_TYPES = new Set(['note', 'person', 'event', 'organization']);
 
 function coerceNoteType(v, fallback = 'note') {
@@ -135,7 +179,8 @@ router.get('/roots', async (req, res) => {
         SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
-                WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
+                WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count,
+               ${sqlDescendantCountFromN(1)} AS descendant_count
         FROM notes n
         WHERE n.parent_id IS NULL AND n.user_id = $1 AND n.id IN (SELECT root_id FROM starred_roots)
         ORDER BY ${SQL_NOTE_SORT_AT} ASC NULLS LAST
@@ -144,7 +189,8 @@ router.get('/roots', async (req, res) => {
         SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
-                WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
+                WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count,
+               ${sqlDescendantCountFromN(1)} AS descendant_count
         FROM notes n
         WHERE n.parent_id IS NULL AND n.user_id = $1
         ORDER BY ${SQL_NOTE_SORT_AT} ASC NULLS LAST
@@ -211,6 +257,7 @@ router.get('/thread/:id', async (req, res) => {
       byNote[row.note_id].push({ id: row.tag_id, name: row.name });
     });
     notes.forEach((n) => { n.tags = byNote[n.id] || []; });
+    addDescendantCountsToNotes(notes);
     await attachBlobListToNotes(notes, userId);
     res.json(notes);
   } catch (err) {
@@ -968,10 +1015,12 @@ router.post('/:id/spaztick-task', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT ${NOTE_RETURNING},
+      `SELECT ${NOTE_RETURNING_N},
+              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
               (SELECT COUNT(*)::int FROM note_connections nc
-               WHERE nc.user_id = $2 AND (nc.anchor_note_id = $1::uuid OR nc.linked_note_id = $1::uuid)) AS connection_count
-       FROM notes WHERE id = $1 AND user_id = $2`,
+               WHERE nc.user_id = $2 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count,
+              ${sqlDescendantCountFromN(2)} AS descendant_count
+       FROM notes n WHERE n.id = $1::uuid AND n.user_id = $2`,
       [req.params.id, req.userId]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
