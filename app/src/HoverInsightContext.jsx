@@ -924,37 +924,8 @@ function HoverInsightPanels() {
     [persisted]
   );
 
-  /**
-   * Under-card stack: real connections plus similar-note hits not yet in that set (same cards as “Linked”,
-   * labeled “Similar” when there is no note_connections row yet).
-   * Uses similarNotesAfterSimilarity (not type-filtered) so sidebar type toggles don’t hide stack cards.
-   */
-  const connectionStackPeers = useMemo(() => {
-    const byId = new Map();
-    for (const p of persisted) {
-      const k = String(p.id).toLowerCase();
-      byId.set(k, p);
-    }
-    for (const sn of similarNotesAfterSimilarity) {
-      const k = String(sn.id).toLowerCase();
-      if (byId.has(k)) continue;
-      byId.set(k, {
-        id: sn.id,
-        content: sn.content,
-        parent_id: sn.parent_id,
-        note_type: sn.note_type || 'note',
-        event_start_at: sn.event_start_at,
-        event_end_at: sn.event_end_at,
-        starred: sn.starred,
-        updated_at: sn.updated_at,
-        similarity: sn.similarity != null ? Number(sn.similarity) : null,
-        threadRootId: sn.threadRootId ?? sn.thread_root_id,
-        threadPath: sn.threadPath || sn.thread_path || '',
-        tags: Array.isArray(sn.tags) ? sn.tags : [],
-      });
-    }
-    return sortBySimilarityDesc([...byId.values()]);
-  }, [persisted, similarNotesAfterSimilarity]);
+  /** Under-card stack: linked peers only. Similar notes appear only in the right panel (avoids reading as duplicate “connections”). */
+  const connectionStackPeers = persisted;
 
   const ragdollByCollection = useMemo(
     () => groupRagdollDocumentsByCollection(ragdollDocs),
