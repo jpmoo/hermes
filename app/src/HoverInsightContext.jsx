@@ -490,27 +490,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
             } catch (e) {
               console.error(e);
             }
-            const hasPersistedKey =
-              data &&
-              typeof data === 'object' &&
-              !Array.isArray(data) &&
-              ('persistedLinks' in data || 'persisted_links' in data);
-            setInsight((prev) => {
+            setInsight(() => {
               const next = normalizeHoverInsightPayload(data);
               const mergedPl = mergePersistedLinksLists(next.persistedLinks, quickPl);
-              const nextMerged = { ...next, persistedLinks: mergedPl };
-              if (
-                !hasPersistedKey &&
-                nextMerged.persistedLinks.length === 0 &&
-                Array.isArray(prev?.persistedLinks) &&
-                prev.persistedLinks.length > 0
-              ) {
-                return {
-                  ...nextMerged,
-                  persistedLinks: mergePersistedLinksLists(nextMerged.persistedLinks, prev.persistedLinks),
-                };
-              }
-              return nextMerged;
+              return { ...next, persistedLinks: mergedPl };
             });
           })
           .catch(() => {
@@ -589,7 +572,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
           if (!prev) return prev;
           return {
             ...prev,
-            persistedLinks: (prev.persistedLinks || []).filter((x) => x.id !== linkedNoteId),
+            persistedLinks: (prev.persistedLinks || []).filter((x) => !noteIdSame(x.id, linkedNoteId)),
           };
         });
         setConnectionModal((cur) => {
