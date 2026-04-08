@@ -78,6 +78,8 @@ export default function HoverInsightMobileSheet({
   setRagdollIncludeChildren,
   ragdollIncludeConnected,
   setRagdollIncludeConnected,
+  ragdollQuerySimilarityMinPct,
+  setRagdollQuerySimilarityMinPct,
   similarMinPct,
   setSimilarMinPct,
   similarVisibleTypes,
@@ -438,6 +440,29 @@ export default function HoverInsightMobileSheet({
                       <input type="checkbox" checked={ragdollIncludeChildren} onChange={(e) => setRagdollIncludeChildren(e.target.checked)} />
                       <span>Children</span>
                     </label>
+                  </div>
+                  <div className="hover-insight-similar-slider-wrap hover-insight-ragdoll-threshold-slider">
+                    <div className="hover-insight-similar-slider-label">
+                      <span>Min. similarity</span>
+                      <span className="hover-insight-similar-slider-value">{ragdollQuerySimilarityMinPct}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      className="hover-insight-similar-slider"
+                      min={5}
+                      max={95}
+                      step={5}
+                      value={ragdollQuerySimilarityMinPct}
+                      onChange={(e) => setRagdollQuerySimilarityMinPct(Number(e.target.value))}
+                      aria-label="Minimum similarity for RAG document search"
+                    />
+                    <div className="hover-insight-similar-slider-ticks" aria-hidden>
+                      <span>5%</span>
+                      <span>25%</span>
+                      <span>50%</span>
+                      <span>75%</span>
+                      <span>95%</span>
+                    </div>
                   </div>
                   <div className="hover-insight-ragdoll-results">
                     {ragdollLoading && <p className="hover-insight-muted">Searching library…</p>}

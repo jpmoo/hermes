@@ -223,6 +223,8 @@ export async function fetchRagdollRelevant(noteId, options = {}) {
     includeChildren: !!options.includeChildren,
     includeConnected: options.includeConnected !== false,
   };
+  const th = options.threshold;
+  if (th != null && Number.isFinite(Number(th))) body.threshold = Number(th);
   const r = await fetch(`${API}/ragdoll/relevant`, {
     method: 'POST',
     headers: headers(),

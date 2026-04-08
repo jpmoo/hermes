@@ -41,6 +41,7 @@ function noteIdSame(a, b) {
 const SIMILAR_MIN_LS_KEY = 'hermes.insightSimilarMinPct';
 const SIMILAR_TYPES_LS_KEY = 'hermes.insightSimilarVisibleTypes';
 const RAGDOLL_CONTEXT_LS_KEY = 'hermes.ragdollContextOptions';
+const RAGDOLL_QUERY_SIMILARITY_MIN_LS_KEY = 'hermes.ragdollQuerySimilarityMinPct';
 
 const SIMILAR_TYPE_FILTER_LABELS = {
   note: 'Notes',
@@ -81,6 +82,18 @@ function readStoredSimilarMinPct() {
     return Math.min(95, Math.max(5, n));
   } catch {
     return 25;
+  }
+}
+
+/** Default 45% matches typical RAGDoll / env default of 0.45. */
+function readStoredRagdollQuerySimilarityMinPct() {
+  try {
+    const raw = localStorage.getItem(RAGDOLL_QUERY_SIMILARITY_MIN_LS_KEY);
+    const n = raw != null ? parseInt(raw, 10) : 45;
+    if (!Number.isFinite(n)) return 45;
+    return Math.min(95, Math.max(5, n));
+  } catch {
+    return 45;
   }
 }
 
@@ -336,6 +349,10 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     }));
   }, []);
 
+  const [ragdollQuerySimilarityMinPct, setRagdollQuerySimilarityMinPct] = useState(
+    readStoredRagdollQuerySimilarityMinPct
+  );
+
   useEffect(() => {
     try {
       localStorage.setItem(RAGDOLL_CONTEXT_LS_KEY, JSON.stringify(ragdollContext));
@@ -343,6 +360,14 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       /* ignore */
     }
   }, [ragdollContext]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RAGDOLL_QUERY_SIMILARITY_MIN_LS_KEY, String(ragdollQuerySimilarityMinPct));
+    } catch {
+      /* ignore */
+    }
+  }, [ragdollQuerySimilarityMinPct]);
 
   useEffect(() => {
     fetchRagdollConfig()
@@ -383,6 +408,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       includeSiblings: ragdollIncludeSiblings,
       includeChildren: ragdollIncludeChildren,
       includeConnected: ragdollIncludeConnected,
+      threshold: ragdollQuerySimilarityMinPct / 100,
     };
     fetchRagdollRelevant(nid, opts)
       .then((data) => {
@@ -404,6 +430,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
     ragdollIncludeSiblings,
     ragdollIncludeChildren,
     ragdollIncludeConnected,
+    ragdollQuerySimilarityMinPct,
   ]);
 
   /** Clear insight selection (Stream: single-click mode). */
@@ -988,6 +1015,8 @@ function HoverInsightPanels() {
           setRagdollIncludeChildren={setRagdollIncludeChildren}
           ragdollIncludeConnected={ragdollIncludeConnected}
           setRagdollIncludeConnected={setRagdollIncludeConnected}
+          ragdollQuerySimilarityMinPct={ragdollQuerySimilarityMinPct}
+          setRagdollQuerySimilarityMinPct={setRagdollQuerySimilarityMinPct}
           similarMinPct={similarMinPct}
           setSimilarMinPct={setSimilarMinPct}
           similarVisibleTypes={similarVisibleTypes}
@@ -1083,6 +1112,29 @@ function HoverInsightPanels() {
                       />
                       <span>Children</span>
                     </label>
+                  </div>
+                  <div className="hover-insight-similar-slider-wrap hover-insight-ragdoll-threshold-slider">
+                    <div className="hover-insight-similar-slider-label">
+                      <span>Min. similarity</span>
+                      <span className="hover-insight-similar-slider-value">{ragdollQuerySimilarityMinPct}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      className="hover-insight-similar-slider"
+                      min={5}
+                      max={95}
+                      step={5}
+                      value={ragdollQuerySimilarityMinPct}
+                      onChange={(e) => setRagdollQuerySimilarityMinPct(Number(e.target.value))}
+                      aria-label="Minimum similarity for RAG document search"
+                    />
+                    <div className="hover-insight-similar-slider-ticks" aria-hidden>
+                      <span>5%</span>
+                      <span>25%</span>
+                      <span>50%</span>
+                      <span>75%</span>
+                      <span>95%</span>
+                    </div>
                   </div>
                   <div className="hover-insight-ragdoll-results">
                     {ragdollLoading && <p className="hover-insight-muted">Searching library…</p>}

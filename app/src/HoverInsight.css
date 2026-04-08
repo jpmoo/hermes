@@ -858,8 +858,13 @@
 
 .hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-title,
 .hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-ragdoll-hint,
-.hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-ragdoll-checkboxes {
+.hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-ragdoll-checkboxes,
+.hover-insight-margin--left-with-ragdoll .hover-insight-panel--ragdoll > .hover-insight-ragdoll-threshold-slider {
   flex-shrink: 0;
+}
+
+.hover-insight-panel--ragdoll .hover-insight-ragdoll-threshold-slider {
+  margin: 0 0 0.45rem;
 }
 
 .hover-insight-ragdoll-checkboxes {

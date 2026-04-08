@@ -83,9 +83,18 @@ router.post('/relevant', async (req, res) => {
 
     const base = ragdollBaseUrl();
     const groups = ragdollCollectionGroups();
-    const thresholdRaw = process.env.RAGDOLL_QUERY_THRESHOLD;
-    const threshold =
-      thresholdRaw != null && thresholdRaw !== '' ? Number.parseFloat(thresholdRaw, 10) : undefined;
+
+    let threshold;
+    const clientTh = req.body?.threshold;
+    if (clientTh != null && clientTh !== '') {
+      const t = Number.parseFloat(clientTh, 10);
+      if (Number.isFinite(t) && t >= 0 && t <= 1) threshold = t;
+    }
+    if (threshold === undefined) {
+      const thresholdRaw = process.env.RAGDOLL_QUERY_THRESHOLD;
+      threshold =
+        thresholdRaw != null && thresholdRaw !== '' ? Number.parseFloat(thresholdRaw, 10) : undefined;
+    }
 
     const scopeBits = ['the selected note'];
     if (includeOpts.includeConnected) scopeBits.push('linked (connected) notes');
