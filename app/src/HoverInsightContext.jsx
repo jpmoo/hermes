@@ -754,6 +754,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       setRagdollIncludeChildren,
       ragdollIncludeConnected,
       setRagdollIncludeConnected,
+      ragdollQuerySimilarityMinPct,
+      setRagdollQuerySimilarityMinPct,
       onNoteUpdated,
     }),
     [
@@ -779,6 +781,8 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
       ragdollIncludeSiblings,
       ragdollIncludeChildren,
       ragdollIncludeConnected,
+      ragdollQuerySimilarityMinPct,
+      setRagdollQuerySimilarityMinPct,
       onNoteUpdated,
     ]
   );
@@ -822,6 +826,8 @@ function HoverInsightPanels() {
     setRagdollIncludeChildren,
     ragdollIncludeConnected,
     setRagdollIncludeConnected,
+    ragdollQuerySimilarityMinPct,
+    setRagdollQuerySimilarityMinPct,
     onNoteUpdated,
   } = ctx;
 
