@@ -119,14 +119,25 @@ function streamNoteAttrEscaped(id) {
 }
 
 /**
- * Scroll so the row for `noteId` is visible. Uses scrollIntoView so the correct overflow ancestor
- * (e.g. .stream-page-scroll) scrolls — manual scrollTop failed when the column had no bounded height.
+ * Scroll so the row for `noteId` is visible inside `streamEl` (.stream-page-scroll).
+ * Uses explicit scrollTop so we account for the sticky nav inside the scroller; scrollIntoView alone
+ * often aligned to the scrollport top and could fight with in-app scroll targets.
  */
-function scrollStreamListToNote(_streamEl, listEl, noteId) {
+function scrollStreamListToNote(streamEl, listEl, noteId) {
   if (!listEl || noteId == null) return false;
   const li = findStreamLiByNoteId(listEl, noteId);
   if (!li) return false;
-  li.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+  if (streamEl) {
+    const nav = streamEl.querySelector(':scope > .stream-page-nav-row');
+    const navH = nav ? nav.getBoundingClientRect().height : 0;
+    const pad = 6;
+    const s = streamEl.getBoundingClientRect();
+    const r = li.getBoundingClientRect();
+    const nextTop = streamEl.scrollTop + (r.top - s.top) - navH - pad;
+    streamEl.scrollTo({ top: Math.max(0, nextTop), behavior: 'auto' });
+    return true;
+  }
+  li.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
   return true;
 }
 
@@ -595,10 +606,17 @@ export default function StreamPage() {
     if (focusFromUrlApplied.current === key) return;
     if (!findNode(pinnedTree, focusParam)) return;
     focusFromUrlApplied.current = key;
+    let skipScroll = false;
     flushSync(() => {
-      setFocusId(focusParam);
+      setFocusId((prev) => {
+        skipScroll = noteIdEq(prev, focusParam);
+        return focusParam;
+      });
     });
-    setStreamScrollIntent({ kind: 'note', id: focusParam });
+    // Do not clobber scroll targets set the same tick (e.g. drill-up scrolls to former head while URL focus becomes parent).
+    if (!skipScroll) {
+      setStreamScrollIntent({ kind: 'note', id: focusParam });
+    }
   }, [threadReady, threadRootId, focusParam, thread, pinnedTree]);
 
   useEffect(() => {
