@@ -112,6 +112,28 @@ function scrollStreamListToNote(streamEl, listEl, noteId, { margin = 10, behavio
   return true;
 }
 
+/**
+ * Scroll so the visible thread list shows its end (last note row at the bottom of the scrollport).
+ * Prefer this over raw scrollHeight while stagger/layout is still settling.
+ */
+function scrollStreamListToBottom(streamEl, listEl, { behavior = 'smooth' } = {}) {
+  if (!streamEl || !listEl) return false;
+  const lis = [...listEl.querySelectorAll('li[data-stream-note]')];
+  if (lis.length === 0) {
+    streamEl.scrollTo({ top: streamEl.scrollHeight, behavior });
+    return true;
+  }
+  const last = lis[lis.length - 1];
+  const scRect = streamEl.getBoundingClientRect();
+  const liRect = last.getBoundingClientRect();
+  const delta = liRect.bottom - scRect.bottom;
+  streamEl.scrollTo({
+    top: Math.max(0, streamEl.scrollTop + delta),
+    behavior,
+  });
+  return true;
+}
+
 function findStreamLiByNoteId(listEl, noteId) {
   if (!listEl || noteId == null) return null;
   return [...listEl.querySelectorAll('li[data-stream-note]')].find((li) =>
@@ -285,7 +307,7 @@ function StreamList({
               hideStar={depth === 0}
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
-              showFocusButton={depth > 0}
+              showFocusButton
               parentTagsForInherit={parentTagsForInherit}
               onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
               onStarredChange={onStarredChange}
@@ -608,8 +630,19 @@ export default function StreamPage() {
     if (!sc || !listEl) return;
 
     if (pending.kind === 'note') {
-      if (scrollStreamListToNote(sc, listEl, pending.id)) {
+      const noteScrollId = pending.id;
+      if (scrollStreamListToNote(sc, listEl, noteScrollId)) {
         pendingStreamScrollRef.current = null;
+      } else {
+        window.setTimeout(() => {
+          const p = pendingStreamScrollRef.current;
+          if (p?.kind !== 'note' || !noteIdEq(p.id, noteScrollId)) return;
+          const s2 = streamScrollRef.current;
+          const l2 = threadListRef.current;
+          if (s2 && l2 && scrollStreamListToNote(s2, l2, noteScrollId)) {
+            pendingStreamScrollRef.current = null;
+          }
+        }, 520);
       }
       return;
     }
@@ -617,11 +650,17 @@ export default function StreamPage() {
     if (pending.kind === 'bottom') {
       const stagger = pending.staggerDelay;
       pendingStreamScrollRef.current = null;
-      window.setTimeout(() => {
+      const run = () => {
         const s = streamScrollRef.current;
-        if (!s || !threadRootId) return;
-        s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' });
-      }, stagger ? 1400 : 450);
+        const list = threadListRef.current;
+        if (!s || !list) return;
+        scrollStreamListToBottom(s, list);
+      };
+      const lead = stagger ? 1400 : 450;
+      window.setTimeout(run, lead);
+      window.setTimeout(() => {
+        requestAnimationFrame(() => requestAnimationFrame(run));
+      }, lead + 320);
     }
   }, [threadRootId, loadingThread, thread.length, focusId, displayTree]);
 
@@ -767,7 +806,7 @@ export default function StreamPage() {
       setBranchHeadExiting(true);
       window.setTimeout(() => {
         setBranchHeadExiting(false);
-        pendingStreamScrollRef.current = { kind: 'note', id: parentId };
+        pendingStreamScrollRef.current = { kind: 'note', id: leavingHeadId };
         setFocusId(parentId);
         setSearchParams({ thread: threadRootId });
         const d = new Map(delays);
@@ -776,7 +815,7 @@ export default function StreamPage() {
         clearLevelDropSoon();
       }, NOTES_EXIT_TO_ROOT_COMMIT_MS);
     } else {
-      pendingStreamScrollRef.current = { kind: 'note', id: parentId };
+      pendingStreamScrollRef.current = { kind: 'note', id: leavingHeadId };
       setFocusId(parentId);
       setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
       setLevelDropDelays(delays);
