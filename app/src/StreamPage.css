@@ -16,7 +16,9 @@
 .stream-page-scroll {
   flex: 1;
   min-height: 0;
-  padding-top: 0.5rem;
+  /* No padding-top: it sat above the sticky nav row and scrolling notes showed through the gap. */
+  padding-top: 0;
+  background: var(--bg);
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -80,9 +82,10 @@
   top: var(--stream-nav-sticky-top, 3.5rem);
   z-index: 9;
   background: var(--bg);
-  padding-top: 0.35rem;
+  /* Formerly offset by scroll padding-top; keep a little air below layout header */
+  padding-top: 0.5rem;
   padding-bottom: 0.5rem;
-  margin-top: -0.15rem;
+  margin-top: 0;
   margin-left: -0.25rem;
   margin-right: -0.25rem;
   padding-left: 0.25rem;
