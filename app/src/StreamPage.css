@@ -89,6 +89,15 @@
   box-shadow: 0 6px 8px -6px rgba(28, 27, 24, 0.12);
 }
 
+/*
+ * Thread list lives in .stream-page-scroll (inner overflow). Sticky top is relative to that
+ * scroller, not the window — do not offset by layout header height or the first message sits in a
+ * dead band / looks clipped.
+ */
+.stream-page-scroll > .stream-page-nav-row {
+  top: 0;
+}
+
 .stream-page-nav-left {
   display: flex;
   flex-wrap: wrap;

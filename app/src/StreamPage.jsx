@@ -607,7 +607,10 @@ export default function StreamPage() {
     const delayMs = replyStagger ? 1400 : 450;
     const t = window.setTimeout(() => {
       requestAnimationFrame(() => {
-        composeWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        const sc = streamScrollRef.current;
+        if (sc) {
+          sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+        }
       });
     }, delayMs);
     return () => clearTimeout(t);
