@@ -153,9 +153,22 @@
   background: var(--note-type-bg-event-hover);
 }
 
-.note-card--depth-1 { border-left-color: #5a4a2a; }
-.note-card--depth-2 { border-left-color: #4a3a1a; }
-.note-card--depth-3 { border-left-color: #3a2a12; }
+/*
+ * Left threadline color: per note type (matches focus head vs replies — no depth-based browns).
+ * Leaf cards keep a neutral edge until they gain replies.
+ */
+.note-card.note-card--type-note:not(.note-card--leaf) {
+  border-left-color: var(--note-type-icon-note);
+}
+.note-card.note-card--type-organization:not(.note-card--leaf) {
+  border-left-color: var(--note-type-icon-organization);
+}
+.note-card.note-card--type-person:not(.note-card--leaf) {
+  border-left-color: var(--note-type-icon-person);
+}
+.note-card.note-card--type-event:not(.note-card--leaf) {
+  border-left-color: var(--note-type-icon-event);
+}
 
 /* Root notes with no replies: no accent threadline */
 .note-card--leaf {

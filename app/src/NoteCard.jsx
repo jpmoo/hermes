@@ -361,7 +361,7 @@ export default function NoteCard({
             : '';
 
   const cardClass = [
-    showThreadline ? `note-card note-card--depth-${Math.min(depth, 3)}` : 'note-card note-card--leaf',
+    showThreadline ? 'note-card' : 'note-card note-card--leaf',
     hasConnections ? 'note-card--linked' : '',
     typeBgClass,
   ]
@@ -485,19 +485,20 @@ export default function NoteCard({
       ? borderWidth
       : Math.max(2, borderWidth)
     : null;
+  const typeIconVarForStripe =
+    displayNoteType === 'organization'
+      ? 'var(--note-type-icon-organization)'
+      : displayNoteType === 'person'
+        ? 'var(--note-type-icon-person)'
+        : displayNoteType === 'event'
+          ? 'var(--note-type-icon-event)'
+          : 'var(--note-type-icon-note)';
+
   const linkedBorderVars =
     hasConnections
       ? {
           '--hermes-link-rw': `${linkStripeWidthPx}px`,
-          '--hermes-link-rc': !showThreadline
-            ? 'var(--accent-dim, #6d5610)'
-            : depth <= 0
-              ? 'var(--accent-dim, #6d5610)'
-              : depth === 1
-                ? '#5a4a2a'
-                : depth === 2
-                  ? '#4a3a1a'
-                  : '#3a2a12',
+          '--hermes-link-rc': typeIconVarForStripe,
         }
       : null;
 
