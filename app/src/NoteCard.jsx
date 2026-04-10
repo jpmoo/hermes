@@ -56,8 +56,6 @@ export default function NoteCard({
   /** Hide “Focus in Stream” on the thread head when viewing a thread; root-level list keeps it. */
   showFocusButton = true,
   hideStar = false,
-  /** Stream: pinned starred row scrolled up — one-line + star. */
-  streamCompact = false,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
@@ -456,14 +454,10 @@ export default function NoteCard({
   const editTypeLabel =
     NOTE_TYPE_OPTIONS.find((o) => o.value === editNoteType)?.label ?? editNoteType;
 
-  const effectiveStreamCompact = streamCompact && !editing;
-  const showStarButton = editing ? !hideStar : !hideStar || (streamCompact && note.starred);
-
   const cardClassNames = [
     cardClass,
     'note-card--has-type-icon',
     editing ? 'note-card--editing' : '',
-    effectiveStreamCompact ? 'note-card--stream-compact' : '',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
   ]
@@ -745,7 +739,7 @@ export default function NoteCard({
                 </div>
               </>
             )}
-            {showStarButton && (
+            {!hideStar && (
               <button
                 type="button"
                 className={`note-card-star ${note.starred ? 'note-card-star--on' : ''}`}

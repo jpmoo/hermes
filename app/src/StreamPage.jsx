@@ -33,7 +33,6 @@ import {
   NavIconUpOneLevel,
 } from './icons/NavIcons';
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
-import { StreamScrollProvider, StreamStarredListItem } from './StreamStarredSticky';
 import './StreamPage.css';
 
 /**
@@ -99,6 +98,18 @@ function streamNoteAttrEscaped(id) {
   const s = String(id);
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(s);
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/** Scroll the thread list column so the row for `noteId` sits near the top of the scrollport. */
+function scrollStreamListToNote(streamEl, listEl, noteId, { margin = 10, behavior = 'smooth' } = {}) {
+  if (!streamEl || !listEl || noteId == null) return false;
+  const li = findStreamLiByNoteId(listEl, noteId);
+  if (!li) return false;
+  const scRect = streamEl.getBoundingClientRect();
+  const liRect = li.getBoundingClientRect();
+  const nextTop = liRect.top - scRect.top + streamEl.scrollTop - margin;
+  streamEl.scrollTo({ top: Math.max(0, nextTop), behavior });
+  return true;
 }
 
 function findStreamLiByNoteId(listEl, noteId) {
@@ -241,8 +252,7 @@ function StreamList({
 }) {
   return (
     <>
-      {nodes.map((n, idx) => {
-        const stackIndex = nodes.slice(0, idx).filter((x) => x.starred).length;
+      {nodes.map((n) => {
         const levelDropMs = exitToRoot ? undefined : levelDropDelays?.get(n.id);
         const replyMs =
           exitToRoot ? undefined : !levelDropMs && depth > 0 ? staggerDelays?.get(n.id) : undefined;
@@ -260,62 +270,45 @@ function StreamList({
             : n.parent_id
               ? threadById?.get(n.parent_id)?.tags ?? []
               : [];
-        const liStyle =
-          !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined;
-        const noteCard = (
-          <NoteCard
-            note={n}
-            depth={depth}
-            hideStar={depth === 0}
-            hasReplies={(n.children?.length ?? 0) > 0}
-            hoverInsightEnabled
-            showFocusButton={depth > 0}
-            parentTagsForInherit={parentTagsForInherit}
-            onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
-            onStarredChange={onStarredChange}
-            onNoteUpdate={onNoteUpdate}
-            onNoteDelete={onNoteDelete}
-          />
-        );
-        const replies =
-          n.children?.length > 0 && depth === 0 ? (
-            <ul className="stream-page-replies">
-              <StreamList
-                nodes={n.children}
-                depth={depth + 1}
-                parentTags={n.tags || []}
-                threadById={threadById}
-                onFocusNote={onFocusNote}
-                onStarredChange={onStarredChange}
-                onNoteUpdate={onNoteUpdate}
-                onNoteDelete={onNoteDelete}
-                staggerDelays={staggerDelays}
-                levelDropDelays={levelDropDelays}
-                exitToRoot={exitToRoot}
-              />
-            </ul>
-          ) : null;
-
-        if (n.starred) {
-          return (
-            <StreamStarredListItem
-              key={n.id}
-              note={n}
-              stackIndex={stackIndex}
-              data-stream-note={n.id}
-              className={animClass}
-              style={liStyle}
-            >
-              {noteCard}
-              {replies}
-            </StreamStarredListItem>
-          );
-        }
-
         return (
-          <li key={n.id} data-stream-note={n.id} className={animClass} style={liStyle}>
-            {noteCard}
-            {replies}
+          <li
+            key={n.id}
+            data-stream-note={n.id}
+            className={animClass}
+            style={
+              !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined
+            }
+          >
+            <NoteCard
+              note={n}
+              depth={depth}
+              hideStar={depth === 0}
+              hasReplies={(n.children?.length ?? 0) > 0}
+              hoverInsightEnabled
+              showFocusButton={depth > 0}
+              parentTagsForInherit={parentTagsForInherit}
+              onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
+              onStarredChange={onStarredChange}
+              onNoteUpdate={onNoteUpdate}
+              onNoteDelete={onNoteDelete}
+            />
+            {n.children?.length > 0 && depth === 0 && (
+              <ul className="stream-page-replies">
+                <StreamList
+                  nodes={n.children}
+                  depth={depth + 1}
+                  parentTags={n.tags || []}
+                  threadById={threadById}
+                  onFocusNote={onFocusNote}
+                  onStarredChange={onStarredChange}
+                  onNoteUpdate={onNoteUpdate}
+                  onNoteDelete={onNoteDelete}
+                  staggerDelays={staggerDelays}
+                  levelDropDelays={levelDropDelays}
+                  exitToRoot={exitToRoot}
+                />
+              </ul>
+            )}
           </li>
         );
       })}
@@ -355,6 +348,8 @@ export default function StreamPage() {
   const threadAnchorRef = useRef(null);
   const threadListRef = useRef(null);
   const streamScrollRef = useRef(null);
+  /** `{ kind: 'bottom', staggerDelay }` or `{ kind: 'note', id }` — consumed by scroll flush after layout. */
+  const pendingStreamScrollRef = useRef(null);
   const composeWrapRef = useRef(null);
   const focusFromUrlApplied = useRef('');
   const floatTimerRef = useRef(null);
@@ -580,6 +575,7 @@ export default function StreamPage() {
     if (focusFromUrlApplied.current === key) return;
     if (!findNode(pinnedTree, focusParam)) return;
     focusFromUrlApplied.current = key;
+    pendingStreamScrollRef.current = { kind: 'note', id: focusParam };
     setFocusId(focusParam);
   }, [threadReady, threadRootId, focusParam, thread, pinnedTree]);
 
@@ -602,27 +598,32 @@ export default function StreamPage() {
     setSearchParams({ thread: threadRootId });
   }, [threadRootId, focusId, pinnedTree, setSearchParams]);
 
-  useEffect(() => {
-    if (!threadRootId || !thread.length || loadingThread) return;
-    const delayMs = replyStagger ? 1400 : 450;
-    const t = window.setTimeout(() => {
-      requestAnimationFrame(() => {
-        const sc = streamScrollRef.current;
-        if (sc) {
-          sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
-        }
-      });
-    }, delayMs);
-    return () => clearTimeout(t);
-  }, [
-    threadRootId,
-    thread[0]?.id,
-    loadingThread,
-    focusParam,
-    replyStagger,
-    focusId,
-    actualRootId,
-  ]);
+  useLayoutEffect(() => {
+    if (!threadRootId || loadingThread || thread.length === 0) return;
+    const pending = pendingStreamScrollRef.current;
+    if (!pending) return;
+
+    const sc = streamScrollRef.current;
+    const listEl = threadListRef.current;
+    if (!sc || !listEl) return;
+
+    if (pending.kind === 'note') {
+      if (scrollStreamListToNote(sc, listEl, pending.id)) {
+        pendingStreamScrollRef.current = null;
+      }
+      return;
+    }
+
+    if (pending.kind === 'bottom') {
+      const stagger = pending.staggerDelay;
+      pendingStreamScrollRef.current = null;
+      window.setTimeout(() => {
+        const s = streamScrollRef.current;
+        if (!s || !threadRootId) return;
+        s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' });
+      }, stagger ? 1400 : 450);
+    }
+  }, [threadRootId, loadingThread, thread.length, focusId, displayTree]);
 
   const openThreadDirect = useCallback(
     (rootId) => {
@@ -633,6 +634,7 @@ export default function StreamPage() {
       clearFloatPicked(threadListRef.current);
       setFloatOpen(null);
       setReplyStagger(false);
+      pendingStreamScrollRef.current = { kind: 'bottom', staggerDelay: false };
       setSearchParams({ thread: rootId });
       setFocusId(null);
     },
@@ -676,6 +678,7 @@ export default function StreamPage() {
         });
         setFloatOpen(null);
         setReplyStagger(true);
+        pendingStreamScrollRef.current = { kind: 'bottom', staggerDelay: true };
         setSearchParams({ thread: rootId });
         setFocusId(null);
       }, 480);
@@ -706,6 +709,7 @@ export default function StreamPage() {
     setBranchHeadExiting(true);
     window.setTimeout(() => {
       setBranchHeadExiting(false);
+      pendingStreamScrollRef.current = { kind: 'note', id: actualRootId };
       setFocusId(null);
       setSearchParams({ thread: threadRootId });
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
@@ -763,6 +767,7 @@ export default function StreamPage() {
       setBranchHeadExiting(true);
       window.setTimeout(() => {
         setBranchHeadExiting(false);
+        pendingStreamScrollRef.current = { kind: 'note', id: parentId };
         setFocusId(parentId);
         setSearchParams({ thread: threadRootId });
         const d = new Map(delays);
@@ -771,6 +776,7 @@ export default function StreamPage() {
         clearLevelDropSoon();
       }, NOTES_EXIT_TO_ROOT_COMMIT_MS);
     } else {
+      pendingStreamScrollRef.current = { kind: 'note', id: parentId };
       setFocusId(parentId);
       setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
       setLevelDropDelays(delays);
@@ -888,16 +894,22 @@ export default function StreamPage() {
 
   const applyFocusImmediate = useCallback(
     (id) => {
+      if (threadRootId) {
+        if (id && !noteIdEq(id, actualRootId)) {
+          pendingStreamScrollRef.current = { kind: 'bottom', staggerDelay: false };
+        } else {
+          pendingStreamScrollRef.current = { kind: 'note', id: actualRootId };
+        }
+      }
       setFocusId(id);
       if (!threadRootId) return;
-      const rid = thread[0]?.id;
-      if (id && !noteIdEq(id, rid)) {
+      if (id && !noteIdEq(id, actualRootId)) {
         setSearchParams({ thread: threadRootId, focus: id });
       } else {
         setSearchParams({ thread: threadRootId });
       }
     },
-    [threadRootId, thread, setSearchParams]
+    [threadRootId, actualRootId, setSearchParams]
   );
 
   const beginDrillFocus = useCallback(
@@ -970,6 +982,7 @@ export default function StreamPage() {
         clearFloatPicked(threadListRef.current);
         setFloatOpen(null);
         setReplyStagger(true);
+        pendingStreamScrollRef.current = { kind: 'bottom', staggerDelay: true };
         setFocusId(id);
         setSearchParams({ thread: threadRootId, focus: id });
       }, 480);
@@ -995,6 +1008,7 @@ export default function StreamPage() {
         if (focusId && !noteIdEq(focusId, actualRootId)) {
           animateToFullThread();
         } else {
+          pendingStreamScrollRef.current = { kind: 'note', id: actualRootId };
           setFocusId(null);
           setSearchParams({ thread: threadRootId });
         }
@@ -1169,6 +1183,7 @@ export default function StreamPage() {
     (it) => {
       if (!it?.noteId) return;
       setHistoryOpen(false);
+      pendingStreamScrollRef.current = { kind: 'note', id: it.noteId };
       if (it.threadRootId) setSearchParams({ thread: it.threadRootId, focus: it.noteId });
       else setSearchParams({ thread: it.noteId });
       setFocusId(it.noteId);
@@ -1257,7 +1272,6 @@ export default function StreamPage() {
             />
           </div>
         )}
-        <StreamScrollProvider scrollRef={streamScrollRef}>
         <div ref={streamScrollRef} className="stream-page-scroll">
           {threadRootId ? (
             <>
@@ -1338,9 +1352,8 @@ export default function StreamPage() {
                 <p className="stream-page-muted">No threads match the current type filters.</p>
               ) : roots.length > 0 ? (
                 <ul className="stream-page-list">
-                  {filteredRoots.map((n, idx) => {
-                    const stackIndex = filteredRoots.slice(0, idx).filter((x) => x.starred).length;
-                    const card = (
+                  {filteredRoots.map((n) => (
+                    <li key={n.id} className="stream-page-root-item" data-stream-note={n.id}>
                       <NoteCard
                         note={n}
                         depth={0}
@@ -1351,32 +1364,13 @@ export default function StreamPage() {
                         onNoteUpdate={loadRoots}
                         onNoteDelete={loadRoots}
                       />
-                    );
-                    if (n.starred) {
-                      return (
-                        <StreamStarredListItem
-                          key={n.id}
-                          note={n}
-                          stackIndex={stackIndex}
-                          className="stream-page-root-item"
-                          data-stream-note={n.id}
-                        >
-                          {card}
-                        </StreamStarredListItem>
-                      );
-                    }
-                    return (
-                      <li key={n.id} className="stream-page-root-item" data-stream-note={n.id}>
-                        {card}
-                      </li>
-                    );
-                  })}
+                    </li>
+                  ))}
                 </ul>
               ) : null}
             </>
           )}
         </div>
-        </StreamScrollProvider>
 
         <div className="stream-page-compose-wrap" data-stream-compose ref={composeWrapRef}>
           {threadRootId ? (
