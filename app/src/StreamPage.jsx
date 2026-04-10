@@ -113,18 +113,6 @@ function scrollStreamListToNote(_streamEl, listEl, noteId) {
   return true;
 }
 
-/** Scroll so the last note row in the list is at the bottom of the visible area. */
-function scrollStreamListToBottom(streamEl, listEl) {
-  if (!listEl) return false;
-  const lis = [...listEl.querySelectorAll('li[data-stream-note]')];
-  if (lis.length === 0) {
-    if (streamEl) streamEl.scrollTop = Math.max(0, streamEl.scrollHeight - streamEl.clientHeight);
-    return Boolean(streamEl);
-  }
-  lis[lis.length - 1].scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
-  return true;
-}
-
 function findStreamLiByNoteId(listEl, noteId) {
   if (!listEl || noteId == null) return null;
   return [...listEl.querySelectorAll('li[data-stream-note]')].find((li) =>
@@ -655,19 +643,6 @@ export default function StreamPage() {
         }, 450);
         return;
       }
-
-      if (intent.kind === 'bottom') {
-        setStreamScrollIntent(null);
-        const stagger = intent.staggerDelay;
-        const run = () => {
-          if (cancelled) return;
-          const s = streamScrollRef.current;
-          const list = threadListRef.current;
-          if (s && list) scrollStreamListToBottom(s, list);
-        };
-        const delays = stagger ? [0, 120, 400, 900, 1400, 2000] : [0, 50, 200, 450, 700];
-        delays.forEach((ms) => window.setTimeout(run, ms));
-      }
     };
 
     tryOnce();
@@ -690,7 +665,7 @@ export default function StreamPage() {
         setSearchParams({ thread: rootId });
         setFocusId(null);
       });
-      setStreamScrollIntent({ kind: 'bottom', staggerDelay: false });
+      setStreamScrollIntent({ kind: 'note', id: rootId });
     },
     [setSearchParams]
   );
@@ -736,7 +711,7 @@ export default function StreamPage() {
           setSearchParams({ thread: rootId });
           setFocusId(null);
         });
-        setStreamScrollIntent({ kind: 'bottom', staggerDelay: true });
+        setStreamScrollIntent({ kind: 'note', id: rootId });
       }, 480);
     },
     [filteredRoots, openThreadDirect, setSearchParams]
@@ -829,7 +804,7 @@ export default function StreamPage() {
           setFocusId(parentId);
           setSearchParams({ thread: threadRootId });
         });
-        setStreamScrollIntent({ kind: 'note', id: leavingHeadId });
+        setStreamScrollIntent({ kind: 'note', id: parentId });
         const d = new Map(delays);
         d.set(leavingHeadId, 440);
         setLevelDropDelays(d);
@@ -840,7 +815,7 @@ export default function StreamPage() {
         setFocusId(parentId);
         setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
       });
-      setStreamScrollIntent({ kind: 'note', id: leavingHeadId });
+      setStreamScrollIntent({ kind: 'note', id: parentId });
       setLevelDropDelays(delays);
       clearLevelDropSoon();
     }
@@ -958,7 +933,7 @@ export default function StreamPage() {
     (id) => {
       if (threadRootId) {
         if (id && !noteIdEq(id, actualRootId)) {
-          setStreamScrollIntent({ kind: 'bottom', staggerDelay: false });
+          setStreamScrollIntent({ kind: 'note', id });
         } else {
           setStreamScrollIntent({ kind: 'note', id: actualRootId });
         }
@@ -1050,7 +1025,7 @@ export default function StreamPage() {
           setFocusId(id);
           setSearchParams({ thread: threadRootId, focus: id });
         });
-        setStreamScrollIntent({ kind: 'bottom', staggerDelay: true });
+        setStreamScrollIntent({ kind: 'note', id });
       }, 480);
     },
     [
@@ -1178,6 +1153,7 @@ export default function StreamPage() {
       resetComposeMeta();
       if (replyFileRef.current) replyFileRef.current.value = '';
       await loadThread(true);
+      setStreamScrollIntent({ kind: 'note', id: note.id });
     } catch (err) {
       console.error(err);
     } finally {
