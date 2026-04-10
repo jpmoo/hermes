@@ -655,19 +655,23 @@ export default function StreamPage() {
       return false;
     };
 
-    const tryOnce = () => {
+    const MAX_FRAMES = 150;
+    const tick = () => {
       if (cancelled) return;
+      attempts += 1;
       const sc = streamScrollRef.current;
       const listEl = threadListRef.current;
       if (!sc || !listEl) {
-        attempts += 1;
-        if (attempts < 90) rafId = requestAnimationFrame(tryOnce);
+        if (attempts < MAX_FRAMES) rafId = requestAnimationFrame(tick);
         return;
       }
-
       if (intent.kind === 'note') {
         const noteScrollId = intent.id;
         if (finishNote(sc, listEl, noteScrollId)) return;
+        if (attempts < MAX_FRAMES) {
+          rafId = requestAnimationFrame(tick);
+          return;
+        }
         window.setTimeout(() => {
           if (cancelled) return;
           const s2 = streamScrollRef.current;
@@ -676,11 +680,10 @@ export default function StreamPage() {
             setStreamScrollIntent(null);
           }
         }, 450);
-        return;
       }
     };
 
-    tryOnce();
+    tick();
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafId);
@@ -795,7 +798,8 @@ export default function StreamPage() {
       return;
     }
     levelNavBusyRef.current = true;
-    focusFromUrlApplied.current = '';
+    // Do not clear focusFromUrlApplied here — the URL sync effect would re-run with a stale
+    // focus= param (still the child) before React Router updates, resetting focusId and breaking scroll.
     const leavingHeadId = focusId;
     const listEl = threadListRef.current;
     const headLi = listEl?.querySelector(
@@ -840,8 +844,9 @@ export default function StreamPage() {
         flushSync(() => {
           setFocusId(parentId);
           setSearchParams({ thread: threadRootId });
+          setStreamScrollIntent({ kind: 'note', id: scrollToId });
         });
-        setStreamScrollIntent({ kind: 'note', id: scrollToId });
+        focusFromUrlApplied.current = '';
         const d = new Map(delays);
         d.set(leavingHeadId, 440);
         setLevelDropDelays(d);
@@ -851,8 +856,13 @@ export default function StreamPage() {
       flushSync(() => {
         setFocusId(parentId);
         setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
+        setStreamScrollIntent({ kind: 'note', id: scrollToId });
       });
-      setStreamScrollIntent({ kind: 'note', id: scrollToId });
+      if (movingToRoot) {
+        focusFromUrlApplied.current = '';
+      } else {
+        focusFromUrlApplied.current = `${threadRootId}|${parentId}`;
+      }
       setLevelDropDelays(delays);
       clearLevelDropSoon();
     }
