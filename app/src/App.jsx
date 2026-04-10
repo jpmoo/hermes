@@ -10,6 +10,7 @@ import CalendarView from './CalendarView';
 import CanvasPage from './CanvasPage';
 import { NoteTypeFilterProvider } from './NoteTypeFilterContext';
 import { NoteTypeColorProvider } from './NoteTypeColorContext';
+import './App.css';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -103,13 +104,15 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename="/hermes">
-        <NoteTypeColorProvider>
-          <NoteTypeFilterProvider>
-            <AppRoutes />
-          </NoteTypeFilterProvider>
-        </NoteTypeColorProvider>
-      </BrowserRouter>
+      <div className="app-shell">
+        <BrowserRouter basename="/hermes">
+          <NoteTypeColorProvider>
+            <NoteTypeFilterProvider>
+              <AppRoutes />
+            </NoteTypeFilterProvider>
+          </NoteTypeColorProvider>
+        </BrowserRouter>
+      </div>
     </AuthProvider>
   );
 }

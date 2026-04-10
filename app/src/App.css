@@ -1,0 +1,14 @@
+/* Fill #root so Stream/Layout can use flex + overflow without the column growing past the viewport. */
+.app-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell > * {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

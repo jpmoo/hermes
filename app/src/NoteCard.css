@@ -220,6 +220,8 @@
   margin-top: auto;
   flex-shrink: 0;
   padding-top: 0.3rem;
+  /* Avoid double-click “word select” on timestamp / icon row so drill fires instead. */
+  user-select: none;
 }
 
 .note-card-time {
@@ -587,6 +589,7 @@
   overflow-y: auto;
   z-index: 5;
   transform: translateX(-50%);
+  user-select: text;
 }
 
 .note-card-tag-dropdown li button {

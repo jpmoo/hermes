@@ -33,7 +33,6 @@ import { NavIconAttach } from './icons/NavIcons';
 import {
   NoteCardIconDelete,
   NoteCardIconEdit,
-  NoteCardIconFocus,
   NoteCardIconInsight,
   NoteCardIconTag,
   NoteCardIconSpaztick,
@@ -53,8 +52,6 @@ export default function NoteCard({
   parentTagsForInherit,
   /** Stream/canvas/search: show insight action; insight panels use HoverInsightProvider */
   hoverInsightEnabled = false,
-  /** Hide “Focus in Stream” on the thread head when viewing a thread; root-level list keeps it. */
-  showFocusButton = true,
   hideStar = false,
 }) {
   const navigate = useNavigate();
@@ -399,23 +396,15 @@ export default function NoteCard({
     onOpenThread?.(e);
   }, [hoverInsight, onOpenThread]);
 
-  const handleFocusNote = useCallback(
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      focusNoteInStream(e);
-    },
-    [focusNoteInStream]
-  );
-
   const handleNoteDoubleClick = useCallback(
     (e) => {
-      if (!showFocusButton || editing) return;
-      const target = e.target;
+      if (!onOpenThread || editing) return;
+      const raw = e.target;
+      const el = raw instanceof Element ? raw : raw?.parentElement;
+      // Only skip real controls — not the whole .note-card-actions box (padding/gap was blocking drill).
       if (
-        target instanceof Element &&
-        target.closest(
-          '.note-card-actions, button, input, textarea, select, a, [role="button"], [contenteditable="true"]'
+        el?.closest(
+          'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown'
         )
       ) {
         return;
@@ -424,7 +413,7 @@ export default function NoteCard({
       e.stopPropagation();
       focusNoteInStream(e);
     },
-    [showFocusButton, editing, focusNoteInStream]
+    [onOpenThread, editing, focusNoteInStream]
   );
 
   const handleNoteClickCapture = useCallback(
@@ -520,8 +509,8 @@ export default function NoteCard({
         borderLeftWidth: borderWidth,
         ...linkedBorderVars,
       }}
-      onDoubleClickCapture={showFocusButton && !editing ? handleNoteDoubleClick : undefined}
-      onClickCapture={showFocusButton && !editing ? handleNoteClickCapture : undefined}
+      onDoubleClickCapture={onOpenThread && !editing ? handleNoteDoubleClick : undefined}
+      onClickCapture={onOpenThread && !editing ? handleNoteClickCapture : undefined}
     >
       {editing ? (
         <button
@@ -623,17 +612,6 @@ export default function NoteCard({
           <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
               <>
-                {showFocusButton ? (
-                  <button
-                    type="button"
-                    className="note-card-icon-btn"
-                    onClick={handleFocusNote}
-                    title="Focus this note in Stream"
-                    aria-label="Focus this note in Stream"
-                  >
-                    <NoteCardIconFocus className="note-card-icon-btn__svg" />
-                  </button>
-                ) : null}
                 {hoverInsightEnabled ? (
                   <button
                     type="button"

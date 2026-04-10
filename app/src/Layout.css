@@ -1,7 +1,9 @@
 .layout {
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .layout-header {
@@ -298,6 +300,13 @@
   --stream-nav-sticky-top: 3.5rem;
   /* Taller when header was two rows; single-row phone header ≈ primary sticky offset */
   --stream-nav-sticky-top-mobile: 6.85rem;
+}
+
+/* Single view (Stream, Canvas, …) fills main so nested flex scroll columns get a real height cap. */
+.layout-main > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 @media (max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px) {
