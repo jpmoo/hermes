@@ -123,12 +123,13 @@ function streamNoteAttrEscaped(id) {
  * right overflow ancestor (.stream-page-scroll). Avoid manual scrollTop during thread/level-drop
  * animations — rects are wrong until ~400–500ms after focus changes, which caused “stuck at top +
  * bump” behavior.
+ * @param {'start' | 'center'} [block] — `start` for drill-down (head at top of list); `center` for drill-up / reply visibility.
  */
-function scrollStreamListToNote(_streamEl, listEl, noteId) {
+function scrollStreamListToNote(_streamEl, listEl, noteId, block = 'center') {
   if (!listEl || noteId == null) return false;
   const li = findStreamLiByNoteId(listEl, noteId);
   if (!li) return false;
-  li.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+  li.scrollIntoView({ block, inline: 'nearest', behavior: 'auto' });
   return true;
 }
 
@@ -637,13 +638,14 @@ export default function StreamPage() {
     if (intent.kind !== 'note') return;
 
     const noteScrollId = intent.id;
+    const scrollBlock = intent.block ?? 'center';
     let cancelled = false;
 
     const run = () => {
       if (cancelled) return;
       const sc = streamScrollRef.current;
       const listEl = threadListRef.current;
-      if (sc && listEl) scrollStreamListToNote(sc, listEl, noteScrollId);
+      if (sc && listEl) scrollStreamListToNote(sc, listEl, noteScrollId, scrollBlock);
     };
 
     // Thread enter + level-drop animations run ~0.4–0.5s; first rects are wrong and fire-and-forget
@@ -674,7 +676,7 @@ export default function StreamPage() {
         setSearchParams({ thread: rootId });
         setFocusId(null);
       });
-      setStreamScrollIntent({ kind: 'note', id: rootId });
+      setStreamScrollIntent({ kind: 'note', id: rootId, block: 'start' });
     },
     [setSearchParams]
   );
@@ -720,7 +722,7 @@ export default function StreamPage() {
           setSearchParams({ thread: rootId });
           setFocusId(null);
         });
-        setStreamScrollIntent({ kind: 'note', id: rootId });
+        setStreamScrollIntent({ kind: 'note', id: rootId, block: 'start' });
       }, 480);
     },
     [filteredRoots, openThreadDirect, setSearchParams]
@@ -753,7 +755,7 @@ export default function StreamPage() {
         setFocusId(null);
         setSearchParams({ thread: threadRootId });
       });
-      setStreamScrollIntent({ kind: 'note', id: actualRootId });
+      setStreamScrollIntent({ kind: 'note', id: actualRootId, block: 'start' });
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
       clearLevelDropSoon();
       levelNavBusyRef.current = false;
@@ -951,9 +953,9 @@ export default function StreamPage() {
     (id) => {
       if (threadRootId) {
         if (id && !noteIdEq(id, actualRootId)) {
-          setStreamScrollIntent({ kind: 'note', id });
+          setStreamScrollIntent({ kind: 'note', id, block: 'start' });
         } else {
-          setStreamScrollIntent({ kind: 'note', id: actualRootId });
+          setStreamScrollIntent({ kind: 'note', id: actualRootId, block: 'start' });
         }
       }
       flushSync(() => {
@@ -1043,7 +1045,7 @@ export default function StreamPage() {
           setFocusId(id);
           setSearchParams({ thread: threadRootId, focus: id });
         });
-        setStreamScrollIntent({ kind: 'note', id });
+        setStreamScrollIntent({ kind: 'note', id, block: 'start' });
       }, 480);
     },
     [
@@ -1071,7 +1073,7 @@ export default function StreamPage() {
             setFocusId(null);
             setSearchParams({ thread: threadRootId });
           });
-          setStreamScrollIntent({ kind: 'note', id: actualRootId });
+          setStreamScrollIntent({ kind: 'note', id: actualRootId, block: 'start' });
         }
         return;
       }
