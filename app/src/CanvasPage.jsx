@@ -25,7 +25,7 @@ import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import NoteTypeIcon from './NoteTypeIcon';
 import ComposeCalendarPills from './ComposeCalendarPills';
-import { eventFieldsToPayload, NOTE_TYPE_OPTIONS, isoToDateTimeFields } from './noteEventUtils';
+import { eventFieldsToPayload, NOTE_TYPE_OPTIONS, calendarFeedPickToComposeFields } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
@@ -579,13 +579,14 @@ export default function CanvasPage() {
   }, [composeNoteType]);
 
   const handleCalendarPick = useCallback(
-    ({ title, startIso }) => {
+    (ev) => {
       setComposeNoteType('event');
-      const fields = isoToDateTimeFields(startIso, false);
-      setComposeStartDate(fields.date);
-      setComposeStartTime(fields.time);
-      setComposeEndDate('');
-      setComposeEndTime('');
+      const f = calendarFeedPickToComposeFields(ev);
+      setComposeStartDate(f.startDate);
+      setComposeStartTime(f.startTime);
+      setComposeEndDate(f.endDate);
+      setComposeEndTime(f.endTime);
+      const title = typeof ev?.title === 'string' ? ev.title : '';
       if (threadRootId) {
         setReplyContent(title);
       } else {

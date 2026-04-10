@@ -431,6 +431,13 @@ router.get('/calendar-feed-events', requireAuth, async (req, res) => {
         start: e.start.toISOString(),
         end: e.end.toISOString(),
         feedUrl: e.feedUrl,
+        ...(e.allDay === true
+          ? {
+              allDay: true,
+              startDay: e.startDay,
+              endDayInclusive: e.endDayInclusive,
+            }
+          : {}),
       })),
     });
   } catch (err) {

@@ -74,6 +74,38 @@ export function eventFieldsToPayload(noteType, { startDate, startTime, endDate, 
   };
 }
 
+/**
+ * Map a calendar-feed API event to compose date/time fields (all-day uses dates only, no times).
+ * @param {{ start: string, end: string, allDay?: boolean, startDay?: string, endDayInclusive?: string }} ev
+ */
+export function calendarFeedPickToComposeFields(ev) {
+  if (ev?.allDay === true && typeof ev.startDay === 'string' && ev.startDay) {
+    const multi =
+      typeof ev.endDayInclusive === 'string' &&
+      ev.endDayInclusive &&
+      ev.endDayInclusive !== ev.startDay;
+    return {
+      startDate: ev.startDay,
+      startTime: '',
+      endDate: multi ? ev.endDayInclusive : '',
+      endTime: '',
+    };
+  }
+  const startIso = ev?.start;
+  const endIso = ev?.end;
+  if (!startIso) {
+    return { startDate: '', startTime: '', endDate: '', endTime: '' };
+  }
+  const s = isoToDateTimeFields(startIso, false);
+  const e = endIso ? isoToDateTimeFields(endIso, true) : { date: '', time: '' };
+  return {
+    startDate: s.date,
+    startTime: s.time,
+    endDate: e.date,
+    endTime: e.time,
+  };
+}
+
 export function formatEventRange(note) {
   if (note?.note_type !== 'event') return '';
   const fmt = (iso, withTime) => {

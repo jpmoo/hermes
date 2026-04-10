@@ -18,7 +18,7 @@ import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import NoteTypeIcon from './NoteTypeIcon';
 import ComposeCalendarPills from './ComposeCalendarPills';
-import { eventFieldsToPayload, NOTE_TYPE_OPTIONS, isoToDateTimeFields } from './noteEventUtils';
+import { eventFieldsToPayload, NOTE_TYPE_OPTIONS, calendarFeedPickToComposeFields } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
@@ -336,6 +336,8 @@ export default function StreamPage() {
   const threadAnchorRef = useRef(null);
   const threadListRef = useRef(null);
   const composeWrapRef = useRef(null);
+  /** When true, scroll composer into view even in branch (drill) layout — set after up-level / open-thread, not after drill-down. */
+  const scrollComposeExplicitRef = useRef(false);
   const focusFromUrlApplied = useRef('');
   const floatTimerRef = useRef(null);
   const { logout, user } = useAuth();
@@ -433,13 +435,14 @@ export default function StreamPage() {
   }, [composeNoteType]);
 
   const handleCalendarPick = useCallback(
-    ({ title, startIso }) => {
+    (ev) => {
       setComposeNoteType('event');
-      const fields = isoToDateTimeFields(startIso, false);
-      setComposeStartDate(fields.date);
-      setComposeStartTime(fields.time);
-      setComposeEndDate('');
-      setComposeEndTime('');
+      const f = calendarFeedPickToComposeFields(ev);
+      setComposeStartDate(f.startDate);
+      setComposeStartTime(f.startTime);
+      setComposeEndDate(f.endDate);
+      setComposeEndTime(f.endTime);
+      const title = typeof ev?.title === 'string' ? ev.title : '';
       if (threadRootId) {
         setReplyContent(title);
       } else {
@@ -591,10 +594,12 @@ export default function StreamPage() {
       return;
     }
 
-    const showingBranch = focusId && actualRootId && !noteIdEq(focusId, actualRootId);
-    if (showingBranch) {
+    const inBranchView = focusId && actualRootId && !noteIdEq(focusId, actualRootId);
+    const allowScrollToCompose = !inBranchView || scrollComposeExplicitRef.current;
+    if (!allowScrollToCompose) {
       return;
     }
+    scrollComposeExplicitRef.current = false;
 
     const delayMs = replyStagger ? 1400 : 450;
     const t = window.setTimeout(() => {
@@ -615,6 +620,7 @@ export default function StreamPage() {
 
   const openThreadDirect = useCallback(
     (rootId) => {
+      scrollComposeExplicitRef.current = true;
       if (floatTimerRef.current) {
         clearTimeout(floatTimerRef.current);
         floatTimerRef.current = null;
@@ -665,6 +671,7 @@ export default function StreamPage() {
         });
         setFloatOpen(null);
         setReplyStagger(true);
+        scrollComposeExplicitRef.current = true;
         setSearchParams({ thread: rootId });
         setFocusId(null);
       }, 480);
@@ -695,6 +702,7 @@ export default function StreamPage() {
     setBranchHeadExiting(true);
     window.setTimeout(() => {
       setBranchHeadExiting(false);
+      scrollComposeExplicitRef.current = true;
       setFocusId(null);
       setSearchParams({ thread: threadRootId });
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
@@ -711,6 +719,7 @@ export default function StreamPage() {
       animateToFullThread();
       return;
     }
+    scrollComposeExplicitRef.current = true;
     levelNavBusyRef.current = true;
     focusFromUrlApplied.current = '';
     const leavingHeadId = focusId;

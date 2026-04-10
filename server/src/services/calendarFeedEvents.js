@@ -68,6 +68,24 @@ function overlapsWindow(aStart, aEnd, wFrom, wTo) {
   return aStart < wTo && aEnd > wFrom;
 }
 
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+/** Local calendar YYYY-MM-DD for Hermes date inputs (matches client Date parsing). */
+function localYmd(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/**
+ * iCal all-day DTEND is exclusive (first day after the event). Last inclusive day is one calendar day before.
+ */
+function allDayInclusiveEndDay(exclusiveEnd) {
+  const d = new Date(exclusiveEnd.getTime());
+  d.setDate(d.getDate() - 1);
+  return localYmd(d);
+}
+
 /**
  * @param {string} icsBody
  * @param {Date} rangeFrom start of local "today" as Date
@@ -88,6 +106,7 @@ export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl) {
     if (!comp || comp.type !== 'VEVENT') continue;
     if (comp.status === 'CANCELLED') continue;
     const title = getSummary(comp);
+    const allDay = comp.datetype === 'date';
     const instances = expandEventInstances(comp, rangeFrom, rangeTo);
     for (const { start, end } of instances) {
       if (!start || !end) continue;
@@ -95,7 +114,12 @@ export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl) {
       if (!overlapsWindow(start, end, rangeFrom, rangeTo)) continue;
       // Still ongoing: not fully ended yet (includes in-progress and future starts; excludes finished)
       if (end.getTime() <= now.getTime()) continue;
-      candidates.push({ title, start: new Date(start), end: new Date(end), feedUrl });
+      const row = { title, start: new Date(start), end: new Date(end), feedUrl, allDay };
+      if (allDay) {
+        row.startDay = localYmd(start);
+        row.endDayInclusive = allDayInclusiveEndDay(end);
+      }
+      candidates.push(row);
     }
   }
   return candidates;

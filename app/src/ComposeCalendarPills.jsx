@@ -67,7 +67,11 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
               onClick={() =>
                 onPickEvent({
                   title: ev.title,
-                  startIso: ev.start,
+                  start: ev.start,
+                  end: ev.end,
+                  allDay: ev.allDay === true,
+                  startDay: ev.startDay,
+                  endDayInclusive: ev.endDayInclusive,
                 })
               }
             >
