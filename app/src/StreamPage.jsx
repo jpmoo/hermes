@@ -119,25 +119,16 @@ function streamNoteAttrEscaped(id) {
 }
 
 /**
- * Scroll so the row for `noteId` is visible inside `streamEl` (.stream-page-scroll).
- * Uses explicit scrollTop so we account for the sticky nav inside the scroller; scrollIntoView alone
- * often aligned to the scrollport top and could fight with in-app scroll targets.
+ * Scroll the note row into view. Uses scrollIntoView + scroll-margin (CSS) so the browser picks the
+ * right overflow ancestor (.stream-page-scroll). Avoid manual scrollTop during thread/level-drop
+ * animations — rects are wrong until ~400–500ms after focus changes, which caused “stuck at top +
+ * bump” behavior.
  */
-function scrollStreamListToNote(streamEl, listEl, noteId) {
+function scrollStreamListToNote(_streamEl, listEl, noteId) {
   if (!listEl || noteId == null) return false;
   const li = findStreamLiByNoteId(listEl, noteId);
   if (!li) return false;
-  if (streamEl) {
-    const nav = streamEl.querySelector(':scope > .stream-page-nav-row');
-    const navH = nav ? nav.getBoundingClientRect().height : 0;
-    const pad = 6;
-    const s = streamEl.getBoundingClientRect();
-    const r = li.getBoundingClientRect();
-    const nextTop = streamEl.scrollTop + (r.top - s.top) - navH - pad;
-    streamEl.scrollTo({ top: Math.max(0, nextTop), behavior: 'auto' });
-    return true;
-  }
-  li.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+  li.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
   return true;
 }
 
@@ -643,50 +634,30 @@ export default function StreamPage() {
     if (!threadRootId || loadingThread || thread.length === 0) return;
 
     const intent = streamScrollIntent;
+    if (intent.kind !== 'note') return;
+
+    const noteScrollId = intent.id;
     let cancelled = false;
-    let rafId = 0;
-    let attempts = 0;
 
-    const finishNote = (sc, listEl, noteScrollId) => {
-      if (scrollStreamListToNote(sc, listEl, noteScrollId)) {
-        setStreamScrollIntent(null);
-        return true;
-      }
-      return false;
-    };
-
-    const MAX_FRAMES = 150;
-    const tick = () => {
+    const run = () => {
       if (cancelled) return;
-      attempts += 1;
       const sc = streamScrollRef.current;
       const listEl = threadListRef.current;
-      if (!sc || !listEl) {
-        if (attempts < MAX_FRAMES) rafId = requestAnimationFrame(tick);
-        return;
-      }
-      if (intent.kind === 'note') {
-        const noteScrollId = intent.id;
-        if (finishNote(sc, listEl, noteScrollId)) return;
-        if (attempts < MAX_FRAMES) {
-          rafId = requestAnimationFrame(tick);
-          return;
-        }
-        window.setTimeout(() => {
-          if (cancelled) return;
-          const s2 = streamScrollRef.current;
-          const l2 = threadListRef.current;
-          if (s2 && l2 && scrollStreamListToNote(s2, l2, noteScrollId)) {
-            setStreamScrollIntent(null);
-          }
-        }, 450);
-      }
+      if (sc && listEl) scrollStreamListToNote(sc, listEl, noteScrollId);
     };
 
-    tick();
+    // Thread enter + level-drop animations run ~0.4–0.5s; first rects are wrong and fire-and-forget
+    // scrollTop/IntoView once lands at the wrong place. Retry through settle time.
+    const delaysMs = [0, 50, 120, 280, 450, 650, 900];
+    const timers = delaysMs.map((ms) => window.setTimeout(run, ms));
+    const doneTimer = window.setTimeout(() => {
+      if (!cancelled) setStreamScrollIntent(null);
+    }, 950);
+
     return () => {
       cancelled = true;
-      cancelAnimationFrame(rafId);
+      timers.forEach((t) => clearTimeout(t));
+      clearTimeout(doneTimer);
     };
   }, [streamScrollIntent, threadRootId, loadingThread, thread.length, focusId, displayTree]);
 

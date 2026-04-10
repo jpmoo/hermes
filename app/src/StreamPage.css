@@ -562,6 +562,13 @@
   padding: 0;
 }
 
+/* scrollIntoView targets: room below sticky .stream-page-nav-row inside .stream-page-scroll */
+.stream-page-scroll .stream-page-list > li[data-stream-note],
+.stream-page-scroll .stream-page-replies > li[data-stream-note] {
+  scroll-margin-top: 5.25rem;
+  scroll-margin-bottom: 1rem;
+}
+
 .stream-page-replies {
   list-style: none;
   margin: 0.25rem 0 0.25rem 1rem;
