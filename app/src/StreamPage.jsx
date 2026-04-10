@@ -84,6 +84,23 @@ function parentInFilteredTree(nodes, targetId) {
   return null;
 }
 
+/**
+ * Row to scroll to after “up one level” focuses `newFocusId`. Stream shows that head plus its direct
+ * replies only, so we need a note id that has an `li` under the new head — the child on the path
+ * from `newFocus` toward `formerHeadId` (usually `formerHeadId` itself when it was a direct reply).
+ */
+function scrollTargetForOneLevelUp(treeRoots, newFocusId, formerHeadId) {
+  if (formerHeadId == null || newFocusId == null) return newFocusId;
+  let id = formerHeadId;
+  for (let guard = 0; guard < 256; guard++) {
+    const p = parentInFilteredTree(treeRoots, id);
+    if (p == null) return newFocusId;
+    if (noteIdEq(p, newFocusId)) return id;
+    id = p;
+  }
+  return newFocusId;
+}
+
 /** IDs from tree root down to target (inclusive). */
 function pathFromRootToId(nodes, targetId, acc = []) {
   for (const n of nodes) {
@@ -791,6 +808,8 @@ export default function StreamPage() {
 
     const canFloat = Boolean(fr && note && fr.width > 0 && fr.height > 0);
 
+    const scrollToId = scrollTargetForOneLevelUp(tree, parentId, leavingHeadId);
+
     /*
      * Up to thread root: deferring focus keeps the parent row out of the DOM, so the float cannot
      * measure the real reply slot (fallback = head row = no motion). When we can float, commit focus
@@ -804,7 +823,7 @@ export default function StreamPage() {
           setFocusId(parentId);
           setSearchParams({ thread: threadRootId });
         });
-        setStreamScrollIntent({ kind: 'note', id: parentId });
+        setStreamScrollIntent({ kind: 'note', id: scrollToId });
         const d = new Map(delays);
         d.set(leavingHeadId, 440);
         setLevelDropDelays(d);
@@ -815,7 +834,7 @@ export default function StreamPage() {
         setFocusId(parentId);
         setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
       });
-      setStreamScrollIntent({ kind: 'note', id: parentId });
+      setStreamScrollIntent({ kind: 'note', id: scrollToId });
       setLevelDropDelays(delays);
       clearLevelDropSoon();
     }
