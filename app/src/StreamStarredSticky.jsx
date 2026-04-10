@@ -46,7 +46,7 @@ export function StreamStarredListItem({ note, stackIndex, className, style, chil
     };
 
     const attach = () => {
-      scrollEl = scrollRef?.current;
+      const scrollEl = scrollRef?.current;
       if (!scrollEl) {
         rafId = requestAnimationFrame(attach);
         return;
