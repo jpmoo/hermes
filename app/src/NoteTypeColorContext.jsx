@@ -30,15 +30,18 @@ export function NoteTypeColorProvider({ children }) {
   const [inboxThreadRootId, setInboxThreadRootId] = useState('');
   const [spaztickApiUrl, setSpaztickApiUrl] = useState('');
   const [spaztickApiKeySet, setSpaztickApiKeySet] = useState(false);
+  const [calendarFeedUrls, setCalendarFeedUrls] = useState([]);
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
   const skipSimilarNotesSave = useRef(false);
   const skipInboxSave = useRef(false);
   const skipSpaztickSave = useRef(false);
+  const skipCalendarFeedsSave = useRef(false);
   const saveTimer = useRef(null);
   const similarSaveTimer = useRef(null);
   const inboxSaveTimer = useRef(null);
   const spaztickSaveTimer = useRef(null);
+  const calendarFeedsSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
 
   /* Load from server when logged in (canonical); seed server from this device if account has none yet. */
@@ -68,12 +71,14 @@ export function NoteTypeColorProvider({ children }) {
         setInboxThreadRootId(typeof data.inboxThreadRootId === 'string' ? data.inboxThreadRootId : '');
         setSpaztickApiUrl(typeof data.spaztickApiUrl === 'string' ? data.spaztickApiUrl : '');
         setSpaztickApiKeySet(data.spaztickApiKeySet === true);
+        setCalendarFeedUrls(Array.isArray(data.calendarFeedUrls) ? data.calendarFeedUrls : []);
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
           skipSimilarNotesSave.current = true;
           skipInboxSave.current = true;
           skipSpaztickSave.current = true;
+          skipCalendarFeedsSave.current = true;
           try {
             await patchUserSettings({ noteTypeColors: local });
           } catch (e) {
@@ -85,6 +90,7 @@ export function NoteTypeColorProvider({ children }) {
           skipSimilarNotesSave.current = true;
           skipInboxSave.current = true;
           skipSpaztickSave.current = true;
+          skipCalendarFeedsSave.current = true;
         }
       } catch (e) {
         console.error(e);
@@ -92,6 +98,7 @@ export function NoteTypeColorProvider({ children }) {
         skipSimilarNotesSave.current = true;
         skipInboxSave.current = true;
         skipSpaztickSave.current = true;
+        skipCalendarFeedsSave.current = true;
       } finally {
         if (!cancelled) setServerReady(true);
       }
@@ -112,10 +119,12 @@ export function NoteTypeColorProvider({ children }) {
       setInboxThreadRootId('');
       setSpaztickApiUrl('');
       setSpaztickApiKeySet(false);
+      setCalendarFeedUrls([]);
       skipNoteTypeColorsSave.current = true;
       skipSimilarNotesSave.current = true;
       skipInboxSave.current = true;
       skipSpaztickSave.current = true;
+      skipCalendarFeedsSave.current = true;
     }
   }, [user]);
 
@@ -192,6 +201,24 @@ export function NoteTypeColorProvider({ children }) {
     };
   }, [spaztickApiUrl, user?.id, serverReady]);
 
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipCalendarFeedsSave.current) {
+      skipCalendarFeedsSave.current = false;
+      return;
+    }
+    if (calendarFeedsSaveTimer.current) clearTimeout(calendarFeedsSaveTimer.current);
+    calendarFeedsSaveTimer.current = setTimeout(() => {
+      calendarFeedsSaveTimer.current = null;
+      patchUserSettings({
+        calendarFeedUrls: calendarFeedUrls.length > 0 ? calendarFeedUrls : null,
+      }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (calendarFeedsSaveTimer.current) clearTimeout(calendarFeedsSaveTimer.current);
+    };
+  }, [calendarFeedUrls, user?.id, serverReady]);
+
   const setTypeColor = useCallback((type, hexOrNull) => {
     if (!NOTE_TYPE_COLOR_KEYS.includes(type)) return;
     setColors((prev) => {
@@ -250,6 +277,14 @@ export function NoteTypeColorProvider({ children }) {
     skipSpaztickSave.current = true;
   }, []);
 
+  const setCalendarFeedUrlsSetting = useCallback((urls) => {
+    if (!Array.isArray(urls)) {
+      setCalendarFeedUrls([]);
+      return;
+    }
+    setCalendarFeedUrls(urls);
+  }, []);
+
   const spaztickReady =
     Boolean(spaztickApiUrl?.trim()) && spaztickApiKeySet;
 
@@ -270,6 +305,8 @@ export function NoteTypeColorProvider({ children }) {
       spaztickApiKeySet,
       saveSpaztickApiKey,
       spaztickReady,
+      calendarFeedUrls,
+      setCalendarFeedUrls: setCalendarFeedUrlsSetting,
     }),
     [
       colors,
@@ -287,6 +324,8 @@ export function NoteTypeColorProvider({ children }) {
       spaztickApiKeySet,
       saveSpaztickApiKey,
       spaztickReady,
+      calendarFeedUrls,
+      setCalendarFeedUrlsSetting,
     ]
   );
 

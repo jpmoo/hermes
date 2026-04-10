@@ -5,8 +5,33 @@ import {
   similarNotesMinCharsEnvDefault,
   sanitizeSimilarNotesMinChars,
 } from '../config/similarNotes.js';
+import {
+  eventsFromIcsForDay,
+  fetchIcsText,
+  isAllowedCalendarFeedUrl,
+} from '../services/calendarFeedEvents.js';
 
 const router = Router();
+
+const MAX_CALENDAR_FEEDS = 12;
+const MAX_FEED_URL_LEN = 2048;
+
+function sanitizeCalendarFeedUrls(input) {
+  if (input == null || !Array.isArray(input)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const item of input) {
+    if (typeof item !== 'string') continue;
+    const t = item.trim();
+    if (!t || t.length > MAX_FEED_URL_LEN) continue;
+    if (!isAllowedCalendarFeedUrl(t)) continue;
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+    if (out.length >= MAX_CALENDAR_FEEDS) break;
+  }
+  return out;
+}
 
 const NOTE_TYPES = ['note', 'event', 'person', 'organization'];
 const NOTE_HISTORY_MAX = 20;
@@ -182,6 +207,7 @@ router.get('/settings', requireAuth, async (req, res) => {
     const inboxThreadRootId = sanitizeInboxThreadRootId(raw.inboxThreadRootId);
     const spUrl = sanitizeSpaztickApiUrl(raw.spaztickApiUrl);
     const spKeyStored = typeof raw.spaztickApiKey === 'string' && raw.spaztickApiKey.trim().length > 0;
+    const calendarFeedUrls = sanitizeCalendarFeedUrls(raw.calendarFeedUrls);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
@@ -192,6 +218,7 @@ router.get('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId: inboxThreadRootId === undefined ? null : inboxThreadRootId,
       spaztickApiUrl: spUrl === undefined ? null : spUrl,
       spaztickApiKeySet: spKeyStored,
+      calendarFeedUrls,
     });
   } catch (err) {
     console.error(err);
@@ -210,6 +237,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId,
       spaztickApiUrl,
       spaztickApiKey,
+      calendarFeedUrls,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -319,6 +347,18 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (calendarFeedUrls !== undefined) {
+      if (calendarFeedUrls === null) {
+        delete cur.calendarFeedUrls;
+      } else if (!Array.isArray(calendarFeedUrls)) {
+        return res.status(400).json({ error: 'calendarFeedUrls must be an array of URLs or null' });
+      } else {
+        const cleaned = sanitizeCalendarFeedUrls(calendarFeedUrls);
+        if (cleaned.length === 0) delete cur.calendarFeedUrls;
+        else cur.calendarFeedUrls = cleaned;
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -331,6 +371,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outInbox = sanitizeInboxThreadRootId(cur.inboxThreadRootId);
     const outSpUrl = sanitizeSpaztickApiUrl(cur.spaztickApiUrl);
     const outSpKeySet = typeof cur.spaztickApiKey === 'string' && cur.spaztickApiKey.trim().length > 0;
+    const outCalendarFeeds = sanitizeCalendarFeedUrls(cur.calendarFeedUrls);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
@@ -341,10 +382,60 @@ router.patch('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId: outInbox === undefined ? null : outInbox,
       spaztickApiUrl: outSpUrl === undefined ? null : outSpUrl,
       spaztickApiKeySet: outSpKeySet,
+      calendarFeedUrls: outCalendarFeeds,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
+router.get('/calendar-feed-events', requireAuth, async (req, res) => {
+  try {
+    const fromStr = typeof req.query.from === 'string' ? req.query.from.trim() : '';
+    const toStr = typeof req.query.to === 'string' ? req.query.to.trim() : '';
+    const rangeFrom = fromStr ? new Date(fromStr) : null;
+    const rangeTo = toStr ? new Date(toStr) : null;
+    const now = new Date();
+    if (
+      !rangeFrom ||
+      !rangeTo ||
+      Number.isNaN(rangeFrom.getTime()) ||
+      Number.isNaN(rangeTo.getTime())
+    ) {
+      return res.status(400).json({ error: 'Query params from and to must be valid ISO date strings' });
+    }
+    if (rangeTo <= rangeFrom) {
+      return res.status(400).json({ error: 'to must be after from' });
+    }
+
+    const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
+    const raw = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
+      ? r.rows[0].settings_json
+      : {};
+    const urls = sanitizeCalendarFeedUrls(raw.calendarFeedUrls);
+    const all = [];
+    for (const url of urls) {
+      try {
+        const ics = await fetchIcsText(url);
+        const evs = eventsFromIcsForDay(ics, rangeFrom, rangeTo, now, url);
+        all.push(...evs);
+      } catch (e) {
+        console.error('calendar feed fetch failed', url, e?.message || e);
+      }
+    }
+    all.sort((a, b) => a.start.getTime() - b.start.getTime());
+    res.json({
+      events: all.map((e) => ({
+        title: e.title,
+        start: e.start.toISOString(),
+        end: e.end.toISOString(),
+        feedUrl: e.feedUrl,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load calendar events' });
   }
 });
 

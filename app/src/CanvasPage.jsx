@@ -24,7 +24,8 @@ import { firstLinePreview, historyPrimaryLabel } from './noteHistoryUtils';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import NoteTypeIcon from './NoteTypeIcon';
-import { eventFieldsToPayload, NOTE_TYPE_OPTIONS } from './noteEventUtils';
+import ComposeCalendarPills from './ComposeCalendarPills';
+import { eventFieldsToPayload, NOTE_TYPE_OPTIONS, isoToDateTimeFields } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
@@ -576,6 +577,23 @@ export default function CanvasPage() {
     const idx = i < 0 ? 0 : i;
     setComposeNoteType(NOTE_TYPE_OPTIONS[(idx + 1) % NOTE_TYPE_OPTIONS.length].value);
   }, [composeNoteType]);
+
+  const handleCalendarPick = useCallback(
+    ({ title, startIso }) => {
+      setComposeNoteType('event');
+      const fields = isoToDateTimeFields(startIso, false);
+      setComposeStartDate(fields.date);
+      setComposeStartTime(fields.time);
+      setComposeEndDate('');
+      setComposeEndTime('');
+      if (threadRootId) {
+        setReplyContent(title);
+      } else {
+        setNewRootContent(title);
+      }
+    },
+    [threadRootId]
+  );
 
   const composeTypeLabel =
     NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
@@ -1852,6 +1870,7 @@ export default function CanvasPage() {
                     disabled={submitting}
                   />
                   <div className="stream-page-compose-row">
+                    <ComposeCalendarPills disabled={submitting} onPickEvent={handleCalendarPick} />
                     <label className="stream-page-file-label stream-page-file-label--hidden">
                       <input
                         ref={canvasReplyFileRef}
@@ -1922,6 +1941,7 @@ export default function CanvasPage() {
                     disabled={submitting}
                   />
                   <div className="stream-page-compose-row">
+                    <ComposeCalendarPills disabled={submitting} onPickEvent={handleCalendarPick} />
                     <label className="stream-page-file-label stream-page-file-label--hidden">
                       <input
                         ref={canvasRootFileRef}

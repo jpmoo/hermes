@@ -17,7 +17,8 @@ import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import NoteTypeIcon from './NoteTypeIcon';
-import { eventFieldsToPayload, NOTE_TYPE_OPTIONS } from './noteEventUtils';
+import ComposeCalendarPills from './ComposeCalendarPills';
+import { eventFieldsToPayload, NOTE_TYPE_OPTIONS, isoToDateTimeFields } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
@@ -334,6 +335,7 @@ export default function StreamPage() {
   const replyFileRef = useRef(null);
   const threadAnchorRef = useRef(null);
   const threadListRef = useRef(null);
+  const composeWrapRef = useRef(null);
   const focusFromUrlApplied = useRef('');
   const floatTimerRef = useRef(null);
   const { logout, user } = useAuth();
@@ -429,6 +431,23 @@ export default function StreamPage() {
     const idx = i >= 0 ? i : 0;
     setComposeNoteType(NOTE_TYPE_OPTIONS[(idx + 1) % NOTE_TYPE_OPTIONS.length].value);
   }, [composeNoteType]);
+
+  const handleCalendarPick = useCallback(
+    ({ title, startIso }) => {
+      setComposeNoteType('event');
+      const fields = isoToDateTimeFields(startIso, false);
+      setComposeStartDate(fields.date);
+      setComposeStartTime(fields.time);
+      setComposeEndDate('');
+      setComposeEndTime('');
+      if (threadRootId) {
+        setReplyContent(title);
+      } else {
+        setNewRootContent(title);
+      }
+    },
+    [threadRootId]
+  );
 
   const composeTypeLabel =
     NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
@@ -564,15 +583,35 @@ export default function StreamPage() {
 
   useEffect(() => {
     if (!threadRootId || !thread.length || loadingThread) return;
-    requestAnimationFrame(() => {
-      const scrollEl = threadListRef.current?.closest('.stream-page-scroll');
-      if (focusParam && scrollEl) {
+    const scrollEl = threadListRef.current?.closest('.stream-page-scroll');
+    if (focusParam && scrollEl) {
+      requestAnimationFrame(() => {
         scrollEl.scrollTo({ top: 0, behavior: 'auto' });
-        return;
-      }
-      threadAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, [threadRootId, thread[0]?.id, loadingThread, focusParam]);
+      });
+      return;
+    }
+
+    const showingBranch = focusId && actualRootId && !noteIdEq(focusId, actualRootId);
+    if (showingBranch) {
+      return;
+    }
+
+    const delayMs = replyStagger ? 1400 : 450;
+    const t = window.setTimeout(() => {
+      requestAnimationFrame(() => {
+        composeWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      });
+    }, delayMs);
+    return () => clearTimeout(t);
+  }, [
+    threadRootId,
+    thread[0]?.id,
+    loadingThread,
+    focusParam,
+    replyStagger,
+    focusId,
+    actualRootId,
+  ]);
 
   const openThreadDirect = useCallback(
     (rootId) => {
@@ -1307,7 +1346,7 @@ export default function StreamPage() {
           )}
         </div>
 
-        <div className="stream-page-compose-wrap" data-stream-compose>
+        <div className="stream-page-compose-wrap" data-stream-compose ref={composeWrapRef}>
           {threadRootId ? (
             <form className="stream-page-compose" onSubmit={handleReply}>
               <div className="stream-page-compose-mentions">
@@ -1351,6 +1390,7 @@ export default function StreamPage() {
                 disabled={submitting}
               />
               <div className="stream-page-compose-row">
+                <ComposeCalendarPills disabled={submitting} onPickEvent={handleCalendarPick} />
                 <label className="stream-page-file-label stream-page-file-label--hidden">
                   <input
                     ref={replyFileRef}
@@ -1421,6 +1461,7 @@ export default function StreamPage() {
                 disabled={submitting}
               />
               <div className="stream-page-compose-row">
+                <ComposeCalendarPills disabled={submitting} onPickEvent={handleCalendarPick} />
                 <label className="stream-page-file-label stream-page-file-label--hidden">
                   <input
                     ref={rootFileRef}

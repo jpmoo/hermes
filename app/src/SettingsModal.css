@@ -194,6 +194,30 @@
   max-width: 100%;
 }
 
+.settings-modal-spaztick-field .settings-modal-similar-notes-label {
+  flex: none;
+}
+
+.settings-modal-calendar-feed-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.settings-modal-calendar-feed-url {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.settings-modal-calendar-feed-remove {
+  flex-shrink: 0;
+}
+
 .settings-modal-spaztick-url-input {
   width: 100%;
   max-width: 100%;

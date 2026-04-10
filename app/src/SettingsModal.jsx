@@ -21,9 +21,12 @@ export default function SettingsModal({ onClose }) {
     setSpaztickApiUrl,
     spaztickApiKeySet,
     saveSpaztickApiKey,
+    calendarFeedUrls,
+    setCalendarFeedUrls,
   } = useNoteTypeColors();
   const [rootThreads, setRootThreads] = useState([]);
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
+  const [newCalendarFeedUrl, setNewCalendarFeedUrl] = useState('');
 
   const effectiveSimilarMin =
     similarNotesMinChars != null ? similarNotesMinChars : similarNotesMinDefault;
@@ -76,6 +79,49 @@ export default function SettingsModal({ onClose }) {
       window.alert(e?.message || 'Could not remove API key');
     }
   }, [saveSpaztickApiKey]);
+
+  const feeds = Array.isArray(calendarFeedUrls) ? calendarFeedUrls : [];
+
+  const tryAddCalendarFeed = useCallback(() => {
+    let raw = newCalendarFeedUrl.trim();
+    if (!raw) return;
+    if (raw.toLowerCase().startsWith('webcal://')) {
+      raw = `https://${raw.slice('webcal://'.length)}`;
+    }
+    let u;
+    try {
+      u = new URL(raw);
+    } catch {
+      window.alert('Enter a valid URL (for example an https://… webcal or iCal link).');
+      return;
+    }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      window.alert('Only http and https calendar URLs are supported.');
+      return;
+    }
+    const host = u.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1') {
+      window.alert('Hermes cannot fetch calendar feeds from localhost (server restriction). Use a public HTTPS iCal URL.');
+      return;
+    }
+    if (feeds.some((x) => x === u.href)) {
+      setNewCalendarFeedUrl('');
+      return;
+    }
+    if (feeds.length >= 12) {
+      window.alert('You can add at most 12 calendar feeds.');
+      return;
+    }
+    setCalendarFeedUrls([...feeds, u.href]);
+    setNewCalendarFeedUrl('');
+  }, [newCalendarFeedUrl, feeds, setCalendarFeedUrls]);
+
+  const removeCalendarFeed = useCallback(
+    (url) => {
+      setCalendarFeedUrls(feeds.filter((x) => x !== url));
+    },
+    [feeds, setCalendarFeedUrls]
+  );
 
   return (
     <div
@@ -267,6 +313,63 @@ export default function SettingsModal({ onClose }) {
               Remove API key
             </button>
           </div>
+        </section>
+
+        <section className="settings-modal-section" aria-labelledby="settings-calendar-feeds-heading">
+          <h3 id="settings-calendar-feeds-heading" className="settings-modal-section-title">
+            Calendar feeds
+          </h3>
+          <p className="settings-modal-section-lead">
+            Subscribe to published iCal / ICS feeds (for example a &quot;secret&quot; or public calendar URL from Google
+            Calendar, Fastmail, or similar). Hermes fetches them on the server and shows today&apos;s remaining events
+            above the reply box. Add the HTTPS link to the raw <code className="settings-modal-code">.ics</code> feed.
+          </p>
+          <div className="settings-modal-spaztick-field">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-calendar-feed-new">
+              Add feed URL
+            </label>
+            <input
+              id="settings-calendar-feed-new"
+              className="settings-modal-spaztick-url-input"
+              type="url"
+              autoComplete="off"
+              placeholder="https://calendar.example.com/…/basic.ics"
+              value={newCalendarFeedUrl}
+              onChange={(e) => setNewCalendarFeedUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  tryAddCalendarFeed();
+                }
+              }}
+            />
+          </div>
+          <div className="settings-modal-spaztick-actions">
+            <button type="button" className="settings-modal-btn" onClick={tryAddCalendarFeed}>
+              Add feed
+            </button>
+          </div>
+          {feeds.length > 0 ? (
+            <ul className="settings-modal-type-colors" style={{ marginTop: '0.65rem' }}>
+              {feeds.map((url) => (
+                <li key={url} className="settings-modal-calendar-feed-row">
+                  <span className="settings-modal-calendar-feed-url">{url}</span>
+                  <button
+                    type="button"
+                    className="settings-modal-type-color-reset settings-modal-calendar-feed-remove"
+                    onClick={() => removeCalendarFeed(url)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="settings-modal-similar-notes-hint" style={{ marginTop: '0.35rem' }}>
+              No feeds yet. Events from feeds appear as chips above the composer when there is something left on your
+              calendar today.
+            </p>
+          )}
         </section>
 
         <section className="settings-modal-section" aria-labelledby="settings-inbox-thread-heading">

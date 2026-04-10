@@ -965,7 +965,7 @@ router.post('/:id/spaztick-task', async (req, res) => {
   try {
     const { id: noteId } = req.params;
     const userId = req.userId;
-    const noteR = await pool.query('SELECT id, content FROM notes WHERE id = $1 AND user_id = $2', [
+    const noteR = await pool.query('SELECT id, content, created_at FROM notes WHERE id = $1 AND user_id = $2', [
       noteId,
       userId,
     ]);
@@ -992,13 +992,66 @@ router.post('/:id/spaztick-task', async (req, res) => {
     } catch {
       return res.status(400).json({ error: 'Invalid Spaztick API URL in Settings' });
     }
-    const content = String(noteR.rows[0].content ?? '');
-    const title = await suggestTaskTitleFromNoteContent(content);
+    const subtreeR = await pool.query(
+      `WITH RECURSIVE tree AS (
+         SELECT id, parent_id, content, created_at
+         FROM notes
+         WHERE id = $1 AND user_id = $2
+         UNION ALL
+         SELECT n.id, n.parent_id, n.content, n.created_at
+         FROM notes n
+         JOIN tree t ON n.parent_id = t.id
+         WHERE n.user_id = $2
+       )
+       SELECT id, parent_id, content, created_at
+       FROM tree`,
+      [noteId, userId]
+    );
+
+    const all = subtreeR.rows;
+    const byParent = new Map();
+    for (const row of all) {
+      const key = row.parent_id == null ? '__root__' : String(row.parent_id);
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key).push(row);
+    }
+    for (const kids of byParent.values()) {
+      kids.sort((a, b) => {
+        const ta = new Date(a.created_at).getTime();
+        const tb = new Date(b.created_at).getTime();
+        if (ta !== tb) return ta - tb;
+        return String(a.id).localeCompare(String(b.id));
+      });
+    }
+
+    function formatTreeNote(content, depth) {
+      const raw = String(content ?? '');
+      const lines = raw.split(/\r?\n/);
+      const lead = depth === 0 ? '' : `${'  '.repeat(depth)}- `;
+      if (lines.length === 0) return lead || '(empty note)';
+      const first = `${lead}${lines[0] || '(empty note)'}`;
+      if (lines.length === 1) return first;
+      const contIndent = `${depth === 0 ? '' : '  '.repeat(depth + 1)}`;
+      const tail = lines.slice(1).map((ln) => `${contIndent}${ln}`);
+      return [first, ...tail].join('\n');
+    }
+
+    const blocks = [];
+    function dfs(cur, depth) {
+      blocks.push(formatTreeNote(cur.content, depth));
+      const kids = byParent.get(String(cur.id)) || [];
+      for (const k of kids) dfs(k, depth + 1);
+    }
+    const root = noteR.rows[0];
+    dfs(root, 0);
+
+    const exportNotes = blocks.join('\n\n');
+    const title = await suggestTaskTitleFromNoteContent(String(root.content ?? ''));
     const task = await createSpaztickExternalTask({
       baseUrl,
       apiKey,
       title,
-      notes: content,
+      notes: exportNotes,
     });
     res.status(201).json({ title, task });
   } catch (err) {

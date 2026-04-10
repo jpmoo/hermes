@@ -371,6 +371,15 @@ export async function patchUserSettings(patch) {
   return data;
 }
 
+/** Subscribed calendar feeds: events touching local “today” [from, to) that are not finished yet (end > now), including multi-day and in-progress. */
+export async function fetchCalendarFeedEvents(fromIso, toIso) {
+  const params = new URLSearchParams({ from: fromIso, to: toIso });
+  const r = await fetch(`${API}/user/calendar-feed-events?${params}`, { headers: headers() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to load calendar events');
+  return { events: Array.isArray(data.events) ? data.events : [] };
+}
+
 /** Create a Spaztick task from a Hermes note (server uses Ollama for title). Requires Spaztick URL + key in Settings. */
 export async function createSpaztickTaskFromNote(noteId) {
   const r = await fetch(`${API}/notes/${noteId}/spaztick-task`, {
