@@ -133,6 +133,26 @@ function scrollStreamListToNote(_streamEl, listEl, noteId, block = 'center') {
   return true;
 }
 
+/**
+ * Drill-up only: place the target row just below the sticky nav using explicit scrollTop.
+ * `scrollIntoView` + large `scroll-margin-top` on thread rows skews alignment (too much scroll near
+ * the top of the thread, too little near the bottom); manual math matches viewport geometry.
+ */
+function scrollStreamDrillUpRowBelowNav(streamEl, listEl, noteId) {
+  if (!streamEl || !listEl || noteId == null) return false;
+  const li = findStreamLiByNoteId(listEl, noteId);
+  if (!li) return false;
+  const nav = streamEl.querySelector(':scope > .stream-page-nav-row');
+  const navH = nav ? nav.getBoundingClientRect().height : 0;
+  const pad = 8;
+  const s = streamEl.getBoundingClientRect();
+  const r = li.getBoundingClientRect();
+  const delta = r.top - s.top + streamEl.scrollTop - navH - pad;
+  const maxTop = Math.max(0, streamEl.scrollHeight - streamEl.clientHeight);
+  streamEl.scrollTo({ top: Math.min(maxTop, Math.max(0, delta)), behavior: 'auto' });
+  return true;
+}
+
 function findStreamLiByNoteId(listEl, noteId) {
   if (!listEl || noteId == null) return null;
   return [...listEl.querySelectorAll('li[data-stream-note]')].find((li) =>
@@ -646,7 +666,12 @@ export default function StreamPage() {
       if (cancelled) return;
       const sc = streamScrollRef.current;
       const listEl = threadListRef.current;
-      if (sc && listEl) scrollStreamListToNote(sc, listEl, noteScrollId, scrollBlock);
+      if (!sc || !listEl) return;
+      if (drillUp) {
+        scrollStreamDrillUpRowBelowNav(sc, listEl, noteScrollId);
+      } else {
+        scrollStreamListToNote(sc, listEl, noteScrollId, scrollBlock);
+      }
     };
 
     // Thread enter + level-drop run ~0.5s; drill-up also staggers sibling drops (hundreds of ms) so
