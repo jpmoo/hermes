@@ -639,6 +639,7 @@ export default function StreamPage() {
 
     const noteScrollId = intent.id;
     const scrollBlock = intent.block ?? 'center';
+    const drillUp = intent.source === 'drillUp';
     let cancelled = false;
 
     const run = () => {
@@ -648,13 +649,17 @@ export default function StreamPage() {
       if (sc && listEl) scrollStreamListToNote(sc, listEl, noteScrollId, scrollBlock);
     };
 
-    // Thread enter + level-drop animations run ~0.4–0.5s; first rects are wrong and fire-and-forget
-    // scrollTop/IntoView once lands at the wrong place. Retry through settle time.
-    const delaysMs = [0, 50, 120, 280, 450, 650, 900];
+    // Thread enter + level-drop run ~0.5s; drill-up also staggers sibling drops (hundreds of ms) so
+    // the target <li> may not have stable geometry until ~1–1.5s. Default retries cover most flows;
+    // drill-up uses a longer schedule so we don’t clear intent before the row finishes settling.
+    const delaysMs = drillUp
+      ? [0, 40, 100, 200, 320, 480, 650, 900, 1200, 1500]
+      : [0, 50, 120, 280, 450, 650, 900];
+    const doneMs = drillUp ? 1650 : 950;
     const timers = delaysMs.map((ms) => window.setTimeout(run, ms));
     const doneTimer = window.setTimeout(() => {
       if (!cancelled) setStreamScrollIntent(null);
-    }, 950);
+    }, doneMs);
 
     return () => {
       cancelled = true;
@@ -817,7 +822,7 @@ export default function StreamPage() {
         flushSync(() => {
           setFocusId(parentId);
           setSearchParams({ thread: threadRootId });
-          setStreamScrollIntent({ kind: 'note', id: scrollToId });
+          setStreamScrollIntent({ kind: 'note', id: scrollToId, block: 'start', source: 'drillUp' });
         });
         focusFromUrlApplied.current = '';
         const d = new Map(delays);
@@ -829,7 +834,7 @@ export default function StreamPage() {
       flushSync(() => {
         setFocusId(parentId);
         setSearchParams(movingToRoot ? { thread: threadRootId } : { thread: threadRootId, focus: parentId });
-        setStreamScrollIntent({ kind: 'note', id: scrollToId });
+        setStreamScrollIntent({ kind: 'note', id: scrollToId, block: 'start', source: 'drillUp' });
       });
       if (movingToRoot) {
         focusFromUrlApplied.current = '';
