@@ -33,6 +33,7 @@ import {
   NavIconUpOneLevel,
 } from './icons/NavIcons';
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
+import { StreamScrollProvider, StreamStarredListItem } from './StreamStarredSticky';
 import './StreamPage.css';
 
 /**
@@ -240,7 +241,8 @@ function StreamList({
 }) {
   return (
     <>
-      {nodes.map((n) => {
+      {nodes.map((n, idx) => {
+        const stackIndex = nodes.slice(0, idx).filter((x) => x.starred).length;
         const levelDropMs = exitToRoot ? undefined : levelDropDelays?.get(n.id);
         const replyMs =
           exitToRoot ? undefined : !levelDropMs && depth > 0 ? staggerDelays?.get(n.id) : undefined;
@@ -258,45 +260,62 @@ function StreamList({
             : n.parent_id
               ? threadById?.get(n.parent_id)?.tags ?? []
               : [];
-        return (
-          <li
-            key={n.id}
-            data-stream-note={n.id}
-            className={animClass}
-            style={
-              !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined
-            }
-          >
-            <NoteCard
+        const liStyle =
+          !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined;
+        const noteCard = (
+          <NoteCard
+            note={n}
+            depth={depth}
+            hideStar={depth === 0}
+            hasReplies={(n.children?.length ?? 0) > 0}
+            hoverInsightEnabled
+            showFocusButton={depth > 0}
+            parentTagsForInherit={parentTagsForInherit}
+            onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
+            onStarredChange={onStarredChange}
+            onNoteUpdate={onNoteUpdate}
+            onNoteDelete={onNoteDelete}
+          />
+        );
+        const replies =
+          n.children?.length > 0 && depth === 0 ? (
+            <ul className="stream-page-replies">
+              <StreamList
+                nodes={n.children}
+                depth={depth + 1}
+                parentTags={n.tags || []}
+                threadById={threadById}
+                onFocusNote={onFocusNote}
+                onStarredChange={onStarredChange}
+                onNoteUpdate={onNoteUpdate}
+                onNoteDelete={onNoteDelete}
+                staggerDelays={staggerDelays}
+                levelDropDelays={levelDropDelays}
+                exitToRoot={exitToRoot}
+              />
+            </ul>
+          ) : null;
+
+        if (n.starred) {
+          return (
+            <StreamStarredListItem
+              key={n.id}
               note={n}
-              depth={depth}
-              hideStar={depth === 0}
-              hasReplies={(n.children?.length ?? 0) > 0}
-              hoverInsightEnabled
-              showFocusButton={depth > 0}
-              parentTagsForInherit={parentTagsForInherit}
-              onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
-              onStarredChange={onStarredChange}
-              onNoteUpdate={onNoteUpdate}
-              onNoteDelete={onNoteDelete}
-            />
-            {n.children?.length > 0 && depth === 0 && (
-              <ul className="stream-page-replies">
-                <StreamList
-                  nodes={n.children}
-                  depth={depth + 1}
-                  parentTags={n.tags || []}
-                  threadById={threadById}
-                  onFocusNote={onFocusNote}
-                  onStarredChange={onStarredChange}
-                  onNoteUpdate={onNoteUpdate}
-                  onNoteDelete={onNoteDelete}
-                  staggerDelays={staggerDelays}
-                  levelDropDelays={levelDropDelays}
-                  exitToRoot={exitToRoot}
-                />
-              </ul>
-            )}
+              stackIndex={stackIndex}
+              data-stream-note={n.id}
+              className={animClass}
+              style={liStyle}
+            >
+              {noteCard}
+              {replies}
+            </StreamStarredListItem>
+          );
+        }
+
+        return (
+          <li key={n.id} data-stream-note={n.id} className={animClass} style={liStyle}>
+            {noteCard}
+            {replies}
           </li>
         );
       })}
@@ -335,9 +354,8 @@ export default function StreamPage() {
   const replyFileRef = useRef(null);
   const threadAnchorRef = useRef(null);
   const threadListRef = useRef(null);
+  const streamScrollRef = useRef(null);
   const composeWrapRef = useRef(null);
-  /** When true, scroll composer into view even in branch (drill) layout — set after up-level / open-thread, not after drill-down. */
-  const scrollComposeExplicitRef = useRef(false);
   const focusFromUrlApplied = useRef('');
   const floatTimerRef = useRef(null);
   const { logout, user } = useAuth();
@@ -586,21 +604,6 @@ export default function StreamPage() {
 
   useEffect(() => {
     if (!threadRootId || !thread.length || loadingThread) return;
-    const scrollEl = threadListRef.current?.closest('.stream-page-scroll');
-    if (focusParam && scrollEl) {
-      requestAnimationFrame(() => {
-        scrollEl.scrollTo({ top: 0, behavior: 'auto' });
-      });
-      return;
-    }
-
-    const inBranchView = focusId && actualRootId && !noteIdEq(focusId, actualRootId);
-    const allowScrollToCompose = !inBranchView || scrollComposeExplicitRef.current;
-    if (!allowScrollToCompose) {
-      return;
-    }
-    scrollComposeExplicitRef.current = false;
-
     const delayMs = replyStagger ? 1400 : 450;
     const t = window.setTimeout(() => {
       requestAnimationFrame(() => {
@@ -620,7 +623,6 @@ export default function StreamPage() {
 
   const openThreadDirect = useCallback(
     (rootId) => {
-      scrollComposeExplicitRef.current = true;
       if (floatTimerRef.current) {
         clearTimeout(floatTimerRef.current);
         floatTimerRef.current = null;
@@ -671,7 +673,6 @@ export default function StreamPage() {
         });
         setFloatOpen(null);
         setReplyStagger(true);
-        scrollComposeExplicitRef.current = true;
         setSearchParams({ thread: rootId });
         setFocusId(null);
       }, 480);
@@ -702,7 +703,6 @@ export default function StreamPage() {
     setBranchHeadExiting(true);
     window.setTimeout(() => {
       setBranchHeadExiting(false);
-      scrollComposeExplicitRef.current = true;
       setFocusId(null);
       setSearchParams({ thread: threadRootId });
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
@@ -719,7 +719,6 @@ export default function StreamPage() {
       animateToFullThread();
       return;
     }
-    scrollComposeExplicitRef.current = true;
     levelNavBusyRef.current = true;
     focusFromUrlApplied.current = '';
     const leavingHeadId = focusId;
@@ -1255,7 +1254,8 @@ export default function StreamPage() {
             />
           </div>
         )}
-        <div className="stream-page-scroll">
+        <StreamScrollProvider scrollRef={streamScrollRef}>
+        <div ref={streamScrollRef} className="stream-page-scroll">
           {threadRootId ? (
             <>
               <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
@@ -1335,8 +1335,9 @@ export default function StreamPage() {
                 <p className="stream-page-muted">No threads match the current type filters.</p>
               ) : roots.length > 0 ? (
                 <ul className="stream-page-list">
-                  {filteredRoots.map((n) => (
-                    <li key={n.id} className="stream-page-root-item" data-stream-note={n.id}>
+                  {filteredRoots.map((n, idx) => {
+                    const stackIndex = filteredRoots.slice(0, idx).filter((x) => x.starred).length;
+                    const card = (
                       <NoteCard
                         note={n}
                         depth={0}
@@ -1347,13 +1348,32 @@ export default function StreamPage() {
                         onNoteUpdate={loadRoots}
                         onNoteDelete={loadRoots}
                       />
-                    </li>
-                  ))}
+                    );
+                    if (n.starred) {
+                      return (
+                        <StreamStarredListItem
+                          key={n.id}
+                          note={n}
+                          stackIndex={stackIndex}
+                          className="stream-page-root-item"
+                          data-stream-note={n.id}
+                        >
+                          {card}
+                        </StreamStarredListItem>
+                      );
+                    }
+                    return (
+                      <li key={n.id} className="stream-page-root-item" data-stream-note={n.id}>
+                        {card}
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : null}
             </>
           )}
         </div>
+        </StreamScrollProvider>
 
         <div className="stream-page-compose-wrap" data-stream-compose ref={composeWrapRef}>
           {threadRootId ? (

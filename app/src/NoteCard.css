@@ -722,3 +722,53 @@
   color: #c44;
   font-weight: 500;
 }
+
+/* Stream: sticky starred row scrolled up — one preview line + star */
+.note-card--stream-compact {
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+}
+
+.note-card--stream-compact .note-card-body {
+  padding-right: 2.5rem;
+}
+
+.note-card--stream-compact .note-card-type-icon {
+  top: 0.35rem;
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.85;
+}
+
+.note-card--stream-compact .note-card-content {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.note-card--stream-compact .note-card-event-range,
+.note-card--stream-compact .note-attachments,
+.note-card--stream-compact .note-card-tags,
+.note-card--stream-compact .note-card-descendant-count {
+  display: none !important;
+}
+
+.note-card--stream-compact .note-card-meta {
+  margin-top: 0;
+  min-height: 0;
+}
+
+.note-card--stream-compact .note-card-time {
+  display: none;
+}
+
+.note-card--stream-compact .note-card-actions .note-card-icon-btn,
+.note-card--stream-compact .note-card-actions .note-card-tag-add {
+  display: none;
+}
+
+.note-card--stream-compact .note-card-actions .note-card-star {
+  display: inline-flex;
+}

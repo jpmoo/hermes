@@ -12,7 +12,13 @@
 
 .stream-page-scroll {
   flex: 1;
+  min-height: 0;
   padding-top: 0.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  --stream-star-sticky-base: 3.15rem;
+  --stream-star-compact-height: 2.65rem;
 }
 
 /* Quiet context above root / thread-root note lists */
