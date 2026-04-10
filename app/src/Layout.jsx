@@ -57,8 +57,8 @@ export default function Layout({
             <Link
               to="/"
               className="layout-logo"
-              aria-label="Hermes home — Stream root"
-              title="Stream root (all threads)"
+              aria-label="Hermes home"
+              title="Home (default start page from Settings)"
               onClick={() => {
                 clearStreamNavMemory();
               }}
@@ -73,7 +73,7 @@ export default function Layout({
           <div className="layout-header-middle">
             <nav className="layout-nav" aria-label="Main views">
               {viewLinks?.map(({ to, label, tooltip }) =>
-                to === '/' || to === '/campus' ? (
+                to === '/stream' || to === '/canvas' ? (
                   <Link
                     key={to}
                     to={to}
@@ -83,7 +83,7 @@ export default function Layout({
                     aria-label={label}
                     title={
                       tooltip ??
-                      (to === '/'
+                      (to === '/stream'
                         ? 'Return to last Stream level'
                         : 'Infinite canvas — last thread')
                     }

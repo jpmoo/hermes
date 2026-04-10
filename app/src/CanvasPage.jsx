@@ -446,7 +446,8 @@ export default function CanvasPage() {
       try {
         const s = await fetchUserSettings();
         if (cancelled) return;
-        if (s?.campusLayouts && typeof s.campusLayouts === 'object') setCanvasLayouts(s.campusLayouts);
+        const rawLayouts = s?.canvasLayouts ?? s?.campusLayouts;
+        if (rawLayouts && typeof rawLayouts === 'object') setCanvasLayouts(rawLayouts);
         setNoteHistory(Array.isArray(s.noteHistory) ? s.noteHistory : []);
       } catch (e) {
         console.error(e);
@@ -750,7 +751,7 @@ export default function CanvasPage() {
     }
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
-      await patchUserSettings({ campusLayouts: patchLayouts });
+      await patchUserSettings({ canvasLayouts: patchLayouts });
       setCanvasLayouts(patchLayouts);
     } catch (e) {
       console.error(e);
@@ -1095,7 +1096,7 @@ export default function CanvasPage() {
     }
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
-      await patchUserSettings({ campusLayouts: patchLayouts });
+      await patchUserSettings({ canvasLayouts: patchLayouts });
       setCanvasLayouts(patchLayouts);
     } catch (e) {
       console.error(e);
@@ -1130,7 +1131,7 @@ export default function CanvasPage() {
       emptyBlock
     );
     try {
-      await patchUserSettings({ campusLayouts: patchLayouts });
+      await patchUserSettings({ canvasLayouts: patchLayouts });
       pendingFitAllRef.current = true;
       fitAppliedForEmptyRef.current = false;
       setCanvasLayouts(patchLayouts);
@@ -1512,8 +1513,8 @@ export default function CanvasPage() {
   const showCompose = !loadingThread && !(threadRootId && thread.length === 0);
 
   const navLinks = [
-    { to: '/', label: 'Stream' },
-    { to: '/campus', label: 'Canvas' },
+    { to: '/stream', label: 'Stream' },
+    { to: '/canvas', label: 'Canvas' },
     { to: '/outline', label: 'Outline' },
     { to: '/calendar', label: 'Calendar' },
     { to: '/search', label: 'Search' },

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { NOTE_TYPE_COLOR_DEFAULTS } from './noteTypeColorSettings';
 import { useNoteTypeColors } from './NoteTypeColorContext';
+import { DEFAULT_START_PAGE_OPTIONS } from './defaultStartPage';
 import { getRoots } from './api';
 import './SettingsModal.css';
 
@@ -23,6 +24,8 @@ export default function SettingsModal({ onClose }) {
     saveSpaztickApiKey,
     calendarFeedUrls,
     setCalendarFeedUrls,
+    defaultStartPage,
+    setDefaultStartPage,
   } = useNoteTypeColors();
   const [rootThreads, setRootThreads] = useState([]);
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
@@ -138,6 +141,33 @@ export default function SettingsModal({ onClose }) {
         aria-labelledby="settings-modal-title"
       >
         <h2 id="settings-modal-title">Settings</h2>
+
+        <section className="settings-modal-section" aria-labelledby="settings-start-page-heading">
+          <h3 id="settings-start-page-heading" className="settings-modal-section-title">
+            Default start page
+          </h3>
+          <p className="settings-modal-section-lead">
+            When you open Hermes or use the logo to go home, which main view opens first. Stream, Canvas, and
+            other views stay available from the header.
+          </p>
+          <div className="settings-modal-similar-notes-row">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-default-start-page">
+              Start page
+            </label>
+            <select
+              id="settings-default-start-page"
+              className="settings-modal-similar-notes-input"
+              value={defaultStartPage}
+              onChange={(e) => setDefaultStartPage(e.target.value)}
+            >
+              {DEFAULT_START_PAGE_OPTIONS.map(({ id, label }) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
 
         <section className="settings-modal-section" aria-labelledby="settings-note-type-colors-heading">
           <h3 id="settings-note-type-colors-heading" className="settings-modal-section-title">

@@ -65,8 +65,8 @@ export default function OrphanFilesView() {
       title="Orphans"
       onLogout={logout}
       viewLinks={[
-        { to: '/', label: 'Stream' },
-        { to: '/campus', label: 'Canvas' },
+        { to: '/stream', label: 'Stream' },
+        { to: '/canvas', label: 'Canvas' },
         { to: '/outline', label: 'Outline' },
         { to: '/calendar', label: 'Calendar' },
         { to: '/search', label: 'Search' },

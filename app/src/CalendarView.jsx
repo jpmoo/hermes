@@ -127,7 +127,7 @@ export default function CalendarView() {
     const root = ev.thread_root_id;
     if (!root) return;
     navigate({
-      pathname: '/',
+      pathname: '/stream',
       search: `?thread=${encodeURIComponent(root)}&focus=${encodeURIComponent(ev.id)}`,
     });
   };
@@ -159,8 +159,8 @@ export default function CalendarView() {
   };
 
   const viewLinks = [
-    { to: '/', label: 'Stream' },
-    { to: '/campus', label: 'Canvas' },
+    { to: '/stream', label: 'Stream' },
+    { to: '/canvas', label: 'Canvas' },
     { to: '/outline', label: 'Outline' },
     { to: '/calendar', label: 'Calendar' },
     { to: '/search', label: 'Search' },

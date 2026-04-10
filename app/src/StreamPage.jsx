@@ -1321,8 +1321,8 @@ export default function StreamPage() {
   );
 
   const navLinks = [
-    { to: '/', label: 'Stream' },
-    { to: '/campus', label: 'Canvas' },
+    { to: '/stream', label: 'Stream' },
+    { to: '/canvas', label: 'Canvas' },
     { to: '/outline', label: 'Outline' },
     { to: '/calendar', label: 'Calendar' },
     { to: '/search', label: 'Search' },

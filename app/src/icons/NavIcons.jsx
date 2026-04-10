@@ -401,11 +401,11 @@ export function NavIconSequenceLines(props) {
 
 function navIconForTo(to) {
   if (!to) return null;
-  if (to === '/') return NavIconStream;
+  if (to === '/stream') return NavIconStream;
   if (to === '/tags') return NavIconTag;
   if (to === '/search') return NavIconSearch;
   if (to === '/calendar') return NavIconCalendar;
-  if (to === '/campus') return NavIconCanvas;
+  if (to === '/canvas') return NavIconCanvas;
   if (to === '/outline' || to.startsWith('/outline')) return NavIconOutline;
   return null;
 }

@@ -465,7 +465,7 @@ export default function OutlineView() {
         const q = new URLSearchParams();
         q.set('thread', root);
         q.set('focus', linkedId);
-        navigate({ pathname: '/', search: q.toString() });
+        navigate({ pathname: '/stream', search: q.toString() });
       } catch (e) {
         console.error(e);
       }
@@ -637,8 +637,8 @@ export default function OutlineView() {
       noteTypeFilterEnabled
       onLogout={logout}
       viewLinks={[
-        { to: '/', label: 'Stream' },
-        { to: '/campus', label: 'Canvas' },
+        { to: '/stream', label: 'Stream' },
+        { to: '/canvas', label: 'Canvas' },
         { to: '/outline', label: 'Outline' },
         { to: '/calendar', label: 'Calendar' },
         { to: '/search', label: 'Search' },
@@ -697,7 +697,7 @@ export default function OutlineView() {
                       const q = new URLSearchParams();
                       q.set('thread', threadRoot);
                       if (noteId) q.set('focus', noteId);
-                      navigate({ pathname: '/', search: q.toString() });
+                      navigate({ pathname: '/stream', search: q.toString() });
                     }}
                   />
                 ))}

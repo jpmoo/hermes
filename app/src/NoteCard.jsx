@@ -142,7 +142,7 @@ export default function NoteCard({
     async (linkedId) => {
       try {
         const root = await getNoteThreadRoot(linkedId);
-        navigate({ pathname: '/', search: `?thread=${root}&focus=${linkedId}` });
+        navigate({ pathname: '/stream', search: `?thread=${root}&focus=${linkedId}` });
       } catch (err) {
         console.error(err);
       }

@@ -1,4 +1,4 @@
-/** Merge canvas layout for one thread/focus context into settings patch payload (stored as `campusLayouts` in settings JSON). */
+/** Merge canvas layout for one thread/focus context into settings patch payload (`canvasLayouts` in settings JSON). */
 
 /**
  * Narrow UI: portrait phones, or phone landscape (short viewport) so iOS landscape keeps mobile layout.

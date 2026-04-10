@@ -18,6 +18,7 @@ import {
   normalizeNoteTypeHex,
   parseNoteTypeColorsObject,
 } from './noteTypeColorSettings';
+import { normalizeDefaultStartPage } from './defaultStartPage';
 
 const NoteTypeColorContext = createContext(null);
 
@@ -31,17 +32,20 @@ export function NoteTypeColorProvider({ children }) {
   const [spaztickApiUrl, setSpaztickApiUrl] = useState('');
   const [spaztickApiKeySet, setSpaztickApiKeySet] = useState(false);
   const [calendarFeedUrls, setCalendarFeedUrls] = useState([]);
+  const [defaultStartPage, setDefaultStartPage] = useState('stream');
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
   const skipSimilarNotesSave = useRef(false);
   const skipInboxSave = useRef(false);
   const skipSpaztickSave = useRef(false);
   const skipCalendarFeedsSave = useRef(false);
+  const skipDefaultStartPageSave = useRef(false);
   const saveTimer = useRef(null);
   const similarSaveTimer = useRef(null);
   const inboxSaveTimer = useRef(null);
   const spaztickSaveTimer = useRef(null);
   const calendarFeedsSaveTimer = useRef(null);
+  const defaultStartPageSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
 
   /* Load from server when logged in (canonical); seed server from this device if account has none yet. */
@@ -72,6 +76,7 @@ export function NoteTypeColorProvider({ children }) {
         setSpaztickApiUrl(typeof data.spaztickApiUrl === 'string' ? data.spaztickApiUrl : '');
         setSpaztickApiKeySet(data.spaztickApiKeySet === true);
         setCalendarFeedUrls(Array.isArray(data.calendarFeedUrls) ? data.calendarFeedUrls : []);
+        setDefaultStartPage(normalizeDefaultStartPage(data.defaultStartPage));
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
@@ -79,6 +84,7 @@ export function NoteTypeColorProvider({ children }) {
           skipInboxSave.current = true;
           skipSpaztickSave.current = true;
           skipCalendarFeedsSave.current = true;
+          skipDefaultStartPageSave.current = true;
           try {
             await patchUserSettings({ noteTypeColors: local });
           } catch (e) {
@@ -91,6 +97,7 @@ export function NoteTypeColorProvider({ children }) {
           skipInboxSave.current = true;
           skipSpaztickSave.current = true;
           skipCalendarFeedsSave.current = true;
+          skipDefaultStartPageSave.current = true;
         }
       } catch (e) {
         console.error(e);
@@ -99,6 +106,7 @@ export function NoteTypeColorProvider({ children }) {
         skipInboxSave.current = true;
         skipSpaztickSave.current = true;
         skipCalendarFeedsSave.current = true;
+        skipDefaultStartPageSave.current = true;
       } finally {
         if (!cancelled) setServerReady(true);
       }
@@ -120,11 +128,13 @@ export function NoteTypeColorProvider({ children }) {
       setSpaztickApiUrl('');
       setSpaztickApiKeySet(false);
       setCalendarFeedUrls([]);
+      setDefaultStartPage('stream');
       skipNoteTypeColorsSave.current = true;
       skipSimilarNotesSave.current = true;
       skipInboxSave.current = true;
       skipSpaztickSave.current = true;
       skipCalendarFeedsSave.current = true;
+      skipDefaultStartPageSave.current = true;
     }
   }, [user]);
 
@@ -219,6 +229,28 @@ export function NoteTypeColorProvider({ children }) {
     };
   }, [calendarFeedUrls, user?.id, serverReady]);
 
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipDefaultStartPageSave.current) {
+      skipDefaultStartPageSave.current = false;
+      return;
+    }
+    if (defaultStartPageSaveTimer.current) clearTimeout(defaultStartPageSaveTimer.current);
+    defaultStartPageSaveTimer.current = setTimeout(() => {
+      defaultStartPageSaveTimer.current = null;
+      patchUserSettings({
+        defaultStartPage: defaultStartPage === 'stream' ? null : defaultStartPage,
+      }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (defaultStartPageSaveTimer.current) clearTimeout(defaultStartPageSaveTimer.current);
+    };
+  }, [defaultStartPage, user?.id, serverReady]);
+
+  const setDefaultStartPageSetting = useCallback((id) => {
+    setDefaultStartPage(normalizeDefaultStartPage(id));
+  }, []);
+
   const setTypeColor = useCallback((type, hexOrNull) => {
     if (!NOTE_TYPE_COLOR_KEYS.includes(type)) return;
     setColors((prev) => {
@@ -307,6 +339,9 @@ export function NoteTypeColorProvider({ children }) {
       spaztickReady,
       calendarFeedUrls,
       setCalendarFeedUrls: setCalendarFeedUrlsSetting,
+      defaultStartPage,
+      setDefaultStartPage: setDefaultStartPageSetting,
+      serverReady,
     }),
     [
       colors,
@@ -326,6 +361,9 @@ export function NoteTypeColorProvider({ children }) {
       spaztickReady,
       calendarFeedUrls,
       setCalendarFeedUrlsSetting,
+      defaultStartPage,
+      setDefaultStartPageSetting,
+      serverReady,
     ]
   );
 

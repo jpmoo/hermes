@@ -34,6 +34,20 @@ function sanitizeCalendarFeedUrls(input) {
 }
 
 const NOTE_TYPES = ['note', 'event', 'person', 'organization'];
+
+const DEFAULT_START_PAGES = ['stream', 'canvas', 'outline', 'calendar', 'search'];
+
+function sanitizeDefaultStartPage(input) {
+  if (input == null) return undefined;
+  if (typeof input !== 'string') return undefined;
+  const v = input.trim().toLowerCase();
+  return DEFAULT_START_PAGES.includes(v) ? v : undefined;
+}
+
+function defaultStartPageFromStored(raw) {
+  const s = sanitizeDefaultStartPage(raw);
+  return s ?? 'stream';
+}
 const NOTE_HISTORY_MAX = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -139,8 +153,8 @@ function sanitizeCanvasViewSlice(input) {
   return view;
 }
 
-/** Canvas layouts (stored as campusLayouts in settings_json): per-thread, per-focus view(s) + card rects. */
-function sanitizeCampusLayouts(input) {
+/** Canvas layouts in settings_json: per-thread, per-focus view(s) + card rects. Legacy key `campusLayouts` is read once and migrated to `canvasLayouts`. */
+function sanitizeCanvasLayouts(input) {
   if (input == null || typeof input !== 'object' || Array.isArray(input)) return {};
   const out = {};
   for (const tid of Object.keys(input).slice(0, 48)) {
@@ -203,7 +217,9 @@ router.get('/settings', requireAuth, async (req, res) => {
     const similarStored = sanitizeSimilarNotesMinChars(raw.similarNotesMinChars);
     const noteHistory = sanitizeNoteHistory(raw.noteHistory);
     const similarLimitResults = raw.similarNotesLimitResultsToMinChars === true;
-    const campusLayouts = sanitizeCampusLayouts(raw.campusLayouts);
+    const layoutRaw =
+      raw.canvasLayouts != null ? raw.canvasLayouts : raw.campusLayouts;
+    const canvasLayouts = sanitizeCanvasLayouts(layoutRaw);
     const inboxThreadRootId = sanitizeInboxThreadRootId(raw.inboxThreadRootId);
     const spUrl = sanitizeSpaztickApiUrl(raw.spaztickApiUrl);
     const spKeyStored = typeof raw.spaztickApiKey === 'string' && raw.spaztickApiKey.trim().length > 0;
@@ -214,7 +230,8 @@ router.get('/settings', requireAuth, async (req, res) => {
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
       similarNotesLimitResultsToMinChars: similarLimitResults,
       noteHistory,
-      campusLayouts,
+      canvasLayouts,
+      defaultStartPage: defaultStartPageFromStored(raw.defaultStartPage),
       inboxThreadRootId: inboxThreadRootId === undefined ? null : inboxThreadRootId,
       spaztickApiUrl: spUrl === undefined ? null : spUrl,
       spaztickApiKeySet: spKeyStored,
@@ -233,7 +250,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
       similarNotesMinChars,
       similarNotesLimitResultsToMinChars,
       noteHistory,
-      campusLayouts,
+      canvasLayouts,
+      defaultStartPage,
       inboxThreadRootId,
       spaztickApiUrl,
       spaztickApiKey,
@@ -290,11 +308,28 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
-    if (campusLayouts !== undefined) {
-      if (campusLayouts === null) {
+    if (canvasLayouts !== undefined) {
+      if (canvasLayouts === null) {
+        delete cur.canvasLayouts;
         delete cur.campusLayouts;
       } else {
-        cur.campusLayouts = sanitizeCampusLayouts(campusLayouts);
+        cur.canvasLayouts = sanitizeCanvasLayouts(canvasLayouts);
+        delete cur.campusLayouts;
+      }
+    }
+
+    if (defaultStartPage !== undefined) {
+      if (defaultStartPage === null) {
+        delete cur.defaultStartPage;
+      } else {
+        const dsp = sanitizeDefaultStartPage(defaultStartPage);
+        if (dsp === undefined) {
+          return res.status(400).json({
+            error:
+              'defaultStartPage must be one of stream, canvas, outline, calendar, search, or null',
+          });
+        }
+        cur.defaultStartPage = dsp;
       }
     }
 
@@ -367,7 +402,9 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outSimilar = sanitizeSimilarNotesMinChars(cur.similarNotesMinChars);
     const outHistory = sanitizeNoteHistory(cur.noteHistory);
     const outLimitResults = cur.similarNotesLimitResultsToMinChars === true;
-    const outCampus = sanitizeCampusLayouts(cur.campusLayouts);
+    const outLayoutsRaw =
+      cur.canvasLayouts != null ? cur.canvasLayouts : cur.campusLayouts;
+    const outCanvas = sanitizeCanvasLayouts(outLayoutsRaw);
     const outInbox = sanitizeInboxThreadRootId(cur.inboxThreadRootId);
     const outSpUrl = sanitizeSpaztickApiUrl(cur.spaztickApiUrl);
     const outSpKeySet = typeof cur.spaztickApiKey === 'string' && cur.spaztickApiKey.trim().length > 0;
@@ -378,7 +415,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
       similarNotesLimitResultsToMinChars: outLimitResults,
       noteHistory: outHistory,
-      campusLayouts: outCampus,
+      canvasLayouts: outCanvas,
+      defaultStartPage: defaultStartPageFromStored(cur.defaultStartPage),
       inboxThreadRootId: outInbox === undefined ? null : outInbox,
       spaztickApiUrl: outSpUrl === undefined ? null : outSpUrl,
       spaztickApiKeySet: outSpKeySet,

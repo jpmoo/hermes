@@ -9,8 +9,16 @@ import OrphanFilesView from './OrphanFilesView';
 import CalendarView from './CalendarView';
 import CanvasPage from './CanvasPage';
 import { NoteTypeFilterProvider } from './NoteTypeFilterContext';
-import { NoteTypeColorProvider } from './NoteTypeColorContext';
+import { NoteTypeColorProvider, useNoteTypeColors } from './NoteTypeColorContext';
+import { DEFAULT_START_PAGE_PATH } from './defaultStartPage';
 import './App.css';
+
+function DefaultHomeRoute() {
+  const { defaultStartPage, serverReady } = useNoteTypeColors();
+  if (!serverReady) return <div className="loading">Loading…</div>;
+  const path = DEFAULT_START_PAGE_PATH[defaultStartPage] ?? '/stream';
+  return <Navigate to={path} replace />;
+}
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -21,7 +29,7 @@ function PrivateRoute({ children }) {
 
 function LegacyThreadRedirect() {
   const { rootId } = useParams();
-  return <Navigate to={{ pathname: '/', search: `?thread=${encodeURIComponent(rootId)}` }} replace />;
+  return <Navigate to={{ pathname: '/stream', search: `?thread=${encodeURIComponent(rootId)}` }} replace />;
 }
 
 function AppRoutes() {
@@ -30,6 +38,14 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route
         path="/"
+        element={
+          <PrivateRoute>
+            <DefaultHomeRoute />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/stream"
         element={
           <PrivateRoute>
             <StreamPage />
@@ -56,8 +72,9 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
+      <Route path="/campus" element={<Navigate to="/canvas" replace />} />
       <Route
-        path="/campus"
+        path="/canvas"
         element={
           <PrivateRoute>
             <CanvasPage />

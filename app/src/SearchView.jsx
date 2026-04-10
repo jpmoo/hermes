@@ -145,7 +145,7 @@ function SearchViewInner() {
       onNoteUpdated={refreshAfterNoteChange}
       onGoToNote={({ noteId, threadRootId }) => {
         navigate({
-          pathname: '/',
+          pathname: '/stream',
           search: `?thread=${encodeURIComponent(threadRootId)}&focus=${encodeURIComponent(noteId)}`,
         });
       }}
@@ -276,7 +276,7 @@ function SearchViewInner() {
                       n.parent_id && n.root_id
                         ? `?thread=${root}&focus=${n.id}`
                         : `?thread=${root}`;
-                    navigate({ pathname: '/', search });
+                    navigate({ pathname: '/stream', search });
                   }}
                   onStarredChange={() => {
                     const id = n.id;
@@ -316,8 +316,8 @@ export default function SearchView() {
       noteTypeFilterEnabled={false}
       onLogout={logout}
       viewLinks={[
-        { to: '/', label: 'Stream' },
-        { to: '/campus', label: 'Canvas' },
+        { to: '/stream', label: 'Stream' },
+        { to: '/canvas', label: 'Canvas' },
         { to: '/outline', label: 'Outline' },
         { to: '/calendar', label: 'Calendar' },
         { to: '/search', label: 'Search' },
