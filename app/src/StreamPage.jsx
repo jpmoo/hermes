@@ -101,49 +101,27 @@ function streamNoteAttrEscaped(id) {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
-/** Scroll the thread list column so the row for `noteId` sits near the top of the scrollport. */
-function scrollStreamListToNote(streamEl, listEl, noteId, { margin = 10, behavior = 'auto' } = {}) {
-  if (!streamEl || !listEl || noteId == null) return false;
+/**
+ * Scroll so the row for `noteId` is visible. Uses scrollIntoView so the correct overflow ancestor
+ * (e.g. .stream-page-scroll) scrolls — manual scrollTop failed when the column had no bounded height.
+ */
+function scrollStreamListToNote(_streamEl, listEl, noteId) {
+  if (!listEl || noteId == null) return false;
   const li = findStreamLiByNoteId(listEl, noteId);
   if (!li) return false;
-  const scRect = streamEl.getBoundingClientRect();
-  const liRect = li.getBoundingClientRect();
-  const nextTop = liRect.top - scRect.top + streamEl.scrollTop - margin;
-  const top = Math.max(0, nextTop);
-  if (behavior === 'smooth') {
-    streamEl.scrollTo({ top, behavior: 'smooth' });
-  } else {
-    streamEl.scrollTop = top;
-  }
+  li.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
   return true;
 }
 
-/**
- * Scroll so the visible thread list shows its end (last note row at the bottom of the scrollport).
- * Prefer this over raw scrollHeight while stagger/layout is still settling.
- */
-function scrollStreamListToBottom(streamEl, listEl, { behavior = 'auto' } = {}) {
-  if (!streamEl || !listEl) return false;
+/** Scroll so the last note row in the list is at the bottom of the visible area. */
+function scrollStreamListToBottom(streamEl, listEl) {
+  if (!listEl) return false;
   const lis = [...listEl.querySelectorAll('li[data-stream-note]')];
   if (lis.length === 0) {
-    const max = streamEl.scrollHeight - streamEl.clientHeight;
-    if (behavior === 'smooth') {
-      streamEl.scrollTo({ top: Math.max(0, max), behavior: 'smooth' });
-    } else {
-      streamEl.scrollTop = Math.max(0, max);
-    }
-    return true;
+    if (streamEl) streamEl.scrollTop = Math.max(0, streamEl.scrollHeight - streamEl.clientHeight);
+    return Boolean(streamEl);
   }
-  const last = lis[lis.length - 1];
-  const scRect = streamEl.getBoundingClientRect();
-  const liRect = last.getBoundingClientRect();
-  const delta = liRect.bottom - scRect.bottom;
-  const next = Math.max(0, streamEl.scrollTop + delta);
-  if (behavior === 'smooth') {
-    streamEl.scrollTo({ top: next, behavior: 'smooth' });
-  } else {
-    streamEl.scrollTop = next;
-  }
+  lis[lis.length - 1].scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
   return true;
 }
 
@@ -648,7 +626,7 @@ export default function StreamPage() {
     let attempts = 0;
 
     const finishNote = (sc, listEl, noteScrollId) => {
-      if (scrollStreamListToNote(sc, listEl, noteScrollId, { behavior: 'auto', margin: 8 })) {
+      if (scrollStreamListToNote(sc, listEl, noteScrollId)) {
         setStreamScrollIntent(null);
         return true;
       }
@@ -672,7 +650,9 @@ export default function StreamPage() {
           if (cancelled) return;
           const s2 = streamScrollRef.current;
           const l2 = threadListRef.current;
-          if (s2 && l2 && finishNote(s2, l2, noteScrollId)) return;
+          if (s2 && l2 && scrollStreamListToNote(s2, l2, noteScrollId)) {
+            setStreamScrollIntent(null);
+          }
         }, 450);
         return;
       }
@@ -684,7 +664,7 @@ export default function StreamPage() {
           if (cancelled) return;
           const s = streamScrollRef.current;
           const list = threadListRef.current;
-          if (s && list) scrollStreamListToBottom(s, list, { behavior: 'auto' });
+          if (s && list) scrollStreamListToBottom(s, list);
         };
         const delays = stagger ? [0, 120, 400, 900, 1400, 2000] : [0, 50, 200, 450, 700];
         delays.forEach((ms) => window.setTimeout(run, ms));

@@ -1,9 +1,12 @@
 .stream-page {
+  /* Fill layout-main and cap height so the inner column is the scrollport (was growing with content). */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   width: 100%;
   max-width: var(--hermes-stream-column-max);
   margin-left: auto;
   margin-right: auto;
-  min-height: calc(100vh - 8rem);
   display: flex;
   flex-direction: column;
   padding: 0 0 1rem;
