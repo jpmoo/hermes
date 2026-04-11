@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { createSpaztickTaskFromTitle } from './api';
+import { NoteCardIconSpaztick } from './icons/NoteCardActionIcons';
+import { useNoteTypeColors } from './NoteTypeColorContext';
+import './NoteRichText.css';
 
 const UNSAFE_HREF = /^\s*(javascript|data|vbscript):/i;
 
@@ -47,6 +51,32 @@ export function toggleTaskMarkerAtIndex(text, taskIndex, nextChecked) {
   return replaced ? out : src;
 }
 
+/** GFM task lines: `- [ ] title` / `* [x] title` / `1. [ ] title` — document order. */
+function extractGfmTaskTitles(src) {
+  const out = [];
+  for (const line of String(src ?? '').split(/\n/)) {
+    const bullet = line.match(/^[ \t]*[-*]\s+\[(?: |x|X)\]\s+(.*)$/);
+    const ordered = line.match(/^[ \t]*\d+\.\s+\[(?: |x|X)\]\s+(.*)$/);
+    const m = bullet || ordered;
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+/** Plain title for Spaztick (strip common inline markdown). */
+function plainTextFromTaskLine(line) {
+  let t = String(line ?? '').trim();
+  if (!t) return '';
+  t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
+  t = t.replace(/\*([^*]+)\*/g, '$1');
+  t = t.replace(/__([^_]+)__/g, '$1');
+  t = t.replace(/_([^_]+)_/g, '$1');
+  t = t.replace(/`([^`]+)`/g, '$1');
+  t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t.slice(0, 200);
+}
+
 /**
  * Note body: markdown links [t](url), bare URLs, hermes-note:// mentions, #tags (when in tagNames).
  * @param {boolean} [stopClickPropagation=true] — when false (e.g. Outline rows), clicks bubble so a parent can open the row; parent should ignore targets inside `.note-rich-link` / `button.note-rich-mention`.
@@ -59,29 +89,63 @@ export default function NoteRichText({
   onTaskToggle,
   stopClickPropagation = true,
 }) {
-  const tagSet = tagNames instanceof Set ? tagNames : tagNames?.length ? new Set(tagNames) : null;
   const s = text == null ? '' : String(text);
-  if (!s) return <span className={className}>—</span>;
-  /*
-   * Convert only bare hermes-note links to markdown links.
-   * Skip urls already inside markdown link targets: [label](hermes-note://...).
-   */
-  const textWithBareHermesLinks = s.replace(
-    /hermes-note:\/\/([0-9a-f-]{36})/gi,
-    (m, id, offset, whole) => {
-      /* Leave markdown links intact: [Label](hermes-note://...) */
-      if (whole.slice(Math.max(0, offset - 2), offset) === '](') return m;
-      return `[Linked note](hermes-note://${id})`;
-    }
+
+  const markdownInput = useMemo(() => {
+    if (!s) return '';
+    const set =
+      tagNames instanceof Set
+        ? tagNames
+        : Array.isArray(tagNames) && tagNames.length
+          ? new Set(tagNames)
+          : null;
+    const textWithBareHermesLinks = s.replace(
+      /hermes-note:\/\/([0-9a-f-]{36})/gi,
+      (m, id, offset, whole) => {
+        if (whole.slice(Math.max(0, offset - 2), offset) === '](') return m;
+        return `[Linked note](hermes-note://${id})`;
+      }
+    );
+    return set
+      ? textWithBareHermesLinks.replace(
+          /(^|[\s\n([{'"`])#([a-z0-9-]+)(?![a-z0-9-])/gi,
+          (m, pre, name) => (set.has(name) ? `${pre}[#${name}](hermes-tag://${name})` : m)
+        )
+      : textWithBareHermesLinks;
+  }, [s, tagNames]);
+
+  const taskTitles = useMemo(() => extractGfmTaskTitles(markdownInput), [markdownInput]);
+  const taskLineOrdinalRef = useRef(0);
+  const { spaztickReady } = useNoteTypeColors();
+  const [spaztickBusyIdx, setSpaztickBusyIdx] = useState(null);
+
+  const handleSpaztickLineClick = useCallback(
+    async (e, lineIndex, rawLine) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!spaztickReady || spaztickBusyIdx !== null) return;
+      const title = plainTextFromTaskLine(rawLine);
+      if (!title) return;
+      setSpaztickBusyIdx(lineIndex);
+      try {
+        const data = await createSpaztickTaskFromTitle({ title, notes: '' });
+        const t = typeof data?.title === 'string' ? data.title : title;
+        window.alert(`Spaztick task created: ${t}`);
+      } catch (err) {
+        window.alert(err?.message || 'Could not create Spaztick task');
+      } finally {
+        setSpaztickBusyIdx(null);
+      }
+    },
+    [spaztickReady, spaztickBusyIdx]
   );
-  const markdownInput = tagSet
-    ? textWithBareHermesLinks.replace(
-        /(^|[\s\n([{'"`])#([a-z0-9-]+)(?![a-z0-9-])/gi,
-        (m, pre, name) => (tagSet.has(name) ? `${pre}[#${name}](hermes-tag://${name})` : m)
-      )
-    : textWithBareHermesLinks;
 
   let taskItemIndex = 0;
+  taskLineOrdinalRef.current = 0;
+
+  if (!s) {
+    return <span className={className}>—</span>;
+  }
 
   return (
     <div className={[className, 'note-rich-markdown'].filter(Boolean).join(' ')}>
@@ -138,9 +202,41 @@ export default function NoteRichText({
         p: ({ children }) => <p className="note-rich-p">{children}</p>,
         ul: ({ children }) => <ul className="note-rich-ul">{children}</ul>,
         ol: ({ children }) => <ol className="note-rich-ol">{children}</ol>,
-        li: ({ className: liClassName, children }) => (
-          <li className={['note-rich-li', liClassName].filter(Boolean).join(' ')}>{children}</li>
-        ),
+        li: ({ className: liClassName, children }) => {
+          const isTask = String(liClassName || '').includes('task-list-item');
+          const idx = isTask ? taskLineOrdinalRef.current++ : -1;
+          const rawLine = idx >= 0 && idx < taskTitles.length ? taskTitles[idx] : '';
+          const showSpaztick =
+            isTask &&
+            spaztickReady &&
+            idx >= 0 &&
+            Boolean(String(rawLine || '').trim());
+          return (
+            <li
+              className={[
+                'note-rich-li',
+                showSpaztick ? 'note-rich-li--task-row' : '',
+                liClassName,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {children}
+              {showSpaztick ? (
+                <button
+                  type="button"
+                  className="note-rich-task-spaztick-btn"
+                  title="Add to Spaztick"
+                  aria-label="Add checklist item to Spaztick"
+                  disabled={spaztickBusyIdx === idx}
+                  onClick={(e) => handleSpaztickLineClick(e, idx, rawLine)}
+                >
+                  <NoteCardIconSpaztick className="note-rich-task-spaztick-btn__icon" />
+                </button>
+              ) : null}
+            </li>
+          );
+        },
         input: ({ type, checked, ...rest }) => {
           if (type !== 'checkbox') return <input type={type} {...rest} />;
           const currentIndex = taskItemIndex;

@@ -1,0 +1,261 @@
+/* Shared by NoteRichText everywhere (cards, outline, hover insight). Imported from NoteRichText.jsx. */
+
+.note-rich-markdown {
+  display: block;
+  line-height: 1.12;
+}
+
+.note-rich-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.note-rich-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.note-rich-markdown p,
+.note-rich-markdown .note-rich-p {
+  margin: 0 !important;
+  line-height: 1.12 !important;
+}
+
+.note-rich-markdown h1,
+.note-rich-markdown h2,
+.note-rich-markdown h3,
+.note-rich-markdown h4,
+.note-rich-markdown h5,
+.note-rich-markdown h6 {
+  margin: 0.55rem 0 0.3rem;
+  line-height: 1.25;
+}
+
+.note-rich-markdown h1 {
+  font-size: 1.2em;
+}
+.note-rich-markdown h2 {
+  font-size: 1.1em;
+}
+.note-rich-markdown h3 {
+  font-size: 1.02em;
+}
+.note-rich-markdown h4,
+.note-rich-markdown h5,
+.note-rich-markdown h6 {
+  font-size: 0.96em;
+}
+
+.note-rich-markdown ul,
+.note-rich-markdown ol,
+.note-rich-markdown .note-rich-ul,
+.note-rich-markdown .note-rich-ol {
+  margin: 0 !important;
+  margin-left: 0 !important;
+  padding-left: 24px !important;
+  /* Parent .note-card-content-rich / hover may use pre-wrap; lists need normal wrapping
+     so continuation lines hang under the list body, not the viewport margin. */
+  white-space: normal;
+}
+
+.note-rich-markdown li + li,
+.note-rich-markdown .note-rich-li + .note-rich-li {
+  margin-top: 0 !important;
+}
+
+.note-rich-markdown p + ul,
+.note-rich-markdown p + ol {
+  margin-top: 0 !important;
+}
+
+.note-rich-markdown li > p,
+.note-rich-markdown .note-rich-li > .note-rich-p {
+  margin: 0 !important;
+}
+
+.note-rich-markdown li > ul,
+.note-rich-markdown li > ol {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.note-rich-markdown ul > li,
+.note-rich-markdown ol > li,
+.note-rich-markdown .note-rich-ul > .note-rich-li,
+.note-rich-markdown .note-rich-ol > .note-rich-li {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.12 !important;
+  list-style-position: outside;
+}
+
+/* Second+ paragraphs in the same list item align with the first line’s text column */
+.note-rich-markdown li:not(.task-list-item) > .note-rich-p + .note-rich-p {
+  margin-top: 0.35em !important;
+}
+
+.note-rich-markdown ul.contains-task-list,
+.note-rich-markdown ol.contains-task-list,
+.note-rich-markdown .note-rich-ul.contains-task-list,
+.note-rich-markdown .note-rich-ol.contains-task-list {
+  padding-left: 0 !important;
+}
+
+.note-rich-markdown li.task-list-item,
+.note-rich-markdown .note-rich-li.task-list-item {
+  list-style: none !important;
+  margin-left: 0 !important;
+}
+
+.note-rich-markdown li.task-list-item::marker,
+.note-rich-markdown .note-rich-li.task-list-item::marker {
+  content: '' !important;
+}
+
+/* GFM: checkbox lives in first paragraph; position it so wrapped lines align with text after it */
+.note-rich-markdown li.task-list-item > .note-rich-p {
+  position: relative;
+  padding-left: 1.5em;
+  box-sizing: border-box;
+}
+
+.note-rich-markdown li.task-list-item > .note-rich-p > .note-rich-task-checkbox {
+  position: absolute;
+  left: 0;
+  top: 0.12em;
+  margin: 0 !important;
+  vertical-align: top;
+}
+
+/* Tight task lists: checkbox + text may sit directly under li (no wrapping <p>) */
+.note-rich-markdown li.task-list-item:not(:has(> .note-rich-p)) {
+  position: relative;
+  padding-left: 1.5em;
+  box-sizing: border-box;
+}
+
+.note-rich-markdown li.task-list-item:not(:has(> .note-rich-p)) > .note-rich-task-checkbox {
+  position: absolute;
+  left: 0;
+  top: 0.12em;
+  margin: 0 !important;
+}
+
+.note-rich-task-checkbox {
+  margin: 0 0.45rem 0 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+/* Spaztick shortcut: keep task body on the left, small action on the right */
+.note-rich-markdown li.task-list-item.note-rich-li--task-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.note-rich-markdown li.task-list-item.note-rich-li--task-row > .note-rich-p {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.note-rich-task-spaztick-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.note-rich-task-spaztick-btn:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--accent, #c9a227);
+  background: color-mix(in srgb, var(--accent, #c9a227) 12%, transparent);
+}
+
+.note-rich-task-spaztick-btn:disabled {
+  opacity: 0.35;
+  cursor: wait;
+}
+
+.note-rich-task-spaztick-btn__icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+}
+
+.note-rich-markdown blockquote {
+  margin: 0.45rem 0;
+  padding: 0.1rem 0 0.1rem 0.6rem;
+  border-left: 2px solid var(--border);
+  color: var(--text-muted);
+}
+
+.note-rich-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg) 75%, var(--border));
+}
+
+.note-rich-markdown pre {
+  margin: 0.45rem 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  background: color-mix(in srgb, var(--bg) 82%, var(--border));
+}
+
+.note-rich-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.note-rich-mention {
+  display: inline;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.35rem;
+  font: inherit;
+  color: var(--accent, #c9a227);
+  background: color-mix(in srgb, var(--accent, #c9a227) 12%, transparent);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.note-rich-mention:hover {
+  color: var(--text, #eee);
+}
+
+.note-rich-mention--readonly {
+  cursor: default;
+  text-decoration: none;
+}
+
+.note-rich-tag-pill {
+  display: inline;
+  margin: 0 0.1rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.88em;
+  color: var(--text-muted, #aaa);
+  background: var(--bg, #252525);
+  border-radius: 4px;
+  border: 1px solid var(--border, #444);
+}
+
+.note-rich-link {
+  color: var(--accent, #c9a227);
+  word-break: break-all;
+}

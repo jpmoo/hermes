@@ -10,6 +10,7 @@ import {
   fetchIcsText,
   isAllowedCalendarFeedUrl,
 } from '../services/calendarFeedEvents.js';
+import { createSpaztickExternalTask } from '../services/spaztickTask.js';
 
 const router = Router();
 
@@ -574,6 +575,57 @@ router.get('/calendar-feed-events', requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to load calendar events' });
+  }
+});
+
+/** Create a Spaztick task with an explicit title and optional notes (e.g. checklist line → task, no note body). */
+router.post('/spaztick-task', requireAuth, async (req, res) => {
+  try {
+    const titleRaw = req.body?.title;
+    const notesRaw = req.body?.notes;
+    if (typeof titleRaw !== 'string' || !titleRaw.trim()) {
+      return res.status(400).json({ error: 'title is required' });
+    }
+    const title = titleRaw.trim().slice(0, 200);
+    const notes = notesRaw == null || notesRaw === '' ? '' : String(notesRaw);
+
+    const settingsR = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
+    const raw = settingsR.rows[0]?.settings_json && typeof settingsR.rows[0].settings_json === 'object'
+      ? settingsR.rows[0].settings_json
+      : {};
+    const baseUrl =
+      typeof raw.spaztickApiUrl === 'string' ? raw.spaztickApiUrl.trim().replace(/\/$/, '') : '';
+    const apiKey =
+      typeof raw.spaztickApiKey === 'string' ? raw.spaztickApiKey.trim() : '';
+    if (!baseUrl || !apiKey) {
+      return res.status(400).json({
+        error: 'Configure Spaztick API URL and API key in Settings',
+        code: 'SPAZTICK_NOT_CONFIGURED',
+      });
+    }
+    try {
+      const u = new URL(baseUrl);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Spaztick API URL must be http or https' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'Invalid Spaztick API URL in Settings' });
+    }
+
+    const task = await createSpaztickExternalTask({
+      baseUrl,
+      apiKey,
+      title,
+      notes,
+    });
+    res.status(201).json({ title, task });
+  } catch (err) {
+    console.error('spaztick-task:', err);
+    const msg = err?.message || 'Failed to create Spaztick task';
+    const code = err.status;
+    const status =
+      typeof code === 'number' && code >= 400 && code < 600 ? code : 502;
+    res.status(status).json({ error: msg });
   }
 });
 

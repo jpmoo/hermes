@@ -395,4 +395,23 @@ export async function createSpaztickTaskFromNote(noteId) {
   return data;
 }
 
+/**
+ * Create a Spaztick task with a fixed title and optional notes body (same external API as note export).
+ * Pass notes: '' or omit for no description.
+ */
+export async function createSpaztickTaskFromTitle({ title, notes = '' }) {
+  const r = await fetch(`${API}/user/spaztick-task`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ title, notes }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const err = new Error(data.error || 'Failed to create Spaztick task');
+    err.code = data.code;
+    throw err;
+  }
+  return data;
+}
+
 export { getToken };
