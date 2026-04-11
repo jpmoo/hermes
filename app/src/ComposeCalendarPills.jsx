@@ -1,17 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchCalendarFeedEvents } from './api';
 import { useNoteTypeColors } from './NoteTypeColorContext';
+import { localCalendarLookoutBounds, normalizeCalendarLookoutDays } from './calendarLookoutDays';
 import './ComposeCalendarPills.css';
 
-function localDayIsoBounds() {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
-
 export default function ComposeCalendarPills({ onPickEvent, disabled }) {
-  const { calendarFeeds } = useNoteTypeColors();
+  const { calendarFeeds, calendarLookoutDays } = useNoteTypeColors();
+  const lookoutNorm = useMemo(() => normalizeCalendarLookoutDays(calendarLookoutDays), [calendarLookoutDays]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +17,7 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
     }
     setLoading(true);
     try {
-      const { from, to } = localDayIsoBounds();
+      const { from, to } = localCalendarLookoutBounds(calendarLookoutDays);
       const data = await fetchCalendarFeedEvents(from, to);
       setEvents(Array.isArray(data.events) ? data.events : []);
     } catch (e) {
@@ -31,7 +26,7 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
     } finally {
       setLoading(false);
     }
-  }, [calendarFeeds]);
+  }, [calendarFeeds, calendarLookoutDays]);
 
   useEffect(() => {
     load();
@@ -52,7 +47,10 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
   if (!loading && events.length === 0) return null;
 
   return (
-    <div className="compose-calendar-pills compose-calendar-pills--toolbar" aria-label="Today’s calendar events">
+    <div
+      className="compose-calendar-pills compose-calendar-pills--toolbar"
+      aria-label={lookoutNorm === 0 ? 'Today’s calendar events' : 'Calendar events in the selected date range'}
+    >
       <div className="compose-calendar-pills-scroll">
         {loading && events.length === 0 ? (
           <span className="compose-calendar-pills-muted">Calendar…</span>

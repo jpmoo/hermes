@@ -3,6 +3,11 @@ import { NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { NOTE_TYPE_COLOR_DEFAULTS } from './noteTypeColorSettings';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import { DEFAULT_START_PAGE_OPTIONS } from './defaultStartPage';
+import {
+  CALENDAR_LOOKOUT_MAX,
+  CALENDAR_LOOKOUT_MIN,
+  normalizeCalendarLookoutDays,
+} from './calendarLookoutDays';
 import { getRoots } from './api';
 import './SettingsModal.css';
 
@@ -26,6 +31,8 @@ export default function SettingsModal({ onClose }) {
     setCalendarFeeds,
     calendarInviteeLinkedNotes,
     setCalendarInviteeLinkedNotes,
+    calendarLookoutDays,
+    setCalendarLookoutDays,
     defaultStartPage,
     setDefaultStartPage,
     defaultStartPagePhone,
@@ -35,6 +42,11 @@ export default function SettingsModal({ onClose }) {
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
   const [newCalendarFeedUrl, setNewCalendarFeedUrl] = useState('');
   const [newCalendarFeedName, setNewCalendarFeedName] = useState('');
+  const [calendarLookoutDraft, setCalendarLookoutDraft] = useState(() => String(calendarLookoutDays));
+
+  useEffect(() => {
+    setCalendarLookoutDraft(String(calendarLookoutDays));
+  }, [calendarLookoutDays]);
 
   const effectiveSimilarMin =
     similarNotesMinChars != null ? similarNotesMinChars : similarNotesMinDefault;
@@ -462,8 +474,8 @@ export default function SettingsModal({ onClose }) {
             </ul>
           ) : (
             <p className="settings-modal-similar-notes-hint" style={{ marginTop: '0.35rem' }}>
-              No feeds yet. Events from feeds appear as chips above the composer when there is something left on your
-              calendar today.
+              No feeds yet. Events from feeds appear as chips above the composer when there is something in your
+              selected calendar window (see below).
             </p>
           )}
           <div className="settings-modal-similar-notes-checkbox-row" style={{ marginTop: '0.85rem' }}>
@@ -479,9 +491,41 @@ export default function SettingsModal({ onClose }) {
             </label>
           </div>
           <p className="settings-modal-similar-notes-hint" style={{ marginTop: '0.35rem' }}>
-            When enabled, creating an event from a chip also adds one note per invitee in your inbox thread (see below)
-            if configured, otherwise as a child of the event. Each is linked to the event note. Requires ATTENDEE data
-            in the feed.
+            When enabled, each invitee is linked to the event note. If you already have a note whose first line matches
+            that person (same name and email line Hermes would use), that note is reused; otherwise a new note is
+            created under your inbox thread (see below) when set, otherwise under the event. Requires ATTENDEE data in
+            the feed.
+          </p>
+          <div className="settings-modal-similar-notes-row" style={{ marginTop: '0.85rem' }}>
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-calendar-lookout-days">
+              Days to look out
+            </label>
+            <input
+              id="settings-calendar-lookout-days"
+              type="number"
+              min={CALENDAR_LOOKOUT_MIN}
+              max={CALENDAR_LOOKOUT_MAX}
+              step={1}
+              className="settings-modal-similar-notes-input"
+              style={{ maxWidth: '5rem' }}
+              value={calendarLookoutDraft}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setCalendarLookoutDraft(raw);
+                if (raw === '' || raw === '-' || raw === '+') return;
+                setCalendarLookoutDays(raw);
+              }}
+              onBlur={() => {
+                const n = normalizeCalendarLookoutDays(calendarLookoutDraft);
+                setCalendarLookoutDays(n);
+                setCalendarLookoutDraft(String(n));
+              }}
+            />
+          </div>
+          <p className="settings-modal-similar-notes-hint" style={{ marginTop: '0.35rem' }}>
+            <strong>0</strong> shows today only (local date). Use negative values to include past days and positive
+            values to extend further ahead (each step is one calendar day, range {CALENDAR_LOOKOUT_MIN} to{' '}
+            {CALENDAR_LOOKOUT_MAX}).
           </p>
         </section>
 

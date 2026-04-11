@@ -103,65 +103,6 @@ function stripMentionLinksToNote(content, targetNoteId) {
     .trim();
 }
 
-/** Matches client `formatNoteMentionLink` / first-line title used in mention chips. */
-function canonicalMentionLabelFromNoteContent(content) {
-  const line = String(content ?? '')
-    .split(/\n/)[0]
-    .replace(/\r/g, '')
-    .replace(/^\uFEFF/, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const safe = line
-    .replace(/\]/g, '')
-    .replace(/\n/g, ' ')
-    .trim()
-    .slice(0, 120);
-  return safe || 'note';
-}
-
-/**
- * Set every `[label](hermes-note://targetId)` to use `labelText` (aligned with that note's current title line).
- * UUID in existing links is matched case-insensitively.
- */
-function replaceMentionLinkLabelsToNote(content, targetNoteId, labelText) {
-  const s = String(content ?? '');
-  const idLower = String(targetNoteId || '').toLowerCase();
-  if (!idLower) return s;
-  const safe = String(labelText || 'note')
-    .replace(/\]/g, '')
-    .replace(/\n/g, ' ')
-    .trim()
-    .slice(0, 120) || 'note';
-  const re = /\[([^\]]*)\]\(hermes-note:\/\/([0-9a-f-]{36})\)/gi;
-  return s.replace(re, (match, _oldLabel, uuidInLink) => {
-    if (String(uuidInLink).toLowerCase() !== idLower) return match;
-    return `[${safe}](hermes-note://${idLower})`;
-  });
-}
-
-/** After a note’s content changes, sync mention link text in all other notes that link to it. */
-async function propagateMentionLinkLabelsForNote(pg, userId, targetNoteId, targetContent) {
-  const label = canonicalMentionLabelFromNoteContent(targetContent);
-  const idLower = String(targetNoteId).toLowerCase();
-  const needle = `hermes-note://${idLower}`;
-  const { rows } = await pg.query(
-    `SELECT id, content FROM notes
-     WHERE user_id = $1::uuid AND id <> $2::uuid AND content LIKE $3`,
-    [userId, targetNoteId, `%${needle}%`]
-  );
-  for (const row of rows) {
-    const next = replaceMentionLinkLabelsToNote(row.content, targetNoteId, label);
-    if (next !== row.content) {
-      await pg.query('UPDATE notes SET content = $1 WHERE id = $2 AND user_id = $3::uuid', [
-        next,
-        row.id,
-        userId,
-      ]);
-      embedNote(row.id, next).catch(() => {});
-    }
-  }
-}
-
 function stripHashtagPrefixFromContent(content, tagName) {
   const s = String(content ?? '');
   const name = String(tagName || '').trim();
@@ -1298,11 +1239,6 @@ router.patch('/:id', async (req, res) => {
     const note = r.rows[0];
     if (content !== undefined) {
       embedNote(note.id, note.content).catch(() => {});
-      try {
-        await propagateMentionLinkLabelsForNote(pool, userId, id, note.content);
-      } catch (propErr) {
-        console.error('propagateMentionLinkLabelsForNote', propErr);
-      }
     }
     res.json(note);
   } catch (err) {

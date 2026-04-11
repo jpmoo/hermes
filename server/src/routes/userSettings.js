@@ -67,6 +67,18 @@ function calendarInviteeLinkedNotesFromStored(raw) {
   return raw && typeof raw === 'object' && raw.calendarInviteeLinkedNotes === true;
 }
 
+function sanitizeCalendarLookoutDays(input) {
+  if (input == null || input === '') return 0;
+  const n = Math.round(Number(input));
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(-10, Math.min(10, n));
+}
+
+function calendarLookoutDaysFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return 0;
+  return sanitizeCalendarLookoutDays(raw.calendarLookoutDays);
+}
+
 const NOTE_TYPES = ['note', 'event', 'person', 'organization'];
 
 const DEFAULT_START_PAGES = ['stream', 'canvas', 'outline', 'calendar', 'search'];
@@ -280,6 +292,7 @@ router.get('/settings', requireAuth, async (req, res) => {
       spaztickApiKeySet: spKeyStored,
       calendarFeeds,
       calendarInviteeLinkedNotes: calendarInviteeLinkedNotesFromStored(raw),
+      calendarLookoutDays: calendarLookoutDaysFromStored(raw),
     });
   } catch (err) {
     console.error(err);
@@ -303,6 +316,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       calendarFeeds,
       calendarFeedUrls,
       calendarInviteeLinkedNotes,
+      calendarLookoutDays,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -481,6 +495,14 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (calendarLookoutDays !== undefined) {
+      if (calendarLookoutDays === null) {
+        delete cur.calendarLookoutDays;
+      } else {
+        cur.calendarLookoutDays = sanitizeCalendarLookoutDays(calendarLookoutDays);
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -510,6 +532,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       spaztickApiKeySet: outSpKeySet,
       calendarFeeds: outCalendarFeeds,
       calendarInviteeLinkedNotes: calendarInviteeLinkedNotesFromStored(cur),
+      calendarLookoutDays: calendarLookoutDaysFromStored(cur),
     });
   } catch (err) {
     console.error(err);

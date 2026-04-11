@@ -16,7 +16,6 @@ import {
   getNote,
   getNoteThreadPath,
   createNote,
-  createNoteConnection,
   uploadNoteFiles,
   fetchUserSettings,
   patchUserSettings,
@@ -32,8 +31,8 @@ import {
   NOTE_TYPE_OPTIONS,
   calendarFeedPickToComposeFields,
   buildCalendarEventDetailNoteContent,
-  calendarInviteeNoteContentLine,
 } from './noteEventUtils';
+import { linkOrCreateInviteeNotesForEvent } from './calendarInviteeNotes';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
@@ -1062,21 +1061,12 @@ export default function CanvasPage() {
           await syncTagsFromContent(child.id, detail, [], '');
         }
         if (calendarInviteeLinkedNotes && attendees.length > 0) {
-          const invParent =
-            typeof inboxThreadRootId === 'string' && inboxThreadRootId.trim()
-              ? inboxThreadRootId.trim()
-              : note.id;
-          for (const a of attendees) {
-            const line = calendarInviteeNoteContentLine(a);
-            const inv = await createNote({
-              content: line,
-              parent_id: invParent,
-              note_type: 'note',
-            });
-            await syncConnectionsFromContent(inv.id, line, '');
-            await syncTagsFromContent(inv.id, line, [], '');
-            await createNoteConnection(note.id, inv.id);
-          }
+          await linkOrCreateInviteeNotesForEvent({
+            eventNoteId: note.id,
+            attendees,
+            inboxThreadRootId,
+            fallbackParentId: note.id,
+          });
         }
         if (threadRootId) {
           await refreshThread();
