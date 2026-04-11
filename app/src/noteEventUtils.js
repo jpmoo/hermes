@@ -164,12 +164,3 @@ export function buildCalendarEventDetailNoteContent(description, attendees) {
   }
   return parts.join('\n\n').trim();
 }
-
-/** One-line title for an auto-created invitee note. */
-export function calendarInviteeNoteContentLine(a) {
-  if (!a || typeof a !== 'object') return 'Invitee';
-  const name = typeof a.displayName === 'string' ? a.displayName.trim() : '';
-  const em = typeof a.email === 'string' ? a.email.trim() : '';
-  if (name && em) return `${name} <${em}>`;
-  return name || em || 'Invitee';
-}

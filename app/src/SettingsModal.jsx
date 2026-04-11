@@ -29,8 +29,6 @@ export default function SettingsModal({ onClose }) {
     saveSpaztickApiKey,
     calendarFeeds,
     setCalendarFeeds,
-    calendarInviteeLinkedNotes,
-    setCalendarInviteeLinkedNotes,
     calendarLookoutDays,
     setCalendarLookoutDays,
     defaultStartPage,
@@ -478,24 +476,6 @@ export default function SettingsModal({ onClose }) {
               selected calendar window (see below).
             </p>
           )}
-          <div className="settings-modal-similar-notes-checkbox-row" style={{ marginTop: '0.85rem' }}>
-            <input
-              id="settings-calendar-invitee-notes"
-              type="checkbox"
-              className="settings-modal-similar-notes-checkbox"
-              checked={calendarInviteeLinkedNotes}
-              onChange={(e) => setCalendarInviteeLinkedNotes(e.target.checked)}
-            />
-            <label className="settings-modal-similar-notes-checkbox-label" htmlFor="settings-calendar-invitee-notes">
-              Create notes from calendar events invitees
-            </label>
-          </div>
-          <p className="settings-modal-similar-notes-hint" style={{ marginTop: '0.35rem' }}>
-            When enabled, each invitee is linked to the event note. If you already have a note whose first line matches
-            that person (same name and email line Hermes would use), that note is reused; otherwise a new note is
-            created under your inbox thread (see below) when set, otherwise under the event. Requires ATTENDEE data in
-            the feed.
-          </p>
           <div className="settings-modal-similar-notes-row" style={{ marginTop: '0.85rem' }}>
             <label className="settings-modal-similar-notes-label" htmlFor="settings-calendar-lookout-days">
               Days to look out

@@ -9,7 +9,6 @@ import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
-import { useNoteTypeColors } from './NoteTypeColorContext';
 import {
   getThread,
   getRoots,
@@ -32,7 +31,6 @@ import {
   calendarFeedPickToComposeFields,
   buildCalendarEventDetailNoteContent,
 } from './noteEventUtils';
-import { linkOrCreateInviteeNotesForEvent } from './calendarInviteeNotes';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
@@ -345,7 +343,6 @@ const PINCH_ZOOM_EXP = 1.22;
 
 export default function CanvasPage() {
   const { logout, user } = useAuth();
-  const { inboxThreadRootId, calendarInviteeLinkedNotes } = useNoteTypeColors();
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
@@ -1060,14 +1057,6 @@ export default function CanvasPage() {
           await syncConnectionsFromContent(child.id, detail, '');
           await syncTagsFromContent(child.id, detail, [], '');
         }
-        if (calendarInviteeLinkedNotes && attendees.length > 0) {
-          await linkOrCreateInviteeNotesForEvent({
-            eventNoteId: note.id,
-            attendees,
-            inboxThreadRootId,
-            fallbackParentId: note.id,
-          });
-        }
         if (threadRootId) {
           await refreshThread();
           applyFocus(note.id);
@@ -1097,8 +1086,6 @@ export default function CanvasPage() {
       refreshThread,
       applyFocus,
       setSearchParams,
-      inboxThreadRootId,
-      calendarInviteeLinkedNotes,
     ]
   );
 

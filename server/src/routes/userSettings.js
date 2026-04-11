@@ -63,10 +63,6 @@ function calendarFeedsFromStored(raw) {
   return [];
 }
 
-function calendarInviteeLinkedNotesFromStored(raw) {
-  return raw && typeof raw === 'object' && raw.calendarInviteeLinkedNotes === true;
-}
-
 function sanitizeCalendarLookoutDays(input) {
   if (input == null || input === '') return 0;
   const n = Math.round(Number(input));
@@ -291,7 +287,6 @@ router.get('/settings', requireAuth, async (req, res) => {
       spaztickApiUrl: spUrl === undefined ? null : spUrl,
       spaztickApiKeySet: spKeyStored,
       calendarFeeds,
-      calendarInviteeLinkedNotes: calendarInviteeLinkedNotesFromStored(raw),
       calendarLookoutDays: calendarLookoutDaysFromStored(raw),
     });
   } catch (err) {
@@ -315,7 +310,6 @@ router.patch('/settings', requireAuth, async (req, res) => {
       spaztickApiKey,
       calendarFeeds,
       calendarFeedUrls,
-      calendarInviteeLinkedNotes,
       calendarLookoutDays,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
@@ -480,21 +474,6 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
-    if (calendarInviteeLinkedNotes !== undefined) {
-      if (calendarInviteeLinkedNotes === null) {
-        delete cur.calendarInviteeLinkedNotes;
-      } else if (
-        calendarInviteeLinkedNotes !== true &&
-        calendarInviteeLinkedNotes !== false
-      ) {
-        return res
-          .status(400)
-          .json({ error: 'calendarInviteeLinkedNotes must be true, false, or null' });
-      } else {
-        cur.calendarInviteeLinkedNotes = calendarInviteeLinkedNotes;
-      }
-    }
-
     if (calendarLookoutDays !== undefined) {
       if (calendarLookoutDays === null) {
         delete cur.calendarLookoutDays;
@@ -531,7 +510,6 @@ router.patch('/settings', requireAuth, async (req, res) => {
       spaztickApiUrl: outSpUrl === undefined ? null : outSpUrl,
       spaztickApiKeySet: outSpKeySet,
       calendarFeeds: outCalendarFeeds,
-      calendarInviteeLinkedNotes: calendarInviteeLinkedNotesFromStored(cur),
       calendarLookoutDays: calendarLookoutDaysFromStored(cur),
     });
   } catch (err) {

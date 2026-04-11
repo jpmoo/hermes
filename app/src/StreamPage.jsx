@@ -25,14 +25,12 @@ import {
   calendarFeedPickToComposeFields,
   buildCalendarEventDetailNoteContent,
 } from './noteEventUtils';
-import { linkOrCreateInviteeNotesForEvent } from './calendarInviteeNotes';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
-import { useNoteTypeColors } from './NoteTypeColorContext';
 import {
   NavIconAttach,
   NavIconBrain,
@@ -364,7 +362,6 @@ function StreamList({
 }
 
 export default function StreamPage() {
-  const { inboxThreadRootId, calendarInviteeLinkedNotes } = useNoteTypeColors();
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
@@ -1159,14 +1156,6 @@ export default function StreamPage() {
           await syncConnectionsFromContent(child.id, detail, '');
           await syncTagsFromContent(child.id, detail, [], '');
         }
-        if (calendarInviteeLinkedNotes && attendees.length > 0) {
-          await linkOrCreateInviteeNotesForEvent({
-            eventNoteId: note.id,
-            attendees,
-            inboxThreadRootId,
-            fallbackParentId: note.id,
-          });
-        }
         if (threadRootId) {
           await loadThread(true);
           applyFocusImmediate(note.id);
@@ -1195,8 +1184,6 @@ export default function StreamPage() {
       loadThread,
       applyFocusImmediate,
       openThreadDirect,
-      inboxThreadRootId,
-      calendarInviteeLinkedNotes,
     ]
   );
 

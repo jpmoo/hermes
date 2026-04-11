@@ -34,7 +34,6 @@ export function NoteTypeColorProvider({ children }) {
   const [spaztickApiUrl, setSpaztickApiUrl] = useState('');
   const [spaztickApiKeySet, setSpaztickApiKeySet] = useState(false);
   const [calendarFeeds, setCalendarFeeds] = useState([]);
-  const [calendarInviteeLinkedNotes, setCalendarInviteeLinkedNotes] = useState(false);
   const [calendarLookoutDays, setCalendarLookoutDays] = useState(0);
   const [defaultStartPage, setDefaultStartPage] = useState('stream');
   const [defaultStartPagePhone, setDefaultStartPagePhone] = useState('stream');
@@ -44,7 +43,6 @@ export function NoteTypeColorProvider({ children }) {
   const skipInboxSave = useRef(false);
   const skipSpaztickSave = useRef(false);
   const skipCalendarFeedsSave = useRef(false);
-  const skipCalendarInviteeLinkedNotesSave = useRef(false);
   const skipCalendarLookoutDaysSave = useRef(false);
   const skipDefaultStartPageSave = useRef(false);
   const skipDefaultStartPagePhoneSave = useRef(false);
@@ -53,7 +51,6 @@ export function NoteTypeColorProvider({ children }) {
   const inboxSaveTimer = useRef(null);
   const spaztickSaveTimer = useRef(null);
   const calendarFeedsSaveTimer = useRef(null);
-  const calendarInviteeLinkedNotesSaveTimer = useRef(null);
   const calendarLookoutDaysSaveTimer = useRef(null);
   const defaultStartPageSaveTimer = useRef(null);
   const defaultStartPagePhoneSaveTimer = useRef(null);
@@ -87,7 +84,6 @@ export function NoteTypeColorProvider({ children }) {
         setSpaztickApiUrl(typeof data.spaztickApiUrl === 'string' ? data.spaztickApiUrl : '');
         setSpaztickApiKeySet(data.spaztickApiKeySet === true);
         setCalendarFeeds(normalizeCalendarFeedsFromApi(data));
-        setCalendarInviteeLinkedNotes(data.calendarInviteeLinkedNotes === true);
         setCalendarLookoutDays(normalizeCalendarLookoutDays(data.calendarLookoutDays));
         setDefaultStartPage(normalizeDefaultStartPage(data.defaultStartPage));
         setDefaultStartPagePhone(normalizeDefaultStartPage(data.defaultStartPagePhone));
@@ -98,7 +94,6 @@ export function NoteTypeColorProvider({ children }) {
           skipInboxSave.current = true;
           skipSpaztickSave.current = true;
           skipCalendarFeedsSave.current = true;
-          skipCalendarInviteeLinkedNotesSave.current = true;
           skipCalendarLookoutDaysSave.current = true;
           skipDefaultStartPageSave.current = true;
           skipDefaultStartPagePhoneSave.current = true;
@@ -114,7 +109,6 @@ export function NoteTypeColorProvider({ children }) {
           skipInboxSave.current = true;
           skipSpaztickSave.current = true;
           skipCalendarFeedsSave.current = true;
-          skipCalendarInviteeLinkedNotesSave.current = true;
           skipCalendarLookoutDaysSave.current = true;
           skipDefaultStartPageSave.current = true;
           skipDefaultStartPagePhoneSave.current = true;
@@ -126,7 +120,6 @@ export function NoteTypeColorProvider({ children }) {
         skipInboxSave.current = true;
         skipSpaztickSave.current = true;
         skipCalendarFeedsSave.current = true;
-        skipCalendarInviteeLinkedNotesSave.current = true;
         skipCalendarLookoutDaysSave.current = true;
         skipDefaultStartPageSave.current = true;
         skipDefaultStartPagePhoneSave.current = true;
@@ -151,7 +144,6 @@ export function NoteTypeColorProvider({ children }) {
       setSpaztickApiUrl('');
       setSpaztickApiKeySet(false);
       setCalendarFeeds([]);
-      setCalendarInviteeLinkedNotes(false);
       setCalendarLookoutDays(0);
       setDefaultStartPage('stream');
       setDefaultStartPagePhone('stream');
@@ -160,7 +152,6 @@ export function NoteTypeColorProvider({ children }) {
       skipInboxSave.current = true;
       skipSpaztickSave.current = true;
       skipCalendarFeedsSave.current = true;
-      skipCalendarInviteeLinkedNotesSave.current = true;
       skipCalendarLookoutDaysSave.current = true;
       skipDefaultStartPageSave.current = true;
       skipDefaultStartPagePhoneSave.current = true;
@@ -260,26 +251,6 @@ export function NoteTypeColorProvider({ children }) {
 
   useEffect(() => {
     if (!user?.id || !serverReady) return;
-    if (skipCalendarInviteeLinkedNotesSave.current) {
-      skipCalendarInviteeLinkedNotesSave.current = false;
-      return;
-    }
-    if (calendarInviteeLinkedNotesSaveTimer.current) {
-      clearTimeout(calendarInviteeLinkedNotesSaveTimer.current);
-    }
-    calendarInviteeLinkedNotesSaveTimer.current = setTimeout(() => {
-      calendarInviteeLinkedNotesSaveTimer.current = null;
-      patchUserSettings({ calendarInviteeLinkedNotes }).catch((e) => console.error(e));
-    }, 450);
-    return () => {
-      if (calendarInviteeLinkedNotesSaveTimer.current) {
-        clearTimeout(calendarInviteeLinkedNotesSaveTimer.current);
-      }
-    };
-  }, [calendarInviteeLinkedNotes, user?.id, serverReady]);
-
-  useEffect(() => {
-    if (!user?.id || !serverReady) return;
     if (skipCalendarLookoutDaysSave.current) {
       skipCalendarLookoutDaysSave.current = false;
       return;
@@ -334,10 +305,6 @@ export function NoteTypeColorProvider({ children }) {
 
   const setDefaultStartPagePhoneSetting = useCallback((id) => {
     setDefaultStartPagePhone(normalizeDefaultStartPage(id));
-  }, []);
-
-  const setCalendarInviteeLinkedNotesSetting = useCallback((on) => {
-    setCalendarInviteeLinkedNotes(Boolean(on));
   }, []);
 
   const setCalendarLookoutDaysSetting = useCallback((n) => {
@@ -432,8 +399,6 @@ export function NoteTypeColorProvider({ children }) {
       spaztickReady,
       calendarFeeds,
       setCalendarFeeds: setCalendarFeedsSetting,
-      calendarInviteeLinkedNotes,
-      setCalendarInviteeLinkedNotes: setCalendarInviteeLinkedNotesSetting,
       calendarLookoutDays,
       setCalendarLookoutDays: setCalendarLookoutDaysSetting,
       defaultStartPage,
@@ -460,8 +425,6 @@ export function NoteTypeColorProvider({ children }) {
       spaztickReady,
       calendarFeeds,
       setCalendarFeedsSetting,
-      calendarInviteeLinkedNotes,
-      setCalendarInviteeLinkedNotesSetting,
       calendarLookoutDays,
       setCalendarLookoutDaysSetting,
       defaultStartPage,
