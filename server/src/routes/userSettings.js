@@ -15,22 +15,52 @@ const router = Router();
 
 const MAX_CALENDAR_FEEDS = 12;
 const MAX_FEED_URL_LEN = 2048;
+const MAX_FEED_NAME_LEN = 80;
 
-function sanitizeCalendarFeedUrls(input) {
+/**
+ * @returns {{ url: string, name: string }[]}
+ */
+function sanitizeCalendarFeeds(input) {
   if (input == null || !Array.isArray(input)) return [];
   const out = [];
   const seen = new Set();
   for (const item of input) {
-    if (typeof item !== 'string') continue;
-    const t = item.trim();
-    if (!t || t.length > MAX_FEED_URL_LEN) continue;
-    if (!isAllowedCalendarFeedUrl(t)) continue;
-    if (seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
+    if (typeof item === 'string') {
+      const t = item.trim();
+      if (!t || t.length > MAX_FEED_URL_LEN) continue;
+      if (!isAllowedCalendarFeedUrl(t)) continue;
+      if (seen.has(t)) continue;
+      seen.add(t);
+      out.push({ url: t, name: '' });
+      if (out.length >= MAX_CALENDAR_FEEDS) break;
+      continue;
+    }
+    if (!item || typeof item !== 'object') continue;
+    const url = typeof item.url === 'string' ? item.url.trim() : '';
+    if (!url || url.length > MAX_FEED_URL_LEN) continue;
+    if (!isAllowedCalendarFeedUrl(url)) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const name =
+      typeof item.name === 'string' ? item.name.trim().slice(0, MAX_FEED_NAME_LEN) : '';
+    out.push({ url, name });
     if (out.length >= MAX_CALENDAR_FEEDS) break;
   }
   return out;
+}
+
+/** Migrate legacy `calendarFeedUrls: string[]` to feeds with optional names. */
+function calendarFeedsFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return [];
+  const feeds = Array.isArray(raw.calendarFeeds) ? raw.calendarFeeds : null;
+  if (feeds && feeds.length > 0) {
+    const cleaned = sanitizeCalendarFeeds(feeds);
+    if (cleaned.length > 0) return cleaned;
+  }
+  if (Array.isArray(raw.calendarFeedUrls)) {
+    return sanitizeCalendarFeeds(raw.calendarFeedUrls);
+  }
+  return [];
 }
 
 const NOTE_TYPES = ['note', 'event', 'person', 'organization'];
@@ -231,7 +261,7 @@ router.get('/settings', requireAuth, async (req, res) => {
     const inboxThreadRootId = sanitizeInboxThreadRootId(raw.inboxThreadRootId);
     const spUrl = sanitizeSpaztickApiUrl(raw.spaztickApiUrl);
     const spKeyStored = typeof raw.spaztickApiKey === 'string' && raw.spaztickApiKey.trim().length > 0;
-    const calendarFeedUrls = sanitizeCalendarFeedUrls(raw.calendarFeedUrls);
+    const calendarFeeds = calendarFeedsFromStored(raw);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
@@ -244,7 +274,7 @@ router.get('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId: inboxThreadRootId === undefined ? null : inboxThreadRootId,
       spaztickApiUrl: spUrl === undefined ? null : spUrl,
       spaztickApiKeySet: spKeyStored,
-      calendarFeedUrls,
+      calendarFeeds,
     });
   } catch (err) {
     console.error(err);
@@ -265,6 +295,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId,
       spaztickApiUrl,
       spaztickApiKey,
+      calendarFeeds,
       calendarFeedUrls,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
@@ -407,15 +438,25 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
-    if (calendarFeedUrls !== undefined) {
-      if (calendarFeedUrls === null) {
+    const calendarFeedsPayload =
+      calendarFeeds !== undefined ? calendarFeeds : calendarFeedUrls;
+    if (calendarFeedsPayload !== undefined) {
+      if (calendarFeedsPayload === null) {
+        delete cur.calendarFeeds;
         delete cur.calendarFeedUrls;
-      } else if (!Array.isArray(calendarFeedUrls)) {
-        return res.status(400).json({ error: 'calendarFeedUrls must be an array of URLs or null' });
+      } else if (!Array.isArray(calendarFeedsPayload)) {
+        return res.status(400).json({
+          error: 'calendarFeeds must be an array of { url, name? } (or legacy URL strings) or null',
+        });
       } else {
-        const cleaned = sanitizeCalendarFeedUrls(calendarFeedUrls);
-        if (cleaned.length === 0) delete cur.calendarFeedUrls;
-        else cur.calendarFeedUrls = cleaned;
+        const cleaned = sanitizeCalendarFeeds(calendarFeedsPayload);
+        if (cleaned.length === 0) {
+          delete cur.calendarFeeds;
+          delete cur.calendarFeedUrls;
+        } else {
+          cur.calendarFeeds = cleaned;
+          delete cur.calendarFeedUrls;
+        }
       }
     }
 
@@ -433,7 +474,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outInbox = sanitizeInboxThreadRootId(cur.inboxThreadRootId);
     const outSpUrl = sanitizeSpaztickApiUrl(cur.spaztickApiUrl);
     const outSpKeySet = typeof cur.spaztickApiKey === 'string' && cur.spaztickApiKey.trim().length > 0;
-    const outCalendarFeeds = sanitizeCalendarFeedUrls(cur.calendarFeedUrls);
+    const outCalendarFeeds = calendarFeedsFromStored(cur);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
@@ -446,7 +487,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId: outInbox === undefined ? null : outInbox,
       spaztickApiUrl: outSpUrl === undefined ? null : outSpUrl,
       spaztickApiKeySet: outSpKeySet,
-      calendarFeedUrls: outCalendarFeeds,
+      calendarFeeds: outCalendarFeeds,
     });
   } catch (err) {
     console.error(err);
@@ -477,12 +518,12 @@ router.get('/calendar-feed-events', requireAuth, async (req, res) => {
     const raw = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
       ? r.rows[0].settings_json
       : {};
-    const urls = sanitizeCalendarFeedUrls(raw.calendarFeedUrls);
+    const feeds = calendarFeedsFromStored(raw);
     const all = [];
-    for (const url of urls) {
+    for (const { url, name } of feeds) {
       try {
         const ics = await fetchIcsText(url);
-        const evs = eventsFromIcsForDay(ics, rangeFrom, rangeTo, now, url);
+        const evs = eventsFromIcsForDay(ics, rangeFrom, rangeTo, now, url, name);
         all.push(...evs);
       } catch (e) {
         console.error('calendar feed fetch failed', url, e?.message || e);
@@ -495,6 +536,8 @@ router.get('/calendar-feed-events', requireAuth, async (req, res) => {
         start: e.start.toISOString(),
         end: e.end.toISOString(),
         feedUrl: e.feedUrl,
+        feedName: e.feedName || '',
+        ...(e.description ? { description: e.description } : {}),
         ...(e.allDay === true
           ? {
               allDay: true,

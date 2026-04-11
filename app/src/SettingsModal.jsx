@@ -22,8 +22,8 @@ export default function SettingsModal({ onClose }) {
     setSpaztickApiUrl,
     spaztickApiKeySet,
     saveSpaztickApiKey,
-    calendarFeedUrls,
-    setCalendarFeedUrls,
+    calendarFeeds,
+    setCalendarFeeds,
     defaultStartPage,
     setDefaultStartPage,
     defaultStartPagePhone,
@@ -32,6 +32,7 @@ export default function SettingsModal({ onClose }) {
   const [rootThreads, setRootThreads] = useState([]);
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
   const [newCalendarFeedUrl, setNewCalendarFeedUrl] = useState('');
+  const [newCalendarFeedName, setNewCalendarFeedName] = useState('');
 
   const effectiveSimilarMin =
     similarNotesMinChars != null ? similarNotesMinChars : similarNotesMinDefault;
@@ -85,7 +86,7 @@ export default function SettingsModal({ onClose }) {
     }
   }, [saveSpaztickApiKey]);
 
-  const feeds = Array.isArray(calendarFeedUrls) ? calendarFeedUrls : [];
+  const feeds = Array.isArray(calendarFeeds) ? calendarFeeds : [];
 
   const tryAddCalendarFeed = useCallback(() => {
     let raw = newCalendarFeedUrl.trim();
@@ -109,23 +110,35 @@ export default function SettingsModal({ onClose }) {
       window.alert('Hermes cannot fetch calendar feeds from localhost (server restriction). Use a public HTTPS iCal URL.');
       return;
     }
-    if (feeds.some((x) => x === u.href)) {
+    if (feeds.some((x) => x.url === u.href)) {
       setNewCalendarFeedUrl('');
+      setNewCalendarFeedName('');
       return;
     }
     if (feeds.length >= 12) {
       window.alert('You can add at most 12 calendar feeds.');
       return;
     }
-    setCalendarFeedUrls([...feeds, u.href]);
+    const name = newCalendarFeedName.trim().slice(0, 80);
+    setCalendarFeeds([...feeds, { url: u.href, name }]);
     setNewCalendarFeedUrl('');
-  }, [newCalendarFeedUrl, feeds, setCalendarFeedUrls]);
+    setNewCalendarFeedName('');
+  }, [newCalendarFeedUrl, newCalendarFeedName, feeds, setCalendarFeeds]);
 
   const removeCalendarFeed = useCallback(
     (url) => {
-      setCalendarFeedUrls(feeds.filter((x) => x !== url));
+      setCalendarFeeds(feeds.filter((x) => x.url !== url));
     },
-    [feeds, setCalendarFeedUrls]
+    [feeds, setCalendarFeeds]
+  );
+
+  const updateCalendarFeedName = useCallback(
+    (url, name) => {
+      setCalendarFeeds(
+        feeds.map((f) => (f.url === url ? { ...f, name: name.slice(0, 80) } : f))
+      );
+    },
+    [feeds, setCalendarFeeds]
   );
 
   return (
@@ -373,7 +386,29 @@ export default function SettingsModal({ onClose }) {
             Subscribe to published iCal / ICS feeds (for example a &quot;secret&quot; or public calendar URL from Google
             Calendar, Fastmail, or similar). Hermes fetches them on the server and shows today&apos;s remaining events
             above the reply box. Add the HTTPS link to the raw <code className="settings-modal-code">.ics</code> feed.
+            Give each feed a short name; it appears after the event title in parentheses on the chips.
           </p>
+          <div className="settings-modal-spaztick-field">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-calendar-feed-new-name">
+              Name (optional)
+            </label>
+            <input
+              id="settings-calendar-feed-new-name"
+              className="settings-modal-spaztick-url-input"
+              type="text"
+              autoComplete="off"
+              placeholder="Work, Family, …"
+              maxLength={80}
+              value={newCalendarFeedName}
+              onChange={(e) => setNewCalendarFeedName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  tryAddCalendarFeed();
+                }
+              }}
+            />
+          </div>
           <div className="settings-modal-spaztick-field">
             <label className="settings-modal-similar-notes-label" htmlFor="settings-calendar-feed-new">
               Add feed URL
@@ -401,13 +436,22 @@ export default function SettingsModal({ onClose }) {
           </div>
           {feeds.length > 0 ? (
             <ul className="settings-modal-type-colors" style={{ marginTop: '0.65rem' }}>
-              {feeds.map((url) => (
-                <li key={url} className="settings-modal-calendar-feed-row">
-                  <span className="settings-modal-calendar-feed-url">{url}</span>
+              {feeds.map((feed) => (
+                <li key={feed.url} className="settings-modal-calendar-feed-row">
+                  <input
+                    type="text"
+                    className="settings-modal-calendar-feed-name-input"
+                    aria-label={`Name for calendar ${feed.url}`}
+                    placeholder="Name"
+                    maxLength={80}
+                    value={feed.name}
+                    onChange={(e) => updateCalendarFeedName(feed.url, e.target.value)}
+                  />
+                  <span className="settings-modal-calendar-feed-url">{feed.url}</span>
                   <button
                     type="button"
                     className="settings-modal-type-color-reset settings-modal-calendar-feed-remove"
-                    onClick={() => removeCalendarFeed(url)}
+                    onClick={() => removeCalendarFeed(feed.url)}
                   >
                     Remove
                   </button>

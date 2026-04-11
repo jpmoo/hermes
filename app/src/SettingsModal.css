@@ -206,6 +206,20 @@
   flex-wrap: wrap;
 }
 
+.settings-modal-calendar-feed-name-input {
+  flex: 0 1 7rem;
+  min-width: 5rem;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
 .settings-modal-calendar-feed-url {
   flex: 1 1 10rem;
   min-width: 0;

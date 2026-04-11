@@ -16,6 +16,29 @@ function getSummary(ev) {
   return 'Untitled';
 }
 
+const MAX_EVENT_DESCRIPTION_CHARS = 50_000;
+
+function getEventDescription(ev) {
+  const d = ev.description;
+  if (typeof d === 'string') return d;
+  if (d && typeof d === 'object' && typeof d.val === 'string') return d.val;
+  return '';
+}
+
+/** Plain text for calendar DESCRIPTION (often HTML). */
+function normalizeEventDescription(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return '';
+  const stripped = raw
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!stripped) return '';
+  return stripped.length > MAX_EVENT_DESCRIPTION_CHARS
+    ? stripped.slice(0, MAX_EVENT_DESCRIPTION_CHARS)
+    : stripped;
+}
+
 /**
  * Expand a VEVENT into one or more { start, end } instances overlapping [rangeFrom, rangeTo).
  */
@@ -92,9 +115,10 @@ function allDayInclusiveEndDay(exclusiveEnd) {
  * @param {Date} rangeTo end of local "today" (exclusive) as Date
  * @param {Date} now
  * @param {string} feedUrl
- * @returns {{ title: string, start: string, end: string, feedUrl: string }[]}
+ * @param {string} [feedName] User-defined label for this feed (Settings).
+ * @returns {{ title: string, start: string, end: string, feedUrl: string, feedName: string, description?: string }[]}
  */
-export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl) {
+export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl, feedName = '') {
   let parsed;
   try {
     parsed = ical.parseICS(icsBody);
@@ -106,6 +130,7 @@ export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl) {
     if (!comp || comp.type !== 'VEVENT') continue;
     if (comp.status === 'CANCELLED') continue;
     const title = getSummary(comp);
+    const descriptionText = normalizeEventDescription(getEventDescription(comp));
     const allDay = comp.datetype === 'date';
     const instances = expandEventInstances(comp, rangeFrom, rangeTo);
     for (const { start, end } of instances) {
@@ -114,7 +139,17 @@ export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl) {
       if (!overlapsWindow(start, end, rangeFrom, rangeTo)) continue;
       // Still ongoing: not fully ended yet (includes in-progress and future starts; excludes finished)
       if (end.getTime() <= now.getTime()) continue;
-      const row = { title, start: new Date(start), end: new Date(end), feedUrl, allDay };
+      const fn =
+        typeof feedName === 'string' ? feedName.trim().slice(0, 80) : '';
+      const row = {
+        title,
+        start: new Date(start),
+        end: new Date(end),
+        feedUrl,
+        feedName: fn,
+        allDay,
+      };
+      if (descriptionText) row.description = descriptionText;
       if (allDay) {
         row.startDay = localYmd(start);
         row.endDayInclusive = allDayInclusiveEndDay(end);

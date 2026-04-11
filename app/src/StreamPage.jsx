@@ -1114,10 +1114,13 @@ export default function StreamPage() {
   const handleCalendarPick = useCallback(
     async (ev) => {
       const titleRaw = typeof ev?.title === 'string' ? ev.title.trim() : '';
-      const title = titleRaw || '(untitled event)';
-      const label = titleRaw || 'Untitled event';
+      const baseTitle = titleRaw || '(untitled event)';
+      const feedLabel = typeof ev?.feedName === 'string' ? ev.feedName.trim() : '';
+      const title = feedLabel ? `${baseTitle} (${feedLabel})` : baseTitle;
+      const descRaw = typeof ev?.description === 'string' ? ev.description : '';
+      const desc = descRaw.replace(/\s+/g, ' ').trim();
       const where = threadRootId ? 'in this thread' : 'as a new thread';
-      if (!window.confirm(`Create an event note for “${label}” ${where}?`)) return;
+      if (!window.confirm(`Create an event note for “${title}” ${where}?`)) return;
       const f = calendarFeedPickToComposeFields(ev);
       const meta = eventFieldsToPayload('event', {
         startDate: f.startDate,
@@ -1137,6 +1140,15 @@ export default function StreamPage() {
           : await createNote({ content: title, ...meta });
         await syncConnectionsFromContent(note.id, title, '');
         await syncTagsFromContent(note.id, title, [], '');
+        if (desc) {
+          const child = await createNote({
+            content: desc,
+            parent_id: note.id,
+            note_type: 'note',
+          });
+          await syncConnectionsFromContent(child.id, desc, '');
+          await syncTagsFromContent(child.id, desc, [], '');
+        }
         if (threadRootId) {
           await loadThread(true);
           applyFocusImmediate(note.id);

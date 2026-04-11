@@ -11,12 +11,12 @@ function localDayIsoBounds() {
 }
 
 export default function ComposeCalendarPills({ onPickEvent, disabled }) {
-  const { calendarFeedUrls } = useNoteTypeColors();
+  const { calendarFeeds } = useNoteTypeColors();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!Array.isArray(calendarFeedUrls) || calendarFeedUrls.length === 0) {
+    if (!Array.isArray(calendarFeeds) || calendarFeeds.length === 0) {
       setEvents([]);
       return;
     }
@@ -31,14 +31,14 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
     } finally {
       setLoading(false);
     }
-  }, [calendarFeedUrls]);
+  }, [calendarFeeds]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    if (!calendarFeedUrls?.length) return undefined;
+    if (!calendarFeeds?.length) return undefined;
     const t = setInterval(() => load(), 5 * 60 * 1000);
     const onFocus = () => load();
     window.addEventListener('focus', onFocus);
@@ -46,9 +46,9 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
       clearInterval(t);
       window.removeEventListener('focus', onFocus);
     };
-  }, [calendarFeedUrls, load]);
+  }, [calendarFeeds, load]);
 
-  if (!calendarFeedUrls?.length) return null;
+  if (!calendarFeeds?.length) return null;
   if (!loading && events.length === 0) return null;
 
   return (
@@ -57,13 +57,20 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
         {loading && events.length === 0 ? (
           <span className="compose-calendar-pills-muted">Calendar…</span>
         ) : (
-          events.map((ev, i) => (
+          events.map((ev, i) => {
+            const feedName = typeof ev.feedName === 'string' ? ev.feedName.trim() : '';
+            const chipLabel = feedName ? `${ev.title} (${feedName})` : ev.title;
+            return (
             <button
-              key={`${ev.start}-${ev.title}-${i}`}
+              key={`${ev.start}-${ev.title}-${ev.feedUrl}-${i}`}
               type="button"
               className="compose-calendar-pill"
               disabled={disabled}
-              title={ev.feedUrl ? `${ev.title}\n${ev.feedUrl}` : ev.title}
+              title={
+                ev.feedUrl
+                  ? `${chipLabel}${ev.description ? `\n\n${ev.description.slice(0, 500)}${ev.description.length > 500 ? '…' : ''}` : ''}\n\n${ev.feedUrl}`
+                  : chipLabel
+              }
               onClick={() =>
                 onPickEvent({
                   title: ev.title,
@@ -72,12 +79,15 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
                   allDay: ev.allDay === true,
                   startDay: ev.startDay,
                   endDayInclusive: ev.endDayInclusive,
+                  feedName: ev.feedName || '',
+                  description: ev.description || '',
                 })
               }
             >
-              {ev.title}
+              {chipLabel}
             </button>
-          ))
+            );
+          })
         )}
       </div>
     </div>
