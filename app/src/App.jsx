@@ -11,12 +11,16 @@ import CanvasPage from './CanvasPage';
 import { NoteTypeFilterProvider } from './NoteTypeFilterContext';
 import { NoteTypeColorProvider, useNoteTypeColors } from './NoteTypeColorContext';
 import { DEFAULT_START_PAGE_PATH } from './defaultStartPage';
+import { HERMES_COMPACT_VIEWPORT_QUERY } from './canvasLayoutApi';
+import { useMediaQuery } from './useMediaQuery';
 import './App.css';
 
 function DefaultHomeRoute() {
-  const { defaultStartPage, serverReady } = useNoteTypeColors();
+  const { defaultStartPage, defaultStartPagePhone, serverReady } = useNoteTypeColors();
+  const compactPhone = useMediaQuery(HERMES_COMPACT_VIEWPORT_QUERY);
   if (!serverReady) return <div className="loading">Loading…</div>;
-  const path = DEFAULT_START_PAGE_PATH[defaultStartPage] ?? '/stream';
+  const id = compactPhone ? defaultStartPagePhone : defaultStartPage;
+  const path = DEFAULT_START_PAGE_PATH[id] ?? '/stream';
   return <Navigate to={path} replace />;
 }
 

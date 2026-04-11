@@ -579,24 +579,6 @@ export default function CanvasPage() {
     setComposeNoteType(NOTE_TYPE_OPTIONS[(idx + 1) % NOTE_TYPE_OPTIONS.length].value);
   }, [composeNoteType]);
 
-  const handleCalendarPick = useCallback(
-    (ev) => {
-      setComposeNoteType('event');
-      const f = calendarFeedPickToComposeFields(ev);
-      setComposeStartDate(f.startDate);
-      setComposeStartTime(f.startTime);
-      setComposeEndDate(f.endDate);
-      setComposeEndTime(f.endTime);
-      const title = typeof ev?.title === 'string' ? ev.title : '';
-      if (threadRootId) {
-        setReplyContent(title);
-      } else {
-        setNewRootContent(title);
-      }
-    },
-    [threadRootId]
-  );
-
   const composeTypeLabel =
     NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
 
@@ -1012,10 +994,9 @@ export default function CanvasPage() {
 
   const refreshThread = useCallback(() => {
     if (!threadRootId) {
-      getRoots(false).then(setThread).catch(() => {});
-    } else {
-      getThread(threadRootId, false).then(setThread).catch(() => {});
+      return getRoots(false).then(setThread).catch(() => {});
     }
+    return getThread(threadRootId, false).then(setThread).catch(() => {});
   }, [threadRootId]);
 
   const applyFocus = useCallback(
@@ -1029,6 +1010,57 @@ export default function CanvasPage() {
       }
     },
     [threadRootId, setSearchParams]
+  );
+
+  const handleCalendarPick = useCallback(
+    async (ev) => {
+      const titleRaw = typeof ev?.title === 'string' ? ev.title.trim() : '';
+      const title = titleRaw || '(untitled event)';
+      const label = titleRaw || 'Untitled event';
+      const where = threadRootId ? 'in this thread' : 'as a new thread';
+      if (!window.confirm(`Create an event note for “${label}” ${where}?`)) return;
+      const f = calendarFeedPickToComposeFields(ev);
+      const meta = eventFieldsToPayload('event', {
+        startDate: f.startDate,
+        startTime: f.startTime,
+        endDate: f.endDate,
+        endTime: f.endTime,
+      });
+      if (meta.error) {
+        window.alert(meta.error);
+        return;
+      }
+      if (submitting) return;
+      setSubmitting(true);
+      try {
+        const note = threadRootId
+          ? await createNote({ content: title, parent_id: replyParentId, ...meta })
+          : await createNote({ content: title, ...meta });
+        await syncConnectionsFromContent(note.id, title, '');
+        await syncTagsFromContent(note.id, title, [], '');
+        if (threadRootId) {
+          await refreshThread();
+          applyFocus(note.id);
+        } else {
+          const full = {
+            ...note,
+            reply_count: note.reply_count ?? 0,
+            descendant_count: note.descendant_count ?? 0,
+            connection_count: note.connection_count ?? 0,
+            attachments: note.attachments || [],
+          };
+          setThread((prev) => [full, ...prev.filter((x) => x.id !== full.id)]);
+          setFocusId(null);
+          setSearchParams({ thread: String(full.id) });
+        }
+      } catch (err) {
+        console.error(err);
+        window.alert(err?.message || 'Could not create event note');
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [submitting, threadRootId, replyParentId, refreshThread, applyFocus, setSearchParams]
   );
 
   const upOneLevel = useCallback(() => {

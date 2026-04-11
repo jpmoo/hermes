@@ -48,6 +48,14 @@ function defaultStartPageFromStored(raw) {
   const s = sanitizeDefaultStartPage(raw);
   return s ?? 'stream';
 }
+
+/** Phone layout; if unset, match desktop/tablet (`defaultStartPage`) for older accounts. */
+function defaultStartPagePhoneFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return 'stream';
+  const p = sanitizeDefaultStartPage(raw.defaultStartPagePhone);
+  if (p !== undefined) return p;
+  return defaultStartPageFromStored(raw.defaultStartPage);
+}
 const NOTE_HISTORY_MAX = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -232,6 +240,7 @@ router.get('/settings', requireAuth, async (req, res) => {
       noteHistory,
       canvasLayouts,
       defaultStartPage: defaultStartPageFromStored(raw.defaultStartPage),
+      defaultStartPagePhone: defaultStartPagePhoneFromStored(raw),
       inboxThreadRootId: inboxThreadRootId === undefined ? null : inboxThreadRootId,
       spaztickApiUrl: spUrl === undefined ? null : spUrl,
       spaztickApiKeySet: spKeyStored,
@@ -252,6 +261,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       noteHistory,
       canvasLayouts,
       defaultStartPage,
+      defaultStartPagePhone,
       inboxThreadRootId,
       spaztickApiUrl,
       spaztickApiKey,
@@ -330,6 +340,21 @@ router.patch('/settings', requireAuth, async (req, res) => {
           });
         }
         cur.defaultStartPage = dsp;
+      }
+    }
+
+    if (defaultStartPagePhone !== undefined) {
+      if (defaultStartPagePhone === null) {
+        delete cur.defaultStartPagePhone;
+      } else {
+        const dsp = sanitizeDefaultStartPage(defaultStartPagePhone);
+        if (dsp === undefined) {
+          return res.status(400).json({
+            error:
+              'defaultStartPagePhone must be one of stream, canvas, outline, calendar, search, or null',
+          });
+        }
+        cur.defaultStartPagePhone = dsp;
       }
     }
 
@@ -417,6 +442,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       noteHistory: outHistory,
       canvasLayouts: outCanvas,
       defaultStartPage: defaultStartPageFromStored(cur.defaultStartPage),
+      defaultStartPagePhone: defaultStartPagePhoneFromStored(cur),
       inboxThreadRootId: outInbox === undefined ? null : outInbox,
       spaztickApiUrl: outSpUrl === undefined ? null : outSpUrl,
       spaztickApiKeySet: outSpKeySet,

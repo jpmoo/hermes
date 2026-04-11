@@ -26,6 +26,8 @@ export default function SettingsModal({ onClose }) {
     setCalendarFeedUrls,
     defaultStartPage,
     setDefaultStartPage,
+    defaultStartPagePhone,
+    setDefaultStartPagePhone,
   } = useNoteTypeColors();
   const [rootThreads, setRootThreads] = useState([]);
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
@@ -148,17 +150,35 @@ export default function SettingsModal({ onClose }) {
           </h3>
           <p className="settings-modal-section-lead">
             When you open Hermes or use the logo to go home, which main view opens first. Stream, Canvas, and
-            other views stay available from the header.
+            other views stay available from the header. Desktop and tablet share one default; compact phone
+            layouts use the other.
           </p>
           <div className="settings-modal-similar-notes-row">
             <label className="settings-modal-similar-notes-label" htmlFor="settings-default-start-page">
-              Start page
+              Desktop &amp; tablet
             </label>
             <select
               id="settings-default-start-page"
               className="settings-modal-similar-notes-input"
               value={defaultStartPage}
               onChange={(e) => setDefaultStartPage(e.target.value)}
+            >
+              {DEFAULT_START_PAGE_OPTIONS.map(({ id, label }) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="settings-modal-similar-notes-row">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-default-start-page-phone">
+              Phone
+            </label>
+            <select
+              id="settings-default-start-page-phone"
+              className="settings-modal-similar-notes-input"
+              value={defaultStartPagePhone}
+              onChange={(e) => setDefaultStartPagePhone(e.target.value)}
             >
               {DEFAULT_START_PAGE_OPTIONS.map(({ id, label }) => (
                 <option key={id} value={id}>

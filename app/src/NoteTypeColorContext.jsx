@@ -33,6 +33,7 @@ export function NoteTypeColorProvider({ children }) {
   const [spaztickApiKeySet, setSpaztickApiKeySet] = useState(false);
   const [calendarFeedUrls, setCalendarFeedUrls] = useState([]);
   const [defaultStartPage, setDefaultStartPage] = useState('stream');
+  const [defaultStartPagePhone, setDefaultStartPagePhone] = useState('stream');
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
   const skipSimilarNotesSave = useRef(false);
@@ -40,12 +41,14 @@ export function NoteTypeColorProvider({ children }) {
   const skipSpaztickSave = useRef(false);
   const skipCalendarFeedsSave = useRef(false);
   const skipDefaultStartPageSave = useRef(false);
+  const skipDefaultStartPagePhoneSave = useRef(false);
   const saveTimer = useRef(null);
   const similarSaveTimer = useRef(null);
   const inboxSaveTimer = useRef(null);
   const spaztickSaveTimer = useRef(null);
   const calendarFeedsSaveTimer = useRef(null);
   const defaultStartPageSaveTimer = useRef(null);
+  const defaultStartPagePhoneSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
 
   /* Load from server when logged in (canonical); seed server from this device if account has none yet. */
@@ -77,6 +80,7 @@ export function NoteTypeColorProvider({ children }) {
         setSpaztickApiKeySet(data.spaztickApiKeySet === true);
         setCalendarFeedUrls(Array.isArray(data.calendarFeedUrls) ? data.calendarFeedUrls : []);
         setDefaultStartPage(normalizeDefaultStartPage(data.defaultStartPage));
+        setDefaultStartPagePhone(normalizeDefaultStartPage(data.defaultStartPagePhone));
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
@@ -85,6 +89,7 @@ export function NoteTypeColorProvider({ children }) {
           skipSpaztickSave.current = true;
           skipCalendarFeedsSave.current = true;
           skipDefaultStartPageSave.current = true;
+          skipDefaultStartPagePhoneSave.current = true;
           try {
             await patchUserSettings({ noteTypeColors: local });
           } catch (e) {
@@ -98,6 +103,7 @@ export function NoteTypeColorProvider({ children }) {
           skipSpaztickSave.current = true;
           skipCalendarFeedsSave.current = true;
           skipDefaultStartPageSave.current = true;
+          skipDefaultStartPagePhoneSave.current = true;
         }
       } catch (e) {
         console.error(e);
@@ -107,6 +113,7 @@ export function NoteTypeColorProvider({ children }) {
         skipSpaztickSave.current = true;
         skipCalendarFeedsSave.current = true;
         skipDefaultStartPageSave.current = true;
+        skipDefaultStartPagePhoneSave.current = true;
       } finally {
         if (!cancelled) setServerReady(true);
       }
@@ -129,12 +136,14 @@ export function NoteTypeColorProvider({ children }) {
       setSpaztickApiKeySet(false);
       setCalendarFeedUrls([]);
       setDefaultStartPage('stream');
+      setDefaultStartPagePhone('stream');
       skipNoteTypeColorsSave.current = true;
       skipSimilarNotesSave.current = true;
       skipInboxSave.current = true;
       skipSpaztickSave.current = true;
       skipCalendarFeedsSave.current = true;
       skipDefaultStartPageSave.current = true;
+      skipDefaultStartPagePhoneSave.current = true;
     }
   }, [user]);
 
@@ -247,8 +256,28 @@ export function NoteTypeColorProvider({ children }) {
     };
   }, [defaultStartPage, user?.id, serverReady]);
 
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipDefaultStartPagePhoneSave.current) {
+      skipDefaultStartPagePhoneSave.current = false;
+      return;
+    }
+    if (defaultStartPagePhoneSaveTimer.current) clearTimeout(defaultStartPagePhoneSaveTimer.current);
+    defaultStartPagePhoneSaveTimer.current = setTimeout(() => {
+      defaultStartPagePhoneSaveTimer.current = null;
+      patchUserSettings({ defaultStartPagePhone }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (defaultStartPagePhoneSaveTimer.current) clearTimeout(defaultStartPagePhoneSaveTimer.current);
+    };
+  }, [defaultStartPagePhone, user?.id, serverReady]);
+
   const setDefaultStartPageSetting = useCallback((id) => {
     setDefaultStartPage(normalizeDefaultStartPage(id));
+  }, []);
+
+  const setDefaultStartPagePhoneSetting = useCallback((id) => {
+    setDefaultStartPagePhone(normalizeDefaultStartPage(id));
   }, []);
 
   const setTypeColor = useCallback((type, hexOrNull) => {
@@ -341,6 +370,8 @@ export function NoteTypeColorProvider({ children }) {
       setCalendarFeedUrls: setCalendarFeedUrlsSetting,
       defaultStartPage,
       setDefaultStartPage: setDefaultStartPageSetting,
+      defaultStartPagePhone,
+      setDefaultStartPagePhone: setDefaultStartPagePhoneSetting,
       serverReady,
     }),
     [
@@ -363,6 +394,8 @@ export function NoteTypeColorProvider({ children }) {
       setCalendarFeedUrlsSetting,
       defaultStartPage,
       setDefaultStartPageSetting,
+      defaultStartPagePhone,
+      setDefaultStartPagePhoneSetting,
       serverReady,
     ]
   );
