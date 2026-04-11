@@ -311,7 +311,7 @@ export default function HoverInsightMobileSheet({
                                     )}
                                     <p className="hover-insight-connection-card-snippet hover-insight-similar-note-snippet" title={raw || undefined}>
                                       {raw ? (
-                                        <NoteRichText text={raw.slice(0, 900)} tagNames={tagNames} className="hover-insight-card-rich-text" onNoteClick={openNoteFromRichText} />
+                                        <NoteRichText text={raw.slice(0, 900)} tagNames={tagNames} className="hover-insight-card-rich-text" onNoteClick={openNoteFromRichText} sourceNoteId={sn.id} />
                                       ) : (
                                         '—'
                                       )}
@@ -381,7 +381,7 @@ export default function HoverInsightMobileSheet({
                           ) : null}
                           <p className="hover-insight-connection-card-snippet" title={body || undefined}>
                             {body ? (
-                              <NoteRichText text={body.slice(0, 900)} tagNames={tagNames} className="hover-insight-card-rich-text" onNoteClick={openNoteFromRichText} />
+                              <NoteRichText text={body.slice(0, 900)} tagNames={tagNames} className="hover-insight-card-rich-text" onNoteClick={openNoteFromRichText} sourceNoteId={pn.id} />
                             ) : (
                               '—'
                             )}

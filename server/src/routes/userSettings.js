@@ -11,6 +11,11 @@ import {
   isAllowedCalendarFeedUrl,
 } from '../services/calendarFeedEvents.js';
 import { createSpaztickExternalTask } from '../services/spaztickTask.js';
+import {
+  appendHermesLinkToNotes,
+  buildHermesStreamUrl,
+  getThreadRootIdForNote,
+} from '../services/hermesNoteLink.js';
 
 const router = Router();
 
@@ -583,11 +588,39 @@ router.post('/spaztick-task', requireAuth, async (req, res) => {
   try {
     const titleRaw = req.body?.title;
     const notesRaw = req.body?.notes;
+    const hermesNoteUrlRaw = req.body?.hermesNoteUrl;
+    const noteIdRaw = req.body?.noteId;
     if (typeof titleRaw !== 'string' || !titleRaw.trim()) {
       return res.status(400).json({ error: 'title is required' });
     }
     const title = titleRaw.trim().slice(0, 200);
     const notes = notesRaw == null || notesRaw === '' ? '' : String(notesRaw);
+
+    let clientHttpUrl = null;
+    if (typeof hermesNoteUrlRaw === 'string') {
+      const u = hermesNoteUrlRaw.trim();
+      if (/^https?:\/\//i.test(u) && u.length <= 2048) clientHttpUrl = u;
+    }
+    let candidateNoteId = null;
+    if (typeof noteIdRaw === 'string' && /^[0-9a-f-]{36}$/i.test(noteIdRaw.trim())) {
+      candidateNoteId = noteIdRaw.trim().toLowerCase();
+    }
+
+    let serverHttpUrl = null;
+    let verifiedNoteId = null;
+    if (candidateNoteId) {
+      const own = await pool.query('SELECT 1 FROM notes WHERE id = $1::uuid AND user_id = $2', [
+        candidateNoteId,
+        req.userId,
+      ]);
+      if (own.rows.length > 0) {
+        verifiedNoteId = candidateNoteId;
+        const tr = await getThreadRootIdForNote(candidateNoteId, req.userId);
+        if (tr) serverHttpUrl = buildHermesStreamUrl(candidateNoteId, tr);
+      }
+    }
+    const httpUrl = clientHttpUrl || serverHttpUrl;
+    const notesWithHermes = appendHermesLinkToNotes(notes, { httpUrl, noteId: verifiedNoteId });
 
     const settingsR = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const raw = settingsR.rows[0]?.settings_json && typeof settingsR.rows[0].settings_json === 'object'
@@ -616,7 +649,7 @@ router.post('/spaztick-task', requireAuth, async (req, res) => {
       baseUrl,
       apiKey,
       title,
-      notes,
+      notes: notesWithHermes,
     });
     res.status(201).json({ title, task });
   } catch (err) {

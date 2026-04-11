@@ -183,6 +183,7 @@ function OutlineNode({
           onNoteClick={onOpenLinkedNote}
           onTaskToggle={handleToggleTask}
           stopClickPropagation={false}
+          sourceNoteId={node.id}
         />
       </span>
       {node.starred && <span className="outline-star">★</span>}

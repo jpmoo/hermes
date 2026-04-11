@@ -398,12 +398,16 @@ export async function createSpaztickTaskFromNote(noteId) {
 /**
  * Create a Spaztick task with a fixed title and optional notes body (same external API as note export).
  * Pass notes: '' or omit for no description.
+ * When `hermesNoteUrl` and/or `noteId` are set, the server appends a Hermes back-link line to task notes.
  */
-export async function createSpaztickTaskFromTitle({ title, notes = '' }) {
+export async function createSpaztickTaskFromTitle({ title, notes = '', hermesNoteUrl, noteId } = {}) {
+  const payload = { title, notes };
+  if (typeof hermesNoteUrl === 'string' && hermesNoteUrl.trim()) payload.hermesNoteUrl = hermesNoteUrl.trim();
+  if (typeof noteId === 'string' && noteId.trim()) payload.noteId = noteId.trim();
   const r = await fetch(`${API}/user/spaztick-task`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ title, notes }),
+    body: JSON.stringify(payload),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {

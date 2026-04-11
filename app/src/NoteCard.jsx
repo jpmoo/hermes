@@ -590,6 +590,7 @@ export default function NoteCard({
                   className="note-card-content-rich"
                   onNoteClick={openLinkedNote}
                   onTaskToggle={handleToggleTask}
+                  sourceNoteId={note.id}
                 />
               ) : note.attachments?.length ? null : (
                 '—'

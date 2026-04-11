@@ -3,6 +3,7 @@
 .note-rich-markdown {
   display: block;
   line-height: 1.12;
+  text-align: start;
 }
 
 .note-rich-markdown > *:first-child {
@@ -115,7 +116,7 @@
 .note-rich-markdown ol.contains-task-list > li.task-list-item + li.task-list-item,
 .note-rich-markdown .note-rich-ul.contains-task-list > .note-rich-li.task-list-item + .note-rich-li.task-list-item,
 .note-rich-markdown .note-rich-ol.contains-task-list > .note-rich-li.task-list-item + .note-rich-li.task-list-item {
-  margin-top: 0.45rem !important;
+  margin-top: 0.7rem !important;
 }
 
 /* Alternating row tint (odd = slightly elevated, even = subtler) */
@@ -132,46 +133,46 @@
 .note-rich-markdown ol.contains-task-list > li.task-list-item:nth-child(odd),
 .note-rich-markdown .note-rich-ul.contains-task-list > .note-rich-li.task-list-item:nth-child(odd),
 .note-rich-markdown .note-rich-ol.contains-task-list > .note-rich-li.task-list-item:nth-child(odd) {
-  background: color-mix(in srgb, var(--border, #888) 12%, var(--bg-card, var(--bg)));
+  background: color-mix(in srgb, var(--text) 8%, var(--bg-card, var(--bg)));
 }
 
 .note-rich-markdown ul.contains-task-list > li.task-list-item:nth-child(even),
 .note-rich-markdown ol.contains-task-list > li.task-list-item:nth-child(even),
 .note-rich-markdown .note-rich-ul.contains-task-list > .note-rich-li.task-list-item:nth-child(even),
 .note-rich-markdown .note-rich-ol.contains-task-list > .note-rich-li.task-list-item:nth-child(even) {
-  background: color-mix(in srgb, var(--border, #888) 4%, var(--bg-card, var(--bg)));
+  background: color-mix(in srgb, var(--text) 3%, var(--bg-card, var(--bg)));
 }
 
-/* GFM: flex keeps checkbox out of the text column; wrapped lines stay under the label */
+/* GFM: float + BFC so checkbox, inline runs, and wrapped lines share one text column (flex breaks multi-node lines) */
 .note-rich-markdown li.task-list-item > .note-rich-p {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.5rem;
+  display: block;
+  overflow: hidden;
   padding-left: 0;
   min-width: 0;
   box-sizing: border-box;
+  text-align: start;
 }
 
 .note-rich-markdown li.task-list-item > .note-rich-p > .note-rich-task-checkbox {
-  flex-shrink: 0;
-  margin: 0.18em 0 0 0 !important;
+  float: left;
+  clear: left;
+  margin: 0.18em 0.5rem 0 0 !important;
   vertical-align: top;
 }
 
 /* Tight task lists: checkbox + text directly under li */
 .note-rich-markdown li.task-list-item:not(:has(> .note-rich-p)) {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.5rem;
+  display: block;
+  overflow: hidden;
   padding-left: 0;
   box-sizing: border-box;
+  text-align: start;
 }
 
 .note-rich-markdown li.task-list-item:not(:has(> .note-rich-p)) > .note-rich-task-checkbox {
-  flex-shrink: 0;
-  margin: 0.18em 0 0 0 !important;
+  float: left;
+  clear: left;
+  margin: 0.18em 0.5rem 0 0 !important;
 }
 
 .note-rich-task-checkbox {

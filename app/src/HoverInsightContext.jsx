@@ -1316,6 +1316,7 @@ function HoverInsightPanels() {
                                         tagNames={tagNames}
                                         className="hover-insight-card-rich-text"
                                         onNoteClick={openNoteFromRichText}
+                                        sourceNoteId={sn.id}
                                       />
                                     ) : (
                                       '—'
@@ -1406,6 +1407,7 @@ function HoverInsightPanels() {
                       tagNames={tagNames}
                       className="hover-insight-card-rich-text"
                       onNoteClick={openNoteFromRichText}
+                      sourceNoteId={pn.id}
                     />
                   ) : (
                     '—'

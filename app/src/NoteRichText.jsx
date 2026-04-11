@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { createSpaztickTaskFromTitle } from './api';
+import { createSpaztickTaskFromTitle, getNoteThreadRoot } from './api';
+import { buildHermesStreamNoteUrlClient } from './hermesWebUrl';
 import { NoteCardIconSpaztick } from './icons/NoteCardActionIcons';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import './NoteRichText.css';
@@ -80,6 +81,7 @@ function plainTextFromTaskLine(line) {
 /**
  * Note body: markdown links [t](url), bare URLs, hermes-note:// mentions, #tags (when in tagNames).
  * @param {boolean} [stopClickPropagation=true] — when false (e.g. Outline rows), clicks bubble so a parent can open the row; parent should ignore targets inside `.note-rich-link` / `button.note-rich-mention`.
+ * @param {string} [sourceNoteId] — note whose body is rendered; used to add a Hermes back-link when creating Spaztick tasks from checklist lines.
  */
 export default function NoteRichText({
   text,
@@ -88,6 +90,7 @@ export default function NoteRichText({
   onNoteClick,
   onTaskToggle,
   stopClickPropagation = true,
+  sourceNoteId = null,
 }) {
   const s = text == null ? '' : String(text);
 
@@ -118,6 +121,27 @@ export default function NoteRichText({
   const taskLineOrdinalRef = useRef(0);
   const { spaztickReady } = useNoteTypeColors();
   const [spaztickBusyIdx, setSpaztickBusyIdx] = useState(null);
+  const [hermesStreamBackUrl, setHermesStreamBackUrl] = useState(null);
+
+  useEffect(() => {
+    if (!sourceNoteId) {
+      setHermesStreamBackUrl(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const root = await getNoteThreadRoot(sourceNoteId);
+        if (cancelled) return;
+        setHermesStreamBackUrl(buildHermesStreamNoteUrlClient(sourceNoteId, root));
+      } catch {
+        if (!cancelled) setHermesStreamBackUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sourceNoteId]);
 
   const handleSpaztickLineClick = useCallback(
     async (e, lineIndex, rawLine) => {
@@ -126,9 +150,25 @@ export default function NoteRichText({
       if (!spaztickReady || spaztickBusyIdx !== null) return;
       const title = plainTextFromTaskLine(rawLine);
       if (!title) return;
+      if (
+        !window.confirm(
+          'Create a task in Spaztick from this checklist line? The task will use this line as the title and will include a link back to this Hermes note in the task notes. No project, tags, or due dates will be set.'
+        )
+      ) {
+        return;
+      }
       setSpaztickBusyIdx(lineIndex);
       try {
-        const data = await createSpaztickTaskFromTitle({ title, notes: '' });
+        const data = await createSpaztickTaskFromTitle({
+          title,
+          notes: '',
+          ...(sourceNoteId
+            ? {
+                hermesNoteUrl: hermesStreamBackUrl || undefined,
+                noteId: sourceNoteId,
+              }
+            : {}),
+        });
         const t = typeof data?.title === 'string' ? data.title : title;
         window.alert(`Spaztick task created: ${t}`);
       } catch (err) {
@@ -137,7 +177,7 @@ export default function NoteRichText({
         setSpaztickBusyIdx(null);
       }
     },
-    [spaztickReady, spaztickBusyIdx]
+    [spaztickReady, spaztickBusyIdx, sourceNoteId, hermesStreamBackUrl]
   );
 
   let taskItemIndex = 0;
@@ -200,8 +240,12 @@ export default function NoteRichText({
           );
         },
         p: ({ children }) => <p className="note-rich-p">{children}</p>,
-        ul: ({ children }) => <ul className="note-rich-ul">{children}</ul>,
-        ol: ({ children }) => <ol className="note-rich-ol">{children}</ol>,
+        ul: ({ className, children }) => (
+          <ul className={['note-rich-ul', className].filter(Boolean).join(' ')}>{children}</ul>
+        ),
+        ol: ({ className, children }) => (
+          <ol className={['note-rich-ol', className].filter(Boolean).join(' ')}>{children}</ol>
+        ),
         li: ({ className: liClassName, children }) => {
           const isTask = String(liClassName || '').includes('task-list-item');
           const idx = isTask ? taskLineOrdinalRef.current++ : -1;
