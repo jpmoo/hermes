@@ -24,6 +24,8 @@ export default function SettingsModal({ onClose }) {
     saveSpaztickApiKey,
     calendarFeeds,
     setCalendarFeeds,
+    calendarInviteeLinkedNotes,
+    setCalendarInviteeLinkedNotes,
     defaultStartPage,
     setDefaultStartPage,
     defaultStartPagePhone,
@@ -464,6 +466,23 @@ export default function SettingsModal({ onClose }) {
               calendar today.
             </p>
           )}
+          <div className="settings-modal-similar-notes-checkbox-row" style={{ marginTop: '0.85rem' }}>
+            <input
+              id="settings-calendar-invitee-notes"
+              type="checkbox"
+              className="settings-modal-similar-notes-checkbox"
+              checked={calendarInviteeLinkedNotes}
+              onChange={(e) => setCalendarInviteeLinkedNotes(e.target.checked)}
+            />
+            <label className="settings-modal-similar-notes-checkbox-label" htmlFor="settings-calendar-invitee-notes">
+              Create notes from calendar events invitees
+            </label>
+          </div>
+          <p className="settings-modal-similar-notes-hint" style={{ marginTop: '0.35rem' }}>
+            When enabled, creating an event from a chip also adds one note per invitee in your inbox thread (see below)
+            if configured, otherwise as a child of the event. Each is linked to the event note. Requires ATTENDEE data
+            in the feed.
+          </p>
         </section>
 
         <section className="settings-modal-section" aria-labelledby="settings-inbox-thread-heading">

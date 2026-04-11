@@ -126,3 +126,14 @@
   font-style: italic;
   color: var(--text-muted, #888);
 }
+
+.mentions-menu-item--linked-choice {
+  font-weight: 600;
+  color: var(--text, #eee);
+}
+
+.mentions-menu-item--linked-choice + .mentions-menu-item--linked-choice {
+  border-bottom: 1px solid var(--border, #333);
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.45rem;
+}

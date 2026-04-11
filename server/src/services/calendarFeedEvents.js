@@ -39,6 +39,50 @@ function normalizeEventDescription(raw) {
     : stripped;
 }
 
+const MAX_ATTENDEES = 200;
+
+/**
+ * Parse VEVENT ATTENDEE into display strings (excludes ORGANIZER-only flows).
+ * @returns {{ displayName: string, email: string }[]}
+ */
+export function attendeesFromVevent(comp) {
+  const raw = comp?.attendee;
+  if (raw == null) return [];
+  const list = Array.isArray(raw) ? raw : [raw];
+  const out = [];
+  const seen = new Set();
+  for (const a of list) {
+    if (!a) continue;
+    let val = '';
+    let cn = '';
+    if (typeof a === 'string') {
+      val = a;
+    } else if (typeof a === 'object') {
+      const v = a.val;
+      val = typeof v === 'string' ? v : v != null && typeof v === 'object' && typeof v.val === 'string' ? v.val : '';
+      const params = a.params;
+      if (params && typeof params === 'object' && params.CN != null) {
+        cn = String(params.CN).trim();
+      }
+    } else continue;
+    val = String(val).trim();
+    let email = '';
+    const lower = val.toLowerCase();
+    if (lower.startsWith('mailto:')) {
+      email = val.slice('mailto:'.length).split(';')[0].trim();
+    } else if (val.includes('@')) {
+      email = val.replace(/^mailto:/i, '').split(';')[0].trim();
+    }
+    const displayName = cn || '';
+    const key = email ? email.toLowerCase() : displayName.toLowerCase() || val.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ displayName, email: email || '' });
+    if (out.length >= MAX_ATTENDEES) break;
+  }
+  return out;
+}
+
 /**
  * Expand a VEVENT into one or more { start, end } instances overlapping [rangeFrom, rangeTo).
  */
@@ -116,7 +160,7 @@ function allDayInclusiveEndDay(exclusiveEnd) {
  * @param {Date} now
  * @param {string} feedUrl
  * @param {string} [feedName] User-defined label for this feed (Settings).
- * @returns {{ title: string, start: string, end: string, feedUrl: string, feedName: string, description?: string }[]}
+ * @returns {Array<{ title: string, start: Date, end: Date, feedUrl: string, feedName: string, allDay: boolean, description?: string, attendees?: { displayName: string, email: string }[] }>}
  */
 export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl, feedName = '') {
   let parsed;
@@ -131,6 +175,7 @@ export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl, f
     if (comp.status === 'CANCELLED') continue;
     const title = getSummary(comp);
     const descriptionText = normalizeEventDescription(getEventDescription(comp));
+    const attendees = attendeesFromVevent(comp);
     const allDay = comp.datetype === 'date';
     const instances = expandEventInstances(comp, rangeFrom, rangeTo);
     for (const { start, end } of instances) {
@@ -150,6 +195,7 @@ export function eventsFromIcsForDay(icsBody, rangeFrom, rangeTo, now, feedUrl, f
         allDay,
       };
       if (descriptionText) row.description = descriptionText;
+      if (attendees.length > 0) row.attendees = attendees;
       if (allDay) {
         row.startDay = localYmd(start);
         row.endDayInclusive = allDayInclusiveEndDay(end);

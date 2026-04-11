@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   searchContent,
   getMentionRecentNotes,
@@ -7,6 +8,8 @@ import {
   createTag,
   createNote,
   createNoteConnection,
+  getNoteConnections,
+  getNoteThreadRoot,
   addNoteTag,
 } from './api';
 import {
@@ -135,7 +138,36 @@ export default function MentionsTextarea({
   const tagsCache = useRef(null);
   const menuDomId = useId();
   const refreshDelayTimer = useRef(null);
+  const navigate = useNavigate();
   const { inboxThreadRootId } = useNoteTypeColors();
+  const [connectionPeerIds, setConnectionPeerIds] = useState([]);
+
+  useEffect(() => {
+    if (!noteId) {
+      setConnectionPeerIds([]);
+      return undefined;
+    }
+    let cancelled = false;
+    getNoteConnections(noteId)
+      .then((data) => {
+        if (cancelled) return;
+        const ids = [];
+        const seen = new Set();
+        for (const x of [...(data.outgoing || []), ...(data.incoming || [])]) {
+          if (x.noteId && !seen.has(x.noteId)) {
+            seen.add(x.noteId);
+            ids.push(x.noteId);
+          }
+        }
+        setConnectionPeerIds(ids);
+      })
+      .catch(() => {
+        if (!cancelled) setConnectionPeerIds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [noteId]);
 
   useEffect(
     () => () => {
@@ -301,6 +333,31 @@ export default function MentionsTextarea({
               noteTitleLineForMention(n.content).slice(0, 72) || 'Note',
             raw: n,
           }));
+          const peerSet = new Set(connectionPeerIds);
+          const firstLinked = noteItems.find((n) => peerSet.has(n.id));
+          const linkedExtras =
+            firstLinked && qForSearch.length >= 1
+              ? [
+                  {
+                    kind: 'linked-edit',
+                    key: `__ledit_${firstLinked.id}`,
+                    id: firstLinked.id,
+                    label: `Edit original note and links (${firstLinked.label.slice(0, 56)}${
+                      firstLinked.label.length > 56 ? '…' : ''
+                    })`,
+                  },
+                  ...(allowMentionCreate
+                    ? [
+                        {
+                          kind: 'linked-create',
+                          key: '__lcreate__',
+                          createText: qForSearch,
+                          label: `Create new note “${qForSearch}”`,
+                        },
+                      ]
+                    : []),
+                ]
+              : [];
           const createItems =
             noteItems.length === 0 && allowMentionCreate && qForSearch
               ? [
@@ -314,10 +371,7 @@ export default function MentionsTextarea({
                   },
                 ]
               : [];
-          setItems([
-            ...noteItems,
-            ...createItems,
-          ]);
+          setItems([...linkedExtras, ...noteItems, ...createItems]);
         } catch (e) {
           console.error(e);
           const createItems =
@@ -434,13 +488,26 @@ export default function MentionsTextarea({
       };
     }
     return undefined;
-  }, [menuQueryKey, menu?.type, allowMentionCreate, inboxThreadRootId]);
+  }, [menuQueryKey, menu?.type, allowMentionCreate, inboxThreadRootId, connectionPeerIds.join('|')]);
 
   const applyMention = async (item) => {
     const el = taRef.current;
     if (!menu || !el) return;
     const caret = caretForTriggerReplace(el, menu);
-    if (item.kind === 'note-create') {
+    if (item.kind === 'linked-edit') {
+      try {
+        const root = await getNoteThreadRoot(item.id);
+        navigate({
+          pathname: '/stream',
+          search: `?thread=${encodeURIComponent(root)}&focus=${encodeURIComponent(item.id)}`,
+        });
+      } catch (e) {
+        console.error(e);
+      }
+      closeMenu();
+      return;
+    }
+    if (item.kind === 'note-create' || item.kind === 'linked-create') {
       if (!allowMentionCreate) return;
       try {
         const preferredParentId =
@@ -689,7 +756,7 @@ export default function MentionsTextarea({
               type="button"
               role="option"
               aria-selected={i === highlight}
-              className={`mentions-menu-item ${it.createNew ? 'mentions-menu-item--create' : ''} ${it.kind === 'note' ? 'mentions-menu-item--note-ref' : ''} ${i === highlight ? 'mentions-menu-item--active' : ''}`}
+              className={`mentions-menu-item ${it.createNew ? 'mentions-menu-item--create' : ''} ${it.kind === 'note' ? 'mentions-menu-item--note-ref' : ''} ${it.kind === 'linked-edit' || it.kind === 'linked-create' ? 'mentions-menu-item--linked-choice' : ''} ${i === highlight ? 'mentions-menu-item--active' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onSelect(it)}
               onMouseEnter={() => setHighlight(i)}

@@ -81,6 +81,7 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
                   endDayInclusive: ev.endDayInclusive,
                   feedName: ev.feedName || '',
                   description: ev.description || '',
+                  attendees: Array.isArray(ev.attendees) ? ev.attendees : [],
                 })
               }
             >

@@ -137,3 +137,39 @@ export function formatEventRange(note) {
   }
   return left || right;
 }
+
+/**
+ * First child note for a calendar event: optional DESCRIPTION plus invitee list.
+ * @param {string} [description]
+ * @param {{ displayName?: string, email?: string }[]} [attendees]
+ */
+export function buildCalendarEventDetailNoteContent(description, attendees) {
+  const parts = [];
+  const d = typeof description === 'string' ? description.replace(/\s+/g, ' ').trim() : '';
+  if (d) parts.push(d);
+  const list = Array.isArray(attendees) ? attendees : [];
+  const lines = list
+    .map((a) => {
+      if (!a || typeof a !== 'object') return null;
+      const name = typeof a.displayName === 'string' ? a.displayName.trim() : '';
+      const em = typeof a.email === 'string' ? a.email.trim() : '';
+      if (name && em) return `- ${name} <${em}>`;
+      if (name) return `- ${name}`;
+      if (em) return `- ${em}`;
+      return null;
+    })
+    .filter(Boolean);
+  if (lines.length) {
+    parts.push(`Invitees\n${lines.join('\n')}`);
+  }
+  return parts.join('\n\n').trim();
+}
+
+/** One-line title for an auto-created invitee note. */
+export function calendarInviteeNoteContentLine(a) {
+  if (!a || typeof a !== 'object') return 'Invitee';
+  const name = typeof a.displayName === 'string' ? a.displayName.trim() : '';
+  const em = typeof a.email === 'string' ? a.email.trim() : '';
+  if (name && em) return `${name} <${em}>`;
+  return name || em || 'Invitee';
+}

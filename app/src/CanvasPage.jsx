@@ -9,12 +9,14 @@ import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
+import { useNoteTypeColors } from './NoteTypeColorContext';
 import {
   getThread,
   getRoots,
   getNote,
   getNoteThreadPath,
   createNote,
+  createNoteConnection,
   uploadNoteFiles,
   fetchUserSettings,
   patchUserSettings,
@@ -25,7 +27,13 @@ import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import NoteTypeIcon from './NoteTypeIcon';
 import ComposeCalendarPills from './ComposeCalendarPills';
-import { eventFieldsToPayload, NOTE_TYPE_OPTIONS, calendarFeedPickToComposeFields } from './noteEventUtils';
+import {
+  eventFieldsToPayload,
+  NOTE_TYPE_OPTIONS,
+  calendarFeedPickToComposeFields,
+  buildCalendarEventDetailNoteContent,
+  calendarInviteeNoteContentLine,
+} from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
@@ -338,6 +346,7 @@ const PINCH_ZOOM_EXP = 1.22;
 
 export default function CanvasPage() {
   const { logout, user } = useAuth();
+  const { inboxThreadRootId, calendarInviteeLinkedNotes } = useNoteTypeColors();
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
@@ -1019,7 +1028,9 @@ export default function CanvasPage() {
       const feedLabel = typeof ev?.feedName === 'string' ? ev.feedName.trim() : '';
       const title = feedLabel ? `${baseTitle} (${feedLabel})` : baseTitle;
       const descRaw = typeof ev?.description === 'string' ? ev.description : '';
-      const desc = descRaw.replace(/\s+/g, ' ').trim();
+      const description = descRaw.replace(/\s+/g, ' ').trim();
+      const attendees = Array.isArray(ev?.attendees) ? ev.attendees : [];
+      const detail = buildCalendarEventDetailNoteContent(description, attendees);
       const where = threadRootId ? 'in this thread' : 'as a new thread';
       if (!window.confirm(`Create an event note for “${title}” ${where}?`)) return;
       const f = calendarFeedPickToComposeFields(ev);
@@ -1041,14 +1052,31 @@ export default function CanvasPage() {
           : await createNote({ content: title, ...meta });
         await syncConnectionsFromContent(note.id, title, '');
         await syncTagsFromContent(note.id, title, [], '');
-        if (desc) {
+        if (detail) {
           const child = await createNote({
-            content: desc,
+            content: detail,
             parent_id: note.id,
             note_type: 'note',
           });
-          await syncConnectionsFromContent(child.id, desc, '');
-          await syncTagsFromContent(child.id, desc, [], '');
+          await syncConnectionsFromContent(child.id, detail, '');
+          await syncTagsFromContent(child.id, detail, [], '');
+        }
+        if (calendarInviteeLinkedNotes && attendees.length > 0) {
+          const invParent =
+            typeof inboxThreadRootId === 'string' && inboxThreadRootId.trim()
+              ? inboxThreadRootId.trim()
+              : note.id;
+          for (const a of attendees) {
+            const line = calendarInviteeNoteContentLine(a);
+            const inv = await createNote({
+              content: line,
+              parent_id: invParent,
+              note_type: 'note',
+            });
+            await syncConnectionsFromContent(inv.id, line, '');
+            await syncTagsFromContent(inv.id, line, [], '');
+            await createNoteConnection(note.id, inv.id);
+          }
         }
         if (threadRootId) {
           await refreshThread();
@@ -1072,7 +1100,16 @@ export default function CanvasPage() {
         setSubmitting(false);
       }
     },
-    [submitting, threadRootId, replyParentId, refreshThread, applyFocus, setSearchParams]
+    [
+      submitting,
+      threadRootId,
+      replyParentId,
+      refreshThread,
+      applyFocus,
+      setSearchParams,
+      inboxThreadRootId,
+      calendarInviteeLinkedNotes,
+    ]
   );
 
   const upOneLevel = useCallback(() => {
