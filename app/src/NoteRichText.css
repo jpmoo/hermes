@@ -181,7 +181,7 @@ html.hermes-list-alternating-shades
   > .note-rich-li.task-list-item:nth-child(odd) {
   background: color-mix(
     in srgb,
-    #000 5%,
+    #000 10%,
     var(--hermes-list-stripe-base, var(--bg-card, var(--bg)))
   );
 }
@@ -205,7 +205,7 @@ html.hermes-list-alternating-shades
   > .note-rich-li:nth-child(odd):not(.task-list-item) {
   background: color-mix(
     in srgb,
-    #000 5%,
+    #000 10%,
     var(--hermes-list-stripe-base, var(--bg-card, var(--bg)))
   ) !important;
   padding: 0.2rem 0.35rem !important;
