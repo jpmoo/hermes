@@ -323,6 +323,11 @@
   word-break: break-word;
 }
 
+/* Markdown body (lists/checklists) must stay left-aligned; some layouts center sibling rows */
+.note-card-content-rich.note-rich-markdown {
+  text-align: start;
+}
+
 .note-card-edit-attachments {
   margin-top: 0.75rem;
   padding-top: 0;

@@ -9,6 +9,7 @@ import {
   uploadNoteFiles,
   getNote,
   getNoteThreadPath,
+  getNoteThreadRoot,
   fetchUserSettings,
   patchUserSettings,
 } from './api';
@@ -365,6 +366,8 @@ export default function StreamPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
+  /** Single-param deep link (Spaztick-safe); resolved to thread+focus below */
+  const noteOpenParam = searchParams.get('note')?.trim() || null;
 
   useEffect(() => {
     setLastStreamSearchFromParams(searchParams);
@@ -375,6 +378,30 @@ export default function StreamPage() {
   const [loadingRoots, setLoadingRoots] = useState(!threadRootId);
   const [loadingThread, setLoadingThread] = useState(!!threadRootId);
   const [loadError, setLoadError] = useState(null);
+
+  useEffect(() => {
+    if (!noteOpenParam || !/^[0-9a-f-]{36}$/i.test(noteOpenParam)) return undefined;
+    let cancelled = false;
+    setLoadingRoots(true);
+    getNoteThreadRoot(noteOpenParam)
+      .then((root) => {
+        if (cancelled) return;
+        setLoadingRoots(false);
+        if (root) {
+          setSearchParams({ thread: root, focus: noteOpenParam }, { replace: true });
+        } else {
+          setSearchParams({}, { replace: true });
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoadingRoots(false);
+        setSearchParams({}, { replace: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [noteOpenParam, setSearchParams]);
 
   const [newRootContent, setNewRootContent] = useState('');
   const [replyContent, setReplyContent] = useState('');
@@ -545,6 +572,9 @@ export default function StreamPage() {
   }, [threadRootId, resetComposeMeta]);
 
   useEffect(() => {
+    if (noteOpenParam && /^[0-9a-f-]{36}$/i.test(noteOpenParam)) {
+      return;
+    }
     if (!threadRootId) {
       setLoadingRoots(true);
       loadRoots();
@@ -561,7 +591,7 @@ export default function StreamPage() {
         el.classList.remove('stream-page-root-fading', 'stream-page-root-item--picked');
       });
     }
-  }, [threadRootId, loadRoots]);
+  }, [threadRootId, loadRoots, noteOpenParam]);
 
   useEffect(() => {
     if (threadRootId) {

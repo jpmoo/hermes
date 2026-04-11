@@ -35,6 +35,8 @@ export default function SettingsModal({ onClose }) {
     setDefaultStartPage,
     defaultStartPagePhone,
     setDefaultStartPagePhone,
+    markdownListAlternatingShades,
+    setMarkdownListAlternatingShades,
   } = useNoteTypeColors();
   const [rootThreads, setRootThreads] = useState([]);
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
@@ -253,6 +255,25 @@ export default function SettingsModal({ onClose }) {
             <button type="button" className="settings-modal-linkish" onClick={resetAllTypeColors}>
               Reset all to app defaults
             </button>
+          </p>
+          <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
+            <input
+              id="settings-markdown-list-alternating"
+              type="checkbox"
+              className="settings-modal-similar-notes-checkbox"
+              checked={markdownListAlternatingShades}
+              onChange={(e) => setMarkdownListAlternatingShades(e.target.checked)}
+              aria-describedby="settings-markdown-list-alternating-hint"
+            />
+            <label
+              className="settings-modal-similar-notes-checkbox-label"
+              htmlFor="settings-markdown-list-alternating"
+            >
+              Alternating row shading for ordered and bullet lists (including checklists)
+            </label>
+          </div>
+          <p id="settings-markdown-list-alternating-hint" className="settings-modal-similar-notes-hint">
+            When on, odd rows use a light tint so list items are easier to scan. Saved to your account.
           </p>
         </section>
 

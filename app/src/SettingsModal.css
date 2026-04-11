@@ -114,6 +114,10 @@
   font-size: 0.8rem;
 }
 
+.settings-modal-list-alternating-row {
+  margin-top: 0.75rem;
+}
+
 .settings-modal-linkish {
   padding: 0;
   border: none;

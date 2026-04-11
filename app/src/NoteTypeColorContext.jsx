@@ -37,6 +37,7 @@ export function NoteTypeColorProvider({ children }) {
   const [calendarLookoutDays, setCalendarLookoutDays] = useState(0);
   const [defaultStartPage, setDefaultStartPage] = useState('stream');
   const [defaultStartPagePhone, setDefaultStartPagePhone] = useState('stream');
+  const [markdownListAlternatingShades, setMarkdownListAlternatingShades] = useState(true);
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
   const skipSimilarNotesSave = useRef(false);
@@ -46,6 +47,7 @@ export function NoteTypeColorProvider({ children }) {
   const skipCalendarLookoutDaysSave = useRef(false);
   const skipDefaultStartPageSave = useRef(false);
   const skipDefaultStartPagePhoneSave = useRef(false);
+  const skipMarkdownListAlternatingShadesSave = useRef(false);
   const saveTimer = useRef(null);
   const similarSaveTimer = useRef(null);
   const inboxSaveTimer = useRef(null);
@@ -54,6 +56,7 @@ export function NoteTypeColorProvider({ children }) {
   const calendarLookoutDaysSaveTimer = useRef(null);
   const defaultStartPageSaveTimer = useRef(null);
   const defaultStartPagePhoneSaveTimer = useRef(null);
+  const markdownListAlternatingShadesSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
 
   /* Load from server when logged in (canonical); seed server from this device if account has none yet. */
@@ -87,6 +90,7 @@ export function NoteTypeColorProvider({ children }) {
         setCalendarLookoutDays(normalizeCalendarLookoutDays(data.calendarLookoutDays));
         setDefaultStartPage(normalizeDefaultStartPage(data.defaultStartPage));
         setDefaultStartPagePhone(normalizeDefaultStartPage(data.defaultStartPagePhone));
+        setMarkdownListAlternatingShades(data.markdownListAlternatingShades !== false);
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
@@ -97,6 +101,7 @@ export function NoteTypeColorProvider({ children }) {
           skipCalendarLookoutDaysSave.current = true;
           skipDefaultStartPageSave.current = true;
           skipDefaultStartPagePhoneSave.current = true;
+          skipMarkdownListAlternatingShadesSave.current = true;
           try {
             await patchUserSettings({ noteTypeColors: local });
           } catch (e) {
@@ -112,6 +117,7 @@ export function NoteTypeColorProvider({ children }) {
           skipCalendarLookoutDaysSave.current = true;
           skipDefaultStartPageSave.current = true;
           skipDefaultStartPagePhoneSave.current = true;
+          skipMarkdownListAlternatingShadesSave.current = true;
         }
       } catch (e) {
         console.error(e);
@@ -123,6 +129,7 @@ export function NoteTypeColorProvider({ children }) {
         skipCalendarLookoutDaysSave.current = true;
         skipDefaultStartPageSave.current = true;
         skipDefaultStartPagePhoneSave.current = true;
+        skipMarkdownListAlternatingShadesSave.current = true;
       } finally {
         if (!cancelled) setServerReady(true);
       }
@@ -147,6 +154,7 @@ export function NoteTypeColorProvider({ children }) {
       setCalendarLookoutDays(0);
       setDefaultStartPage('stream');
       setDefaultStartPagePhone('stream');
+      setMarkdownListAlternatingShades(true);
       skipNoteTypeColorsSave.current = true;
       skipSimilarNotesSave.current = true;
       skipInboxSave.current = true;
@@ -155,8 +163,16 @@ export function NoteTypeColorProvider({ children }) {
       skipCalendarLookoutDaysSave.current = true;
       skipDefaultStartPageSave.current = true;
       skipDefaultStartPagePhoneSave.current = true;
+      skipMarkdownListAlternatingShadesSave.current = true;
     }
   }, [user]);
+
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle(
+      'hermes-list-alternating-shades',
+      markdownListAlternatingShades
+    );
+  }, [markdownListAlternatingShades]);
 
   useLayoutEffect(() => {
     applyNoteTypeColorVars(colors);
@@ -299,6 +315,26 @@ export function NoteTypeColorProvider({ children }) {
     };
   }, [defaultStartPagePhone, user?.id, serverReady]);
 
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipMarkdownListAlternatingShadesSave.current) {
+      skipMarkdownListAlternatingShadesSave.current = false;
+      return;
+    }
+    if (markdownListAlternatingShadesSaveTimer.current) {
+      clearTimeout(markdownListAlternatingShadesSaveTimer.current);
+    }
+    markdownListAlternatingShadesSaveTimer.current = setTimeout(() => {
+      markdownListAlternatingShadesSaveTimer.current = null;
+      patchUserSettings({ markdownListAlternatingShades }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (markdownListAlternatingShadesSaveTimer.current) {
+        clearTimeout(markdownListAlternatingShadesSaveTimer.current);
+      }
+    };
+  }, [markdownListAlternatingShades, user?.id, serverReady]);
+
   const setDefaultStartPageSetting = useCallback((id) => {
     setDefaultStartPage(normalizeDefaultStartPage(id));
   }, []);
@@ -342,6 +378,10 @@ export function NoteTypeColorProvider({ children }) {
 
   const setSimilarNotesLimitResultsSetting = useCallback((on) => {
     setSimilarNotesLimitResultsToMinChars(Boolean(on));
+  }, []);
+
+  const setMarkdownListAlternatingShadesSetting = useCallback((on) => {
+    setMarkdownListAlternatingShades(Boolean(on));
   }, []);
 
   const setInboxThreadRootIdSetting = useCallback((id) => {
@@ -405,6 +445,8 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPage: setDefaultStartPageSetting,
       defaultStartPagePhone,
       setDefaultStartPagePhone: setDefaultStartPagePhoneSetting,
+      markdownListAlternatingShades,
+      setMarkdownListAlternatingShades: setMarkdownListAlternatingShadesSetting,
       serverReady,
     }),
     [
@@ -431,6 +473,8 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPageSetting,
       defaultStartPagePhone,
       setDefaultStartPagePhoneSetting,
+      markdownListAlternatingShades,
+      setMarkdownListAlternatingShadesSetting,
       serverReady,
     ]
   );

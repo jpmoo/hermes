@@ -18,18 +18,38 @@ export async function getThreadRootIdForNote(noteId, userId) {
 }
 
 /**
- * Full Stream URL for opening a note, using HERMES_PUBLIC_APP_URL or HERMES_PUBLIC_API_URL as origin base.
+ * Public web base for the Hermes app (no trailing slash), e.g. https://host/hermes
+ * @param {import('express').Request|null} req
  * @returns {string|null}
  */
-export function buildHermesStreamUrl(noteId, threadRootId) {
-  const base = (process.env.HERMES_PUBLIC_APP_URL || process.env.HERMES_PUBLIC_API_URL || '')
+export function getHermesPublicWebBase(req) {
+  const env = (process.env.HERMES_PUBLIC_APP_URL || process.env.HERMES_PUBLIC_API_URL || '')
     .trim()
     .replace(/\/$/, '');
+  if (env) return env;
+  if (!req) return null;
+  const host = req.get('x-forwarded-host') || req.get('host');
+  if (!host) return null;
+  let proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+  proto = String(proto).split(',')[0].trim();
+  if (proto !== 'http' && proto !== 'https') proto = 'http';
+  const basePath = (process.env.HERMES_WEB_BASE_PATH || '/hermes').replace(/\/$/, '');
+  return `${proto}://${host}${basePath}`;
+}
+
+/**
+ * Stream deep link with a single query param (avoids & being stripped when pasted into plain text).
+ * Stream resolves ?note= to thread + focus on load.
+ * @param {string} noteId
+ * @param {import('express').Request|null} [req]
+ * @returns {string|null}
+ */
+export function buildHermesStreamUrl(noteId, req = null) {
+  const base = getHermesPublicWebBase(req);
   if (!base) return null;
   try {
     const u = new URL(`${base}/stream`);
-    u.searchParams.set('thread', String(threadRootId));
-    u.searchParams.set('focus', String(noteId));
+    u.searchParams.set('note', String(noteId));
     return u.toString();
   } catch {
     return null;

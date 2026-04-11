@@ -11,11 +11,7 @@ import {
   isAllowedCalendarFeedUrl,
 } from '../services/calendarFeedEvents.js';
 import { createSpaztickExternalTask } from '../services/spaztickTask.js';
-import {
-  appendHermesLinkToNotes,
-  buildHermesStreamUrl,
-  getThreadRootIdForNote,
-} from '../services/hermesNoteLink.js';
+import { appendHermesLinkToNotes, buildHermesStreamUrl } from '../services/hermesNoteLink.js';
 
 const router = Router();
 
@@ -280,11 +276,13 @@ router.get('/settings', requireAuth, async (req, res) => {
     const spUrl = sanitizeSpaztickApiUrl(raw.spaztickApiUrl);
     const spKeyStored = typeof raw.spaztickApiKey === 'string' && raw.spaztickApiKey.trim().length > 0;
     const calendarFeeds = calendarFeedsFromStored(raw);
+    const markdownListAlternatingShades = raw.markdownListAlternatingShades !== false;
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
       similarNotesLimitResultsToMinChars: similarLimitResults,
+      markdownListAlternatingShades,
       noteHistory,
       canvasLayouts,
       defaultStartPage: defaultStartPageFromStored(raw.defaultStartPage),
@@ -317,6 +315,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       calendarFeeds,
       calendarFeedUrls,
       calendarLookoutDays,
+      markdownListAlternatingShades,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -488,6 +487,21 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (markdownListAlternatingShades !== undefined) {
+      if (markdownListAlternatingShades === null) {
+        delete cur.markdownListAlternatingShades;
+      } else if (
+        markdownListAlternatingShades !== true &&
+        markdownListAlternatingShades !== false
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'markdownListAlternatingShades must be true, false, or null' });
+      } else {
+        cur.markdownListAlternatingShades = markdownListAlternatingShades;
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -503,11 +517,13 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outSpUrl = sanitizeSpaztickApiUrl(cur.spaztickApiUrl);
     const outSpKeySet = typeof cur.spaztickApiKey === 'string' && cur.spaztickApiKey.trim().length > 0;
     const outCalendarFeeds = calendarFeedsFromStored(cur);
+    const outListAlt = cur.markdownListAlternatingShades !== false;
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
       similarNotesMinDefault: similarNotesMinCharsEnvDefault(),
       similarNotesLimitResultsToMinChars: outLimitResults,
+      markdownListAlternatingShades: outListAlt,
       noteHistory: outHistory,
       canvasLayouts: outCanvas,
       defaultStartPage: defaultStartPageFromStored(cur.defaultStartPage),
@@ -615,8 +631,7 @@ router.post('/spaztick-task', requireAuth, async (req, res) => {
       ]);
       if (own.rows.length > 0) {
         verifiedNoteId = candidateNoteId;
-        const tr = await getThreadRootIdForNote(candidateNoteId, req.userId);
-        if (tr) serverHttpUrl = buildHermesStreamUrl(candidateNoteId, tr);
+        serverHttpUrl = buildHermesStreamUrl(candidateNoteId, req);
       }
     }
     const httpUrl = clientHttpUrl || serverHttpUrl;

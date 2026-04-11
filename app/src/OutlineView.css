@@ -247,6 +247,10 @@
   line-height: 1.45;
 }
 
+.outline-content-rich-inner.note-rich-markdown {
+  text-align: start;
+}
+
 /* Let NoteRichText spans use pre-wrap; do not force single-line ellipsis here. */
 
 .outline-content-rich-inner .note-rich-link {

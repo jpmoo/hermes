@@ -16,11 +16,7 @@ import {
   suggestTaskTitleFromNoteContent,
   createSpaztickExternalTask,
 } from '../services/spaztickTask.js';
-import {
-  appendHermesLinkToNotes,
-  buildHermesStreamUrl,
-  getThreadRootIdForNote,
-} from '../services/hermesNoteLink.js';
+import { appendHermesLinkToNotes, buildHermesStreamUrl } from '../services/hermesNoteLink.js';
 
 const router = Router();
 
@@ -1052,8 +1048,7 @@ router.post('/:id/spaztick-task', async (req, res) => {
 
     const exportNotes = blocks.join('\n\n');
     const title = await suggestTaskTitleFromNoteContent(String(root.content ?? ''));
-    const threadRootId = await getThreadRootIdForNote(noteId, userId);
-    const streamUrl = threadRootId ? buildHermesStreamUrl(noteId, threadRootId) : null;
+    const streamUrl = buildHermesStreamUrl(noteId, req);
     const notesForTask = appendHermesLinkToNotes(exportNotes, { httpUrl: streamUrl, noteId });
     const task = await createSpaztickExternalTask({
       baseUrl,

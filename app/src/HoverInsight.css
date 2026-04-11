@@ -658,6 +658,10 @@
   word-break: break-word;
 }
 
+.hover-insight-card-rich-text.note-rich-markdown {
+  text-align: start;
+}
+
 .hover-insight-card-rich-text .note-rich-link {
   color: var(--accent, #8a6d0a);
   text-decoration: underline;

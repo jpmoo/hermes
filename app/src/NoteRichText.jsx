@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { createSpaztickTaskFromTitle, getNoteThreadRoot } from './api';
+import { createSpaztickTaskFromTitle } from './api';
 import { buildHermesStreamNoteUrlClient } from './hermesWebUrl';
 import { NoteCardIconSpaztick } from './icons/NoteCardActionIcons';
 import { useNoteTypeColors } from './NoteTypeColorContext';
@@ -121,27 +121,6 @@ export default function NoteRichText({
   const taskLineOrdinalRef = useRef(0);
   const { spaztickReady } = useNoteTypeColors();
   const [spaztickBusyIdx, setSpaztickBusyIdx] = useState(null);
-  const [hermesStreamBackUrl, setHermesStreamBackUrl] = useState(null);
-
-  useEffect(() => {
-    if (!sourceNoteId) {
-      setHermesStreamBackUrl(null);
-      return undefined;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const root = await getNoteThreadRoot(sourceNoteId);
-        if (cancelled) return;
-        setHermesStreamBackUrl(buildHermesStreamNoteUrlClient(sourceNoteId, root));
-      } catch {
-        if (!cancelled) setHermesStreamBackUrl(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceNoteId]);
 
   const handleSpaztickLineClick = useCallback(
     async (e, lineIndex, rawLine) => {
@@ -164,7 +143,7 @@ export default function NoteRichText({
           notes: '',
           ...(sourceNoteId
             ? {
-                hermesNoteUrl: hermesStreamBackUrl || undefined,
+                hermesNoteUrl: buildHermesStreamNoteUrlClient(sourceNoteId) || undefined,
                 noteId: sourceNoteId,
               }
             : {}),
@@ -177,7 +156,7 @@ export default function NoteRichText({
         setSpaztickBusyIdx(null);
       }
     },
-    [spaztickReady, spaztickBusyIdx, sourceNoteId, hermesStreamBackUrl]
+    [spaztickReady, spaztickBusyIdx, sourceNoteId]
   );
 
   let taskItemIndex = 0;
