@@ -212,6 +212,9 @@
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
 }
 
 .note-card-content a {
@@ -326,6 +329,8 @@
 /* Markdown body (lists/checklists) must stay left-aligned; some layouts center sibling rows */
 .note-card-content-rich.note-rich-markdown {
   text-align: start;
+  width: 100%;
+  max-width: 100%;
 }
 
 .note-card-edit-attachments {

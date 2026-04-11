@@ -6,6 +6,35 @@
   text-align: start;
 }
 
+/*
+ * Odd list row shading uses --hermes-list-stripe-base (same family as card tint from Settings → note type colors).
+ * Set on each typed surface below; fall back to --bg-card when no type wrapper.
+ */
+.note-card.note-card--type-note .note-rich-markdown,
+.outline-row.outline-row--type-note .note-rich-markdown,
+.hover-insight-connection-card.hover-insight-connection-card--type-note .note-rich-markdown,
+.hover-insight-similar-btn.hover-insight-similar-btn--type-note .note-rich-markdown {
+  --hermes-list-stripe-base: var(--note-type-bg-note);
+}
+.note-card.note-card--type-organization .note-rich-markdown,
+.outline-row.outline-row--type-organization .note-rich-markdown,
+.hover-insight-connection-card.hover-insight-connection-card--type-organization .note-rich-markdown,
+.hover-insight-similar-btn.hover-insight-similar-btn--type-organization .note-rich-markdown {
+  --hermes-list-stripe-base: var(--note-type-bg-organization);
+}
+.note-card.note-card--type-person .note-rich-markdown,
+.outline-row.outline-row--type-person .note-rich-markdown,
+.hover-insight-connection-card.hover-insight-connection-card--type-person .note-rich-markdown,
+.hover-insight-similar-btn.hover-insight-similar-btn--type-person .note-rich-markdown {
+  --hermes-list-stripe-base: var(--note-type-bg-person);
+}
+.note-card.note-card--type-event .note-rich-markdown,
+.outline-row.outline-row--type-event .note-rich-markdown,
+.hover-insight-connection-card.hover-insight-connection-card--type-event .note-rich-markdown,
+.hover-insight-similar-btn.hover-insight-similar-btn--type-event .note-rich-markdown {
+  --hermes-list-stripe-base: var(--note-type-bg-event);
+}
+
 .note-rich-markdown > *:first-child {
   margin-top: 0;
 }
@@ -150,7 +179,11 @@ html.hermes-list-alternating-shades
   .note-rich-markdown
   .note-rich-ol.contains-task-list
   > .note-rich-li.task-list-item:nth-child(odd) {
-  background: color-mix(in srgb, var(--text) 1.5%, var(--bg-card, var(--bg)));
+  background: color-mix(
+    in srgb,
+    #000 1.15%,
+    var(--hermes-list-stripe-base, var(--bg-card, var(--bg)))
+  );
 }
 
 /* Bullet / ordered lists (not GFM task lists): alternating odd rows */
@@ -170,7 +203,11 @@ html.hermes-list-alternating-shades
   .note-rich-markdown
   .note-rich-ol:not(.contains-task-list)
   > .note-rich-li:nth-child(odd):not(.task-list-item) {
-  background: color-mix(in srgb, var(--text) 1.5%, var(--bg-card, var(--bg))) !important;
+  background: color-mix(
+    in srgb,
+    #000 1.15%,
+    var(--hermes-list-stripe-base, var(--bg-card, var(--bg)))
+  ) !important;
   padding: 0.2rem 0.35rem !important;
   border-radius: 4px;
   box-sizing: border-box;
@@ -185,6 +222,12 @@ html.hermes-list-alternating-shades
   min-width: 0;
   box-sizing: border-box;
   text-align: start;
+}
+
+.note-rich-markdown li.task-list-item > .note-rich-p::after {
+  content: '';
+  display: table;
+  clear: both;
 }
 
 .note-rich-markdown li.task-list-item > .note-rich-p > .note-rich-task-checkbox {
@@ -220,16 +263,23 @@ html.hermes-list-alternating-shades
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .note-rich-markdown li.task-list-item.note-rich-li--task-row > .note-rich-p {
   flex: 1 1 0%;
   align-self: stretch;
   min-width: 0;
-  width: auto;
+  width: 0;
+  max-width: 100%;
   text-align: start;
+}
+
+.note-rich-markdown li.task-list-item.note-rich-li--task-row > .note-rich-task-spaztick-btn {
+  margin-left: auto;
 }
 
 .note-rich-task-spaztick-btn {

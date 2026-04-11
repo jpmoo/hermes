@@ -273,7 +273,8 @@ export default function SettingsModal({ onClose }) {
             </label>
           </div>
           <p id="settings-markdown-list-alternating-hint" className="settings-modal-similar-notes-hint">
-            When on, odd rows use a light tint so list items are easier to scan. Saved to your account.
+            When on, odd rows are slightly darker than the note-type background from the colors above (same tint
+            as the card). Saved to your account.
           </p>
         </section>
 

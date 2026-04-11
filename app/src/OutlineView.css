@@ -249,6 +249,8 @@
 
 .outline-content-rich-inner.note-rich-markdown {
   text-align: start;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Let NoteRichText spans use pre-wrap; do not force single-line ellipsis here. */

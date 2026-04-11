@@ -660,6 +660,8 @@
 
 .hover-insight-card-rich-text.note-rich-markdown {
   text-align: start;
+  width: 100%;
+  max-width: 100%;
 }
 
 .hover-insight-card-rich-text .note-rich-link {
