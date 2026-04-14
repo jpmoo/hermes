@@ -1,7 +1,15 @@
+/* Fill layout-main (flex child) and scroll here — .layout uses overflow:hidden so body does not scroll. */
 .outline-view {
+  flex: 1;
+  min-height: 0;
   max-width: 720px;
+  width: 100%;
   margin: 0 auto;
   padding: 1rem 0 3rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .outline-view-back {
