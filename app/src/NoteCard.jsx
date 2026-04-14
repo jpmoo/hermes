@@ -53,6 +53,8 @@ export default function NoteCard({
   /** Stream/canvas/search: show insight action; insight panels use HoverInsightProvider */
   hoverInsightEnabled = false,
   hideStar = false,
+  /** Stream thread: drill on first click (canvas/search keep double-click). */
+  drillOnSingleClick = false,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
@@ -390,41 +392,59 @@ export default function NoteCard({
     }
   };
 
-  /** Focus note in stream (same as previous double-click / drill). */
+  /** Focus note in stream (drill). */
   const focusNoteInStream = useCallback((e) => {
     hoverInsight?.clearInsightSelection?.();
     onOpenThread?.(e);
   }, [hoverInsight, onOpenThread]);
 
-  const handleNoteDoubleClick = useCallback(
+  const shouldSkipDrillTarget = useCallback((e) => {
+    const raw = e.target;
+    const el = raw instanceof Element ? raw : raw?.parentElement;
+    return Boolean(
+      el?.closest(
+        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn'
+      )
+    );
+  }, []);
+
+  const handleNoteDrill = useCallback(
     (e) => {
       if (!onOpenThread || editing) return;
-      const raw = e.target;
-      const el = raw instanceof Element ? raw : raw?.parentElement;
-      // Only skip real controls — not the whole .note-card-actions box (padding/gap was blocking drill).
-      if (
-        el?.closest(
-          'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown'
-        )
-      ) {
-        return;
-      }
+      if (shouldSkipDrillTarget(e)) return;
       e.preventDefault();
       e.stopPropagation();
       focusNoteInStream(e);
     },
-    [onOpenThread, editing, focusNoteInStream]
+    [onOpenThread, editing, focusNoteInStream, shouldSkipDrillTarget]
   );
 
-  const handleNoteClickCapture = useCallback(
+  const handleNoteDoubleClick = useCallback(
+    (e) => {
+      handleNoteDrill(e);
+    },
+    [handleNoteDrill]
+  );
+
+  /** Double-click path: 2nd click of double-click (detail >= 2) + debounce. */
+  const handleNoteClickCaptureDouble = useCallback(
     (e) => {
       if (e.detail < 2) return;
       const now = Date.now();
       if (now - dblLaunchAtRef.current < 250) return;
       dblLaunchAtRef.current = now;
-      handleNoteDoubleClick(e);
+      handleNoteDrill(e);
     },
-    [handleNoteDoubleClick]
+    [handleNoteDrill]
+  );
+
+  /** Stream: single click drills; ignore 2nd click of a double-click to avoid duplicate navigation. */
+  const handleNoteClickCaptureSingle = useCallback(
+    (e) => {
+      if (e.detail > 1) return;
+      handleNoteDrill(e);
+    },
+    [handleNoteDrill]
   );
 
   const handleInsightClick = useCallback(
@@ -510,8 +530,16 @@ export default function NoteCard({
         borderLeftWidth: borderWidth,
         ...linkedBorderVars,
       }}
-      onDoubleClickCapture={onOpenThread && !editing ? handleNoteDoubleClick : undefined}
-      onClickCapture={onOpenThread && !editing ? handleNoteClickCapture : undefined}
+      onDoubleClickCapture={
+        onOpenThread && !editing && !drillOnSingleClick ? handleNoteDoubleClick : undefined
+      }
+      onClickCapture={
+        onOpenThread && !editing
+          ? drillOnSingleClick
+            ? handleNoteClickCaptureSingle
+            : handleNoteClickCaptureDouble
+          : undefined
+      }
     >
       {editing ? (
         <button

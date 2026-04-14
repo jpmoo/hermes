@@ -282,7 +282,7 @@ function buildFullThreadLevelDrops(treeRoots) {
 
 /**
  * Thread UI is one level at a time: each visible “head” note plus its direct replies only.
- * Deeper replies appear after focusing (click/double-click) that note. Root list has no nested thread.
+ * Deeper replies appear after focusing (single-click) that note. Root list has no nested thread.
  */
 function StreamList({
   nodes,
@@ -333,6 +333,7 @@ function StreamList({
               hideStar={depth === 0}
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
+              drillOnSingleClick
               parentTagsForInherit={parentTagsForInherit}
               onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
               onStarredChange={onStarredChange}
@@ -375,6 +376,9 @@ export default function StreamPage() {
   }, [searchParams]);
 
   const [roots, setRoots] = useState([]);
+  /** Latest roots for thread seeding without widening `loadThread` deps (avoids refetch on roots refresh). */
+  const rootsRef = useRef(roots);
+  rootsRef.current = roots;
   const [thread, setThread] = useState([]);
   const [loadingRoots, setLoadingRoots] = useState(!threadRootId);
   const [loadingThread, setLoadingThread] = useState(!!threadRootId);
@@ -543,7 +547,13 @@ export default function StreamPage() {
       if (!threadRootId) return Promise.resolve();
       if (!soft) {
         setLoadingThread(true);
-        setThread([]);
+        const seedRoot = rootsRef.current.find((r) => noteIdEq(r.id, threadRootId));
+        if (seedRoot) {
+          const { children: _ch, ...row } = seedRoot;
+          setThread([row]);
+        } else {
+          setThread([]);
+        }
       }
       return getThread(threadRootId, false)
         .then((rows) => {
@@ -684,7 +694,7 @@ export default function StreamPage() {
 
   useLayoutEffect(() => {
     if (!streamScrollIntent) return;
-    if (!threadRootId || loadingThread || thread.length === 0) return;
+    if (!threadRootId || thread.length === 0) return;
 
     const intent = streamScrollIntent;
     if (intent.kind !== 'note') return;
@@ -723,7 +733,7 @@ export default function StreamPage() {
       timers.forEach((t) => clearTimeout(t));
       clearTimeout(doneTimer);
     };
-  }, [streamScrollIntent, threadRootId, loadingThread, thread.length, focusId, displayTree]);
+  }, [streamScrollIntent, threadRootId, thread.length, focusId, displayTree]);
 
   const openThreadDirect = useCallback(
     (rootId) => {
@@ -806,7 +816,13 @@ export default function StreamPage() {
   }, []);
 
   const animateToFullThread = useCallback(() => {
-    if (!threadRootId || levelNavBusyRef.current || floatTimerRef.current) return;
+    if (!threadRootId || levelNavBusyRef.current) return;
+    if (floatTimerRef.current) {
+      clearTimeout(floatTimerRef.current);
+      floatTimerRef.current = null;
+    }
+    clearFloatPicked(threadListRef.current);
+    setFloatOpen(null);
     if (!focusId || noteIdEq(focusId, actualRootId)) return;
     levelNavBusyRef.current = true;
     focusFromUrlApplied.current = '';
@@ -837,9 +853,8 @@ export default function StreamPage() {
     // focus= param (still the child) before React Router updates, resetting focusId and breaking scroll.
     const leavingHeadId = focusId;
     const listEl = threadListRef.current;
-    const headLi = listEl?.querySelector(
-      `:scope > li[data-stream-note="${streamNoteAttrEscaped(leavingHeadId)}"]`
-    );
+    /* Direct-child query misses replies under ul.stream-page-replies (e.g. new calendar event). */
+    const headLi = findStreamLiByNoteId(listEl, leavingHeadId);
     const art =
       headLi?.querySelector(':scope > article') ??
       listEl?.querySelector(':scope > li[data-stream-note] > article');
@@ -872,7 +887,7 @@ export default function StreamPage() {
      * measure the real reply slot (fallback = head row = no motion). When we can float, commit focus
      * immediately so the root row exists; keep the staged exit only when there is no float.
      */
-    if (movingToRoot && !canFloat) {
+    if (movingToRoot && !canFloat && note) {
       setBranchHeadExiting(true);
       window.setTimeout(() => {
         setBranchHeadExiting(false);
@@ -1311,10 +1326,6 @@ export default function StreamPage() {
       resetComposeMeta();
       if (replyFileRef.current) replyFileRef.current.value = '';
       await loadThread(true);
-      await new Promise((r) => {
-        requestAnimationFrame(() => requestAnimationFrame(r));
-      });
-      applyFocusImmediate(note.id);
     } catch (err) {
       console.error(err);
     } finally {
@@ -1506,7 +1517,7 @@ export default function StreamPage() {
                   </div>
                 ) : null}
               </div>
-              {loadingThread ? (
+              {loadingThread && thread.length === 0 ? (
                 <p className="stream-page-muted">Loading thread…</p>
               ) : thread.length === 0 ? (
                 <p className="stream-page-muted">Thread not found.</p>
@@ -1564,6 +1575,7 @@ export default function StreamPage() {
                         depth={0}
                         hasReplies={(n.reply_count ?? 0) > 0}
                         hoverInsightEnabled
+                        drillOnSingleClick
                         onOpenThread={(ev) => beginOpenThread(n.id, ev)}
                         onStarredChange={loadRoots}
                         onNoteUpdate={loadRoots}

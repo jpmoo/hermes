@@ -511,11 +511,6 @@
   transform-origin: center;
 }
 
-.stream-page-compose-field--expanded .mentions-textarea-wrap textarea {
-  min-height: min(52vh, 28rem);
-  max-height: min(72vh, 40rem);
-}
-
 .stream-page-compose textarea,
 .stream-page-compose .mentions-textarea-wrap textarea {
   width: 100%;
@@ -527,6 +522,12 @@
   font-size: 1rem;
   resize: vertical;
   min-height: 4rem;
+}
+
+/* Must beat rule above (same element); expanded min-height was losing the cascade. */
+.stream-page-compose .stream-page-compose-field--expanded .mentions-textarea-wrap textarea {
+  min-height: min(52vh, 28rem);
+  max-height: min(72vh, 40rem);
 }
 
 .stream-page-compose textarea:focus,
