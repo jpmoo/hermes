@@ -427,11 +427,13 @@
 
 .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
 .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
-  width: min(80vw, calc(100vw - 2rem));
-  max-width: min(80vw, calc(100vw - 2rem));
-  align-self: center;
-  margin-left: auto;
-  margin-right: auto;
+  /* Sticky flex children ignore align-self:center reliably; center with margins (equal overflow L/R when wider than parent). */
+  --compose-exp-w: min(80vw, calc(100vw - 2rem));
+  box-sizing: border-box;
+  width: var(--compose-exp-w);
+  max-width: var(--compose-exp-w);
+  margin-left: calc(50% - var(--compose-exp-w) / 2);
+  margin-right: calc(50% - var(--compose-exp-w) / 2);
   position: relative;
   left: auto;
   transform: none;
@@ -727,8 +729,11 @@
 
   .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
   .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
-    width: min(80vw, calc(100vw - 2rem));
-    max-width: min(80vw, calc(100vw - 2rem));
+    --compose-exp-w: min(80vw, calc(100vw - 2rem));
+    width: var(--compose-exp-w);
+    max-width: var(--compose-exp-w);
+    margin-left: calc(50% - var(--compose-exp-w) / 2);
+    margin-right: calc(50% - var(--compose-exp-w) / 2);
   }
 
   /* Focus / drill float lands at column width — match 90% cards, not --hermes-stream-column-max (50vw) */

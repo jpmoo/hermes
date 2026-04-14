@@ -454,7 +454,10 @@ export default function NoteCard({
       const el = articleRef.current;
       if (!el || note?.id == null) return;
       const selectedId = hoverInsight?.hover?.note?.id;
-      if (selectedId != null && String(selectedId) === String(note.id)) return;
+      if (selectedId != null && String(selectedId) === String(note.id)) {
+        hoverInsight?.clearInsightSelection?.();
+        return;
+      }
       hoverInsight?.selectInsightNote?.(note, el, depth);
     },
     [hoverInsight, note, depth]
@@ -649,8 +652,10 @@ export default function NoteCard({
                     type="button"
                     className={`note-card-icon-btn${isInsightSelected ? ' note-card-icon-btn--active' : ''}`}
                     onClick={handleInsightClick}
-                    title="Tag and connection suggestions"
-                    aria-label="Tag and connection suggestions"
+                    title={isInsightSelected ? 'Close tag and connection suggestions' : 'Tag and connection suggestions'}
+                    aria-label={
+                      isInsightSelected ? 'Close tag and connection suggestions' : 'Tag and connection suggestions'
+                    }
                     aria-pressed={isInsightSelected ? true : undefined}
                   >
                     <NoteCardIconInsight className="note-card-icon-btn__svg" />
