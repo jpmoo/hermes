@@ -647,6 +647,16 @@ export default function NoteCard({
           <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
               <>
+                {!hideStar && (
+                  <button
+                    type="button"
+                    className={`note-card-star ${note.starred ? 'note-card-star--on' : ''}`}
+                    onClick={handleStar}
+                    aria-label={note.starred ? 'Unstar' : 'Star'}
+                  >
+                    ★
+                  </button>
+                )}
                 {hoverInsightEnabled ? (
                   <button
                     type="button"
@@ -683,15 +693,6 @@ export default function NoteCard({
                   aria-label="Create task in Spaztick"
                 >
                   <NoteCardIconSpaztick className="note-card-icon-btn__svg" />
-                </button>
-                <button
-                  type="button"
-                  className="note-card-icon-btn note-card-icon-btn--danger"
-                  onClick={handleDelete}
-                  title="Delete"
-                  aria-label="Delete"
-                >
-                  <NoteCardIconDelete className="note-card-icon-btn__svg" />
                 </button>
                 <div className="note-card-tag-add" ref={tagDropdownRef}>
                   {addingTag ? (
@@ -752,17 +753,17 @@ export default function NoteCard({
                     <NoteCardIconTag className="note-card-icon-btn__svg" />
                   </button>
                 </div>
+                <span className="note-card-action-spacer" aria-hidden="true" />
+                <button
+                  type="button"
+                  className="note-card-icon-btn note-card-icon-btn--danger"
+                  onClick={handleDelete}
+                  title="Delete"
+                  aria-label="Delete"
+                >
+                  <NoteCardIconDelete className="note-card-icon-btn__svg" />
+                </button>
               </>
-            )}
-            {!hideStar && (
-              <button
-                type="button"
-                className={`note-card-star ${note.starred ? 'note-card-star--on' : ''}`}
-                onClick={handleStar}
-                aria-label={note.starred ? 'Unstar' : 'Star'}
-              >
-                ★
-              </button>
             )}
           </div>
           <time className="note-card-time">

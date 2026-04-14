@@ -558,6 +558,13 @@
   flex-shrink: 0;
 }
 
+.note-card-action-spacer {
+  display: inline-block;
+  width: 0.25rem;
+  height: 1px;
+  flex-shrink: 0;
+}
+
 .note-card-icon-btn--active {
   color: var(--accent);
 }
