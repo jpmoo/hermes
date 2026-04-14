@@ -1,8 +1,84 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getToken } from './api';
 import './NoteAttachments.css';
 
 const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '';
+
+function isImageMime(m, filename) {
+  if (typeof m === 'string' && m.startsWith('image/')) return true;
+  if (typeof filename === 'string' && /\.(jpe?g|png|gif|webp|avif|bmp|svg|heic)$/i.test(filename)) {
+    return true;
+  }
+  return false;
+}
+
+function isPdfMime(m, filename) {
+  if (m === 'application/pdf') return true;
+  if (typeof filename === 'string' && filename.toLowerCase().endsWith('.pdf')) return true;
+  return false;
+}
+
+function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  if (!url || !kind) return null;
+
+  return createPortal(
+    <div
+      className="note-attachment-preview-backdrop"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="note-attachment-preview-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="note-attachment-preview-title"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="note-attachment-preview-toolbar">
+          <span id="note-attachment-preview-title" className="note-attachment-preview-title">
+            {att.filename || 'Attachment'}
+          </span>
+          <div className="note-attachment-preview-actions">
+            <button type="button" className="note-attachment-preview-btn" onClick={onDownload}>
+              Download
+            </button>
+            <button
+              type="button"
+              className="note-attachment-preview-btn note-attachment-preview-btn--primary"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+        <div className="note-attachment-preview-body">
+          {kind === 'image' ? (
+            <img src={url} alt={att.filename || ''} className="note-attachment-preview-img" />
+          ) : (
+            <iframe title={att.filename || 'PDF'} src={url} className="note-attachment-preview-iframe" />
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 /** Paperclip / attach (assets/attach.svg), themed via currentColor */
 function AttachmentIcon(props) {
@@ -32,7 +108,13 @@ function fileUrl(id) {
 
 function AttachmentItem({ att, onDeleted }) {
   const [imgSrc, setImgSrc] = useState(null);
-  const isImage = att.mime_type?.startsWith('image/');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewKind, setPreviewKind] = useState(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const isImage = isImageMime(att.mime_type, att.filename);
+  const isPdf = isPdfMime(att.mime_type, att.filename);
 
   useEffect(() => {
     if (!isImage) return undefined;
@@ -54,26 +136,105 @@ function AttachmentItem({ att, onDeleted }) {
     };
   }, [att.id, isImage]);
 
-  const download = async (e) => {
+  useEffect(() => {
+    return () => {
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+    };
+  }, [pdfPreviewUrl]);
+
+  const download = useCallback(
+    async (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const t = getToken();
+      const r = await fetch(fileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
+      if (!r.ok) return;
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = att.filename || 'download';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    },
+    [att.id, att.filename]
+  );
+
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewKind(null);
+    setPdfPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  const openPreview = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const t = getToken();
-    const r = await fetch(fileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
-    if (!r.ok) return;
-    const blob = await r.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = att.filename || 'download';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    if (isImage && imgSrc) {
+      setPreviewKind('image');
+      setPreviewOpen(true);
+      return;
+    }
+    if (isPdf) {
+      setPdfLoading(true);
+      try {
+        const t = getToken();
+        const r = await fetch(fileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
+        if (!r.ok) throw new Error('fetch failed');
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        setPdfPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+        setPreviewKind('pdf');
+        setPreviewOpen(true);
+      } catch {
+        window.alert('Could not load preview. Try Download instead.');
+      } finally {
+        setPdfLoading(false);
+      }
+    }
   };
+
+  const previewUrl = previewKind === 'image' ? imgSrc : previewKind === 'pdf' ? pdfPreviewUrl : null;
 
   return (
     <div className="note-attachment-item">
+      {previewOpen && previewUrl && previewKind ? (
+        <AttachmentPreviewModal
+          att={att}
+          url={previewUrl}
+          kind={previewKind}
+          onClose={closePreview}
+          onDownload={(e) => download(e)}
+        />
+      ) : null}
       {isImage && imgSrc ? (
-        <a href={imgSrc} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="note-attachment-img-btn"
+          onClick={openPreview}
+          aria-label={`Preview ${att.filename || 'image'}`}
+        >
           <img src={imgSrc} alt={att.filename} className="note-attachment-img" />
-        </a>
+        </button>
+      ) : isPdf ? (
+        <button
+          type="button"
+          className="note-attachment-file note-attachment-file--preview"
+          onClick={openPreview}
+          disabled={pdfLoading}
+        >
+          <AttachmentIcon />
+          <span className="note-attachment-filename">{att.filename}</span>
+          <span className="note-attachment-size">
+            ({Math.round((att.byte_size || 0) / 1024)} KB){pdfLoading ? ' …' : ''}
+          </span>
+        </button>
       ) : (
         <button type="button" className="note-attachment-file" onClick={download}>
           <AttachmentIcon />
