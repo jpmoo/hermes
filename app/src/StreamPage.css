@@ -524,8 +524,9 @@
   min-height: 4rem;
 }
 
-/* Must beat rule above (same element); expanded min-height was losing the cascade. */
+/* Must beat rule above (same element); rows= keeps intrinsic height small so min-height controls expanded size. */
 .stream-page-compose .stream-page-compose-field--expanded .mentions-textarea-wrap textarea {
+  height: auto;
   min-height: min(52vh, 28rem);
   max-height: min(72vh, 40rem);
 }

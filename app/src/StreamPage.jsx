@@ -571,6 +571,9 @@ export default function StreamPage() {
     [threadRootId, setSearchParams]
   );
 
+  const loadThreadRef = useRef(loadThread);
+  loadThreadRef.current = loadThread;
+
   const resetComposeMeta = useCallback(() => {
     setComposeNoteType('note');
     setComposeStartDate('');
@@ -605,11 +608,12 @@ export default function StreamPage() {
     }
   }, [threadRootId, loadRoots, noteOpenParam]);
 
+  /* Only refetch when the thread id changes — not when `loadThread` identity changes (e.g. setSearchParams),
+   * or drill-down can re-run a hard load mid-interaction and clear focus / tree. */
   useEffect(() => {
-    if (threadRootId) {
-      loadThread(false);
-    }
-  }, [threadRootId, loadThread]);
+    if (!threadRootId) return;
+    loadThreadRef.current(false);
+  }, [threadRootId]);
 
   useEffect(() => {
     focusFromUrlApplied.current = '';
@@ -1040,8 +1044,10 @@ export default function StreamPage() {
         if (!threadRootId) return;
         if (id && !noteIdEq(id, actualRootId)) {
           setSearchParams({ thread: threadRootId, focus: id });
+          focusFromUrlApplied.current = `${threadRootId}|${id}`;
         } else {
           setSearchParams({ thread: threadRootId });
+          focusFromUrlApplied.current = '';
         }
       });
     },
@@ -1055,7 +1061,8 @@ export default function StreamPage() {
         applyFocusImmediate(id);
         return;
       }
-      const fullPath = pathFromRootToId(displayTree, id);
+      const fullPath =
+        pathFromRootToId(displayTree, id) ?? pathFromRootToId(pinnedTree, id);
       if (!fullPath) {
         applyFocusImmediate(id);
         return;
@@ -1122,6 +1129,7 @@ export default function StreamPage() {
           setFocusId(id);
           setSearchParams({ thread: threadRootId, focus: id });
         });
+        focusFromUrlApplied.current = `${threadRootId}|${id}`;
         setStreamScrollIntent({ kind: 'note', id, block: 'start' });
       }, 480);
     },
@@ -1130,6 +1138,7 @@ export default function StreamPage() {
       thread,
       tree,
       displayTree,
+      pinnedTree,
       actualRootId,
       focusId,
       threadRootId,
@@ -1616,7 +1625,7 @@ export default function StreamPage() {
                     }
                     value={replyContent}
                     onChange={setReplyContent}
-                    rows={composeExpanded ? 14 : 2}
+                    rows={2}
                     disabled={submitting}
                     allowMentionCreate
                     mentionCreateParentId={replyParentId}
@@ -1693,7 +1702,7 @@ export default function StreamPage() {
                     placeholder="New thread… @ link note, # tag"
                     value={newRootContent}
                     onChange={setNewRootContent}
-                    rows={composeExpanded ? 14 : 2}
+                    rows={2}
                     disabled={submitting}
                     allowMentionCreate
                     mentionCreateParentId={null}
