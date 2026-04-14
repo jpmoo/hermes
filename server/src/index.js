@@ -9,6 +9,7 @@ import tagsRoutes from './routes/tags.js';
 import noteFilesRoutes from './routes/noteFiles.js';
 import ragdollRoutes from './routes/ragdoll.js';
 import userSettingsRoutes from './routes/userSettings.js';
+import ingestRoutes from './routes/ingest.js';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { existsSync } from 'fs';
@@ -41,6 +42,7 @@ app.use((_req, res, next) => {
 // API
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userSettingsRoutes);
+app.use('/api/ingest', ingestRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/tags', tagsRoutes);
 app.use('/api/note-files', noteFilesRoutes);

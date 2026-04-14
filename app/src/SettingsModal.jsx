@@ -27,6 +27,8 @@ export default function SettingsModal({ onClose }) {
     setSpaztickApiUrl,
     spaztickApiKeySet,
     saveSpaztickApiKey,
+    ingestApiKeySet,
+    saveIngestApiKey,
     calendarFeeds,
     setCalendarFeeds,
     calendarLookoutDays,
@@ -40,6 +42,7 @@ export default function SettingsModal({ onClose }) {
   } = useNoteTypeColors();
   const [rootThreads, setRootThreads] = useState([]);
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
+  const [ingestKeyInput, setIngestKeyInput] = useState('');
   const [newCalendarFeedUrl, setNewCalendarFeedUrl] = useState('');
   const [newCalendarFeedName, setNewCalendarFeedName] = useState('');
   const [calendarLookoutDraft, setCalendarLookoutDraft] = useState(() => String(calendarLookoutDays));
@@ -88,6 +91,29 @@ export default function SettingsModal({ onClose }) {
       window.alert(e?.message || 'Could not save API key');
     }
   }, [saveSpaztickApiKey, spaztickKeyInput]);
+
+  const handleSaveIngestKey = useCallback(async () => {
+    try {
+      await saveIngestApiKey(ingestKeyInput.trim() || null);
+      setIngestKeyInput('');
+    } catch (e) {
+      console.error(e);
+      window.alert(e?.message || 'Could not save ingest API key');
+    }
+  }, [saveIngestApiKey, ingestKeyInput]);
+
+  const handleClearIngestKey = useCallback(async () => {
+    if (!window.confirm('Remove the file-ingest API key? Scripts (e.g. Hazel) will no longer be able to call the ingest API.')) {
+      return;
+    }
+    try {
+      await saveIngestApiKey(null);
+      setIngestKeyInput('');
+    } catch (e) {
+      console.error(e);
+      window.alert(e?.message || 'Could not remove API key');
+    }
+  }, [saveIngestApiKey]);
 
   const handleClearSpaztickKey = useCallback(async () => {
     if (!window.confirm('Remove the stored Spaztick API key from Hermes?')) return;
@@ -536,8 +562,10 @@ export default function SettingsModal({ onClose }) {
             Inbox thread for new @ notes
           </h3>
           <p className="settings-modal-section-lead">
-            Choose a root thread where auto-created notes from @ mention links should land. Leave blank to keep
-            creating them as replies at the current thread level.
+            Choose a root thread where auto-created notes from @ mention links should land, and where the file ingest
+            API places new notes when <code className="settings-modal-code">parent_id</code> is omitted. Leave blank to
+            keep creating @-mention notes as replies at the current thread level (ingest API still requires an inbox if
+            you do not pass <code className="settings-modal-code">parent_id</code>).
           </p>
           <div className="settings-modal-inbox-row">
             <label className="settings-modal-similar-notes-label" htmlFor="settings-inbox-thread-select">
@@ -574,6 +602,57 @@ export default function SettingsModal({ onClose }) {
               onClick={() => setInboxThreadRootId('')}
             >
               Clear
+            </button>
+          </div>
+        </section>
+
+        <section className="settings-modal-section" aria-labelledby="settings-ingest-api-heading">
+          <h3 id="settings-ingest-api-heading" className="settings-modal-section-title">
+            File ingest API (Hazel, scripts)
+          </h3>
+          <p className="settings-modal-section-lead">
+            Set a long secret (16+ characters). Use{' '}
+            <code className="settings-modal-code">Authorization: Bearer &lt;secret&gt;</code> or header{' '}
+            <code className="settings-modal-code">X-Hermes-Ingest-Key</code> on requests to{' '}
+            <code className="settings-modal-code">POST …/api/ingest/notes</code> (JSON body:{' '}
+            <code className="settings-modal-code">content</code>, optional{' '}
+            <code className="settings-modal-code">parent_id</code>) and{' '}
+            <code className="settings-modal-code">POST …/api/ingest/notes/&lt;id&gt;/attachments</code> (multipart
+            field <code className="settings-modal-code">files</code>). If you omit <code className="settings-modal-code">
+              parent_id
+            </code>
+            , new notes are created as replies under your <strong>Inbox root thread</strong> above—set that first.
+          </p>
+          <div className="settings-modal-spaztick-field">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-ingest-key">
+              Ingest API key
+            </label>
+            <input
+              id="settings-ingest-key"
+              type="password"
+              autoComplete="new-password"
+              className="settings-modal-spaztick-url-input"
+              placeholder={ingestApiKeySet ? '(key is set — enter a new value to replace)' : 'Min. 16 characters'}
+              value={ingestKeyInput}
+              onChange={(e) => setIngestKeyInput(e.target.value)}
+            />
+          </div>
+          <div className="settings-modal-spaztick-actions">
+            <button
+              type="button"
+              className="settings-modal-btn"
+              onClick={handleSaveIngestKey}
+              disabled={!ingestKeyInput.trim()}
+            >
+              Save key
+            </button>
+            <button
+              type="button"
+              className="settings-modal-type-color-reset"
+              disabled={!ingestApiKeySet}
+              onClick={handleClearIngestKey}
+            >
+              Remove key
             </button>
           </div>
         </section>

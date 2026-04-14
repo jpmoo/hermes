@@ -71,6 +71,7 @@ export function NoteTypeColorProvider({ children }) {
   const [inboxThreadRootId, setInboxThreadRootId] = useState('');
   const [spaztickApiUrl, setSpaztickApiUrl] = useState('');
   const [spaztickApiKeySet, setSpaztickApiKeySet] = useState(false);
+  const [ingestApiKeySet, setIngestApiKeySet] = useState(false);
   const [calendarFeeds, setCalendarFeeds] = useState([]);
   const [calendarLookoutDays, setCalendarLookoutDays] = useState(0);
   const [defaultStartPage, setDefaultStartPage] = useState('stream');
@@ -130,6 +131,7 @@ export function NoteTypeColorProvider({ children }) {
         setInboxThreadRootId(typeof data.inboxThreadRootId === 'string' ? data.inboxThreadRootId : '');
         setSpaztickApiUrl(typeof data.spaztickApiUrl === 'string' ? data.spaztickApiUrl : '');
         setSpaztickApiKeySet(data.spaztickApiKeySet === true);
+        setIngestApiKeySet(data.ingestApiKeySet === true);
         setCalendarFeeds(normalizeCalendarFeedsFromApi(data));
         setCalendarLookoutDays(normalizeCalendarLookoutDays(data.calendarLookoutDays));
         setDefaultStartPage(normalizeDefaultStartPage(data.defaultStartPage));
@@ -226,6 +228,7 @@ export function NoteTypeColorProvider({ children }) {
       setInboxThreadRootId('');
       setSpaztickApiUrl('');
       setSpaztickApiKeySet(false);
+      setIngestApiKeySet(false);
       setCalendarFeeds([]);
       setCalendarLookoutDays(0);
       setDefaultStartPage('stream');
@@ -549,6 +552,13 @@ export function NoteTypeColorProvider({ children }) {
     skipSpaztickSave.current = true;
   }, []);
 
+  const saveIngestApiKey = useCallback(async (secretOrNull) => {
+    const data = await patchUserSettings({
+      ingestApiKey: secretOrNull == null || secretOrNull === '' ? null : String(secretOrNull),
+    });
+    setIngestApiKeySet(data.ingestApiKeySet === true);
+  }, []);
+
   const setCalendarFeedsSetting = useCallback((feeds) => {
     if (!Array.isArray(feeds)) {
       setCalendarFeeds([]);
@@ -577,6 +587,8 @@ export function NoteTypeColorProvider({ children }) {
       spaztickApiKeySet,
       saveSpaztickApiKey,
       spaztickReady,
+      ingestApiKeySet,
+      saveIngestApiKey,
       calendarFeeds,
       setCalendarFeeds: setCalendarFeedsSetting,
       calendarLookoutDays,
@@ -609,6 +621,8 @@ export function NoteTypeColorProvider({ children }) {
       spaztickApiKeySet,
       saveSpaztickApiKey,
       spaztickReady,
+      ingestApiKeySet,
+      saveIngestApiKey,
       calendarFeeds,
       setCalendarFeedsSetting,
       calendarLookoutDays,

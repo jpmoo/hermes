@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
@@ -18,6 +19,20 @@ const router = Router();
 const MAX_CALENDAR_FEEDS = 12;
 const MAX_FEED_URL_LEN = 2048;
 const MAX_FEED_NAME_LEN = 80;
+
+const MIN_INGEST_API_KEY_LEN = 16;
+const MAX_INGEST_API_KEY_LEN = 512;
+
+/** @returns {{ action: 'omit' } | { action: 'clear' } | { action: 'set', value: string } | { action: 'invalid' }} */
+function parseIngestApiKeyPatch(input) {
+  if (input === undefined) return { action: 'omit' };
+  if (input === null) return { action: 'clear' };
+  if (typeof input !== 'string') return { action: 'invalid' };
+  const s = input.trim();
+  if (s.length === 0) return { action: 'clear' };
+  if (s.length < MIN_INGEST_API_KEY_LEN || s.length > MAX_INGEST_API_KEY_LEN) return { action: 'invalid' };
+  return { action: 'set', value: s };
+}
 
 /**
  * @returns {{ url: string, name: string }[]}
@@ -373,6 +388,8 @@ router.get('/settings', requireAuth, async (req, res) => {
     const inboxThreadRootId = sanitizeInboxThreadRootId(raw.inboxThreadRootId);
     const spUrl = sanitizeSpaztickApiUrl(raw.spaztickApiUrl);
     const spKeyStored = typeof raw.spaztickApiKey === 'string' && raw.spaztickApiKey.trim().length > 0;
+    const ingestApiKeySet =
+      typeof raw.ingestApiKeyHash === 'string' && raw.ingestApiKeyHash.trim().length > 0;
     const calendarFeeds = calendarFeedsFromStored(raw);
     const markdownListAlternatingShades = raw.markdownListAlternatingShades !== false;
     const outTheme = themeFromStored(raw);
@@ -390,6 +407,7 @@ router.get('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId: inboxThreadRootId === undefined ? null : inboxThreadRootId,
       spaztickApiUrl: spUrl === undefined ? null : spUrl,
       spaztickApiKeySet: spKeyStored,
+      ingestApiKeySet,
       calendarFeeds,
       calendarLookoutDays: calendarLookoutDaysFromStored(raw),
       theme: outTheme,
@@ -417,6 +435,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId,
       spaztickApiUrl,
       spaztickApiKey,
+      ingestApiKey,
       calendarFeeds,
       calendarFeedUrls,
       calendarLookoutDays,
@@ -564,6 +583,20 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (ingestApiKey !== undefined) {
+      const parsed = parseIngestApiKeyPatch(ingestApiKey);
+      if (parsed.action === 'invalid') {
+        return res.status(400).json({
+          error: `ingestApiKey must be null/empty to remove, or a secret of ${MIN_INGEST_API_KEY_LEN}–${MAX_INGEST_API_KEY_LEN} characters`,
+        });
+      }
+      if (parsed.action === 'clear') {
+        delete cur.ingestApiKeyHash;
+      } else if (parsed.action === 'set') {
+        cur.ingestApiKeyHash = await bcrypt.hash(parsed.value, 10);
+      }
+    }
+
     const calendarFeedsPayload =
       calendarFeeds !== undefined ? calendarFeeds : calendarFeedUrls;
     if (calendarFeedsPayload !== undefined) {
@@ -655,6 +688,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outInbox = sanitizeInboxThreadRootId(cur.inboxThreadRootId);
     const outSpUrl = sanitizeSpaztickApiUrl(cur.spaztickApiUrl);
     const outSpKeySet = typeof cur.spaztickApiKey === 'string' && cur.spaztickApiKey.trim().length > 0;
+    const outIngestApiKeySet =
+      typeof cur.ingestApiKeyHash === 'string' && cur.ingestApiKeyHash.trim().length > 0;
     const outCalendarFeeds = calendarFeedsFromStored(cur);
     const outListAlt = cur.markdownListAlternatingShades !== false;
     const outTheme = themeFromStored(cur);
@@ -672,6 +707,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       inboxThreadRootId: outInbox === undefined ? null : outInbox,
       spaztickApiUrl: outSpUrl === undefined ? null : outSpUrl,
       spaztickApiKeySet: outSpKeySet,
+      ingestApiKeySet: outIngestApiKeySet,
       calendarFeeds: outCalendarFeeds,
       calendarLookoutDays: calendarLookoutDaysFromStored(cur),
       theme: outTheme,
