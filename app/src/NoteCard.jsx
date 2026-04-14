@@ -243,7 +243,7 @@ export default function NoteCard({
     if (!window.confirm('Delete this note and all its replies? This cannot be undone.')) return;
     try {
       await deleteNote(note.id);
-      onNoteDelete?.();
+      onNoteDelete?.(note.id);
     } catch (err) {
       console.error(err);
     }

@@ -1054,6 +1054,25 @@ export default function StreamPage() {
     [threadRootId, actualRootId, setSearchParams]
   );
 
+  const handleThreadNoteDelete = useCallback(
+    (deletedId) => {
+      let parentIdToFocus = null;
+      if (threadRootId && focusId && deletedId != null && noteIdEq(focusId, deletedId)) {
+        const row = thread.find((n) => noteIdEq(n.id, deletedId));
+        if (row?.parent_id != null) {
+          parentIdToFocus = row.parent_id;
+        }
+      }
+      loadThread(true).then(() => {
+        loadRoots();
+        if (parentIdToFocus != null) {
+          applyFocusImmediate(parentIdToFocus);
+        }
+      });
+    },
+    [threadRootId, focusId, thread, loadThread, loadRoots, applyFocusImmediate]
+  );
+
   const beginDrillFocus = useCallback(
     (id, e) => {
       const listEl = threadListRef.current;
@@ -1559,10 +1578,7 @@ export default function StreamPage() {
                       onFocusNote={onFocusNote}
                       onStarredChange={refreshAll}
                       onNoteUpdate={() => loadThread(true)}
-                      onNoteDelete={() => {
-                        loadThread(true);
-                        loadRoots();
-                      }}
+                      onNoteDelete={handleThreadNoteDelete}
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
                       exitToRoot={branchHeadExiting}
