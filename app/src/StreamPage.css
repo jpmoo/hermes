@@ -443,12 +443,62 @@
   gap: 0.5rem;
 }
 
-.stream-page-compose-mentions > .mentions-textarea-wrap {
+.stream-page-compose-mentions > .stream-page-compose-field {
   flex: 1;
   min-width: 0;
   position: relative;
   z-index: 1;
   isolation: isolate;
+}
+
+.stream-page-compose-field .mentions-textarea-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+.stream-page-compose-expand {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  z-index: 3;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0 0 2px 2px;
+  margin: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  border: none;
+  border-radius: 0 0 9px 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--text) 40%, var(--bg));
+  cursor: pointer;
+  line-height: 0;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.stream-page-compose-expand svg {
+  display: block;
+  transition: transform 0.15s ease;
+}
+
+.stream-page-compose-expand:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--text) 72%, var(--bg));
+}
+
+.stream-page-compose-expand:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.stream-page-compose-field--expanded .stream-page-compose-expand svg {
+  transform: rotate(180deg);
+  transform-origin: center;
+}
+
+.stream-page-compose-field--expanded .mentions-textarea-wrap textarea {
+  min-height: min(52vh, 28rem);
+  max-height: min(72vh, 40rem);
 }
 
 .stream-page-compose textarea,

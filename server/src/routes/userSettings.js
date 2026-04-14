@@ -77,6 +77,104 @@ function calendarLookoutDaysFromStored(raw) {
   return sanitizeCalendarLookoutDays(raw.calendarLookoutDays);
 }
 
+function settingsJsonHasKey(raw, key) {
+  return raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, key);
+}
+
+function sanitizeTheme(input) {
+  if (input == null) return undefined;
+  if (input === 'light' || input === 'dark') return input;
+  return undefined;
+}
+
+/** @returns {'light' | 'dark'} */
+function themeFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return 'light';
+  const t = sanitizeTheme(raw.theme);
+  return t === 'dark' ? 'dark' : 'light';
+}
+
+const HOVER_INSIGHT_TYPES = new Set(['note', 'organization', 'person', 'event']);
+
+function clampHoverPct(n, fallback) {
+  if (n == null || n === '') return fallback;
+  const x = Math.round(Number(n));
+  if (!Number.isFinite(x)) return fallback;
+  return Math.min(95, Math.max(5, x));
+}
+
+function sanitizeHoverRagdollContext(input) {
+  if (!input || typeof input !== 'object') {
+    return {
+      includeParent: false,
+      includeSiblings: false,
+      includeChildren: false,
+      includeConnected: true,
+    };
+  }
+  return {
+    includeParent: Boolean(input.includeParent),
+    includeSiblings: Boolean(input.includeSiblings),
+    includeChildren: Boolean(input.includeChildren),
+    includeConnected: input.includeConnected !== false,
+  };
+}
+
+function sanitizeHoverSimilarVisibleTypes(input) {
+  if (!Array.isArray(input)) return ['note', 'event', 'person', 'organization'];
+  const out = [];
+  const seen = new Set();
+  for (const t of input) {
+    if (typeof t === 'string' && HOVER_INSIGHT_TYPES.has(t) && !seen.has(t)) {
+      seen.add(t);
+      out.push(t);
+    }
+  }
+  if (out.length === 0) return ['note', 'event', 'person', 'organization'];
+  return out;
+}
+
+/**
+ * Normalizes hover-insight UI prefs (theme companion: insight panel sliders / RAG toggles).
+ * @returns {{
+ *   ragdollContext: object,
+ *   ragdollQuerySimilarityMinPct: number,
+ *   similarMinPct: number,
+ *   similarVisibleTypes: string[],
+ * }}
+ */
+function normalizeHoverInsightObject(hi) {
+  const base = {
+    ragdollContext: sanitizeHoverRagdollContext(null),
+    ragdollQuerySimilarityMinPct: 45,
+    similarMinPct: 25,
+    similarVisibleTypes: ['note', 'event', 'person', 'organization'],
+  };
+  if (!hi || typeof hi !== 'object') return base;
+  return {
+    ragdollContext: sanitizeHoverRagdollContext({
+      ...base.ragdollContext,
+      ...(hi.ragdollContext && typeof hi.ragdollContext === 'object' ? hi.ragdollContext : {}),
+    }),
+    ragdollQuerySimilarityMinPct: clampHoverPct(
+      hi.ragdollQuerySimilarityMinPct != null ? hi.ragdollQuerySimilarityMinPct : base.ragdollQuerySimilarityMinPct,
+      45
+    ),
+    similarMinPct: clampHoverPct(hi.similarMinPct != null ? hi.similarMinPct : base.similarMinPct, 25),
+    similarVisibleTypes:
+      hi.similarVisibleTypes !== undefined
+        ? sanitizeHoverSimilarVisibleTypes(hi.similarVisibleTypes)
+        : base.similarVisibleTypes,
+  };
+}
+
+function hoverInsightFromStored(raw) {
+  if (!raw || typeof raw !== 'object' || raw.hoverInsight == null || typeof raw.hoverInsight !== 'object') {
+    return normalizeHoverInsightObject(null);
+  }
+  return normalizeHoverInsightObject(raw.hoverInsight);
+}
+
 const NOTE_TYPES = ['note', 'event', 'person', 'organization'];
 
 const DEFAULT_START_PAGES = ['stream', 'canvas', 'outline', 'calendar', 'search'];
@@ -277,6 +375,8 @@ router.get('/settings', requireAuth, async (req, res) => {
     const spKeyStored = typeof raw.spaztickApiKey === 'string' && raw.spaztickApiKey.trim().length > 0;
     const calendarFeeds = calendarFeedsFromStored(raw);
     const markdownListAlternatingShades = raw.markdownListAlternatingShades !== false;
+    const outTheme = themeFromStored(raw);
+    const outHoverInsight = hoverInsightFromStored(raw);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
@@ -292,6 +392,11 @@ router.get('/settings', requireAuth, async (req, res) => {
       spaztickApiKeySet: spKeyStored,
       calendarFeeds,
       calendarLookoutDays: calendarLookoutDaysFromStored(raw),
+      theme: outTheme,
+      hoverInsight: outHoverInsight,
+      /** True once the key exists in settings_json (client may migrate from localStorage when false). */
+      settingsThemeWasSet: settingsJsonHasKey(raw, 'theme'),
+      settingsHoverInsightWasSet: settingsJsonHasKey(raw, 'hoverInsight'),
     });
   } catch (err) {
     console.error(err);
@@ -316,6 +421,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
       calendarFeedUrls,
       calendarLookoutDays,
       markdownListAlternatingShades,
+      theme,
+      hoverInsight,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -502,6 +609,38 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (theme !== undefined) {
+      if (theme === null) {
+        delete cur.theme;
+      } else {
+        const t = sanitizeTheme(theme);
+        if (t === undefined) {
+          return res.status(400).json({ error: 'theme must be light, dark, or null' });
+        }
+        cur.theme = t;
+      }
+    }
+
+    if (hoverInsight !== undefined) {
+      if (hoverInsight === null) {
+        delete cur.hoverInsight;
+      } else if (typeof hoverInsight !== 'object' || Array.isArray(hoverInsight)) {
+        return res.status(400).json({ error: 'hoverInsight must be an object or null' });
+      } else {
+        const prev = cur.hoverInsight && typeof cur.hoverInsight === 'object' ? cur.hoverInsight : {};
+        const prevRc = prev.ragdollContext && typeof prev.ragdollContext === 'object' ? prev.ragdollContext : {};
+        const patchRc =
+          hoverInsight.ragdollContext && typeof hoverInsight.ragdollContext === 'object'
+            ? hoverInsight.ragdollContext
+            : {};
+        cur.hoverInsight = normalizeHoverInsightObject({
+          ...prev,
+          ...hoverInsight,
+          ragdollContext: { ...prevRc, ...patchRc },
+        });
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -518,6 +657,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outSpKeySet = typeof cur.spaztickApiKey === 'string' && cur.spaztickApiKey.trim().length > 0;
     const outCalendarFeeds = calendarFeedsFromStored(cur);
     const outListAlt = cur.markdownListAlternatingShades !== false;
+    const outTheme = themeFromStored(cur);
+    const outHoverInsight = hoverInsightFromStored(cur);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
@@ -533,6 +674,10 @@ router.patch('/settings', requireAuth, async (req, res) => {
       spaztickApiKeySet: outSpKeySet,
       calendarFeeds: outCalendarFeeds,
       calendarLookoutDays: calendarLookoutDaysFromStored(cur),
+      theme: outTheme,
+      hoverInsight: outHoverInsight,
+      settingsThemeWasSet: settingsJsonHasKey(cur, 'theme'),
+      settingsHoverInsightWasSet: settingsJsonHasKey(cur, 'hoverInsight'),
     });
   } catch (err) {
     console.error(err);

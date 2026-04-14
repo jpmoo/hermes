@@ -110,7 +110,7 @@
   flex-shrink: 0;
 }
 
-/* Mini note-type filter (persists in localStorage; independent of Stream header filters) */
+/* Mini note-type filter (synced with account settings; independent of Stream header filters) */
 .hover-insight-similar-type-filters {
   flex-shrink: 0;
   display: flex;

@@ -21,8 +21,46 @@ import {
 import { normalizeDefaultStartPage } from './defaultStartPage';
 import { normalizeCalendarFeedsFromApi } from './calendarFeedsFromApi';
 import { normalizeCalendarLookoutDays } from './calendarLookoutDays';
+import { NOTE_TYPE_FILTER_ORDER } from './noteTypeFilter';
+import {
+  defaultHoverInsightForAccount,
+  defaultRagdollContext,
+  readHoverInsightLocalSeed,
+  readThemeFromLocalStorage,
+} from './hoverInsightLocalSeed';
 
 const NoteTypeColorContext = createContext(null);
+
+const THEME_META = {
+  light: '#f4f3f0',
+  dark: '#15181c',
+};
+
+function clampInsightPct(n, fallback) {
+  const x = Math.round(Number(n));
+  if (!Number.isFinite(x)) return fallback;
+  return Math.min(95, Math.max(5, x));
+}
+
+function normalizeHoverInsightFromApi(h) {
+  const fallback = defaultHoverInsightForAccount();
+  if (!h || typeof h !== 'object') return fallback;
+  const types = Array.isArray(h.similarVisibleTypes)
+    ? h.similarVisibleTypes.filter((t) => typeof t === 'string' && NOTE_TYPE_FILTER_ORDER.includes(t))
+    : [];
+  return {
+    ragdollContext: {
+      ...defaultRagdollContext,
+      ...(h.ragdollContext && typeof h.ragdollContext === 'object' ? h.ragdollContext : {}),
+    },
+    ragdollQuerySimilarityMinPct: clampInsightPct(
+      h.ragdollQuerySimilarityMinPct,
+      fallback.ragdollQuerySimilarityMinPct
+    ),
+    similarMinPct: clampInsightPct(h.similarMinPct, fallback.similarMinPct),
+    similarVisibleTypes: types.length > 0 ? types : [...fallback.similarVisibleTypes],
+  };
+}
 
 export function NoteTypeColorProvider({ children }) {
   const { user } = useAuth();
@@ -38,6 +76,8 @@ export function NoteTypeColorProvider({ children }) {
   const [defaultStartPage, setDefaultStartPage] = useState('stream');
   const [defaultStartPagePhone, setDefaultStartPagePhone] = useState('stream');
   const [markdownListAlternatingShades, setMarkdownListAlternatingShades] = useState(true);
+  const [theme, setTheme] = useState(() => readThemeFromLocalStorage());
+  const [hoverInsight, setHoverInsightState] = useState(() => readHoverInsightLocalSeed());
   const [serverReady, setServerReady] = useState(false);
   const skipNoteTypeColorsSave = useRef(false);
   const skipSimilarNotesSave = useRef(false);
@@ -48,6 +88,8 @@ export function NoteTypeColorProvider({ children }) {
   const skipDefaultStartPageSave = useRef(false);
   const skipDefaultStartPagePhoneSave = useRef(false);
   const skipMarkdownListAlternatingShadesSave = useRef(false);
+  const skipThemeSave = useRef(false);
+  const skipHoverInsightSave = useRef(false);
   const saveTimer = useRef(null);
   const similarSaveTimer = useRef(null);
   const inboxSaveTimer = useRef(null);
@@ -57,6 +99,8 @@ export function NoteTypeColorProvider({ children }) {
   const defaultStartPageSaveTimer = useRef(null);
   const defaultStartPagePhoneSaveTimer = useRef(null);
   const markdownListAlternatingShadesSaveTimer = useRef(null);
+  const themeSaveTimer = useRef(null);
+  const hoverInsightSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
 
   /* Load from server when logged in (canonical); seed server from this device if account has none yet. */
@@ -91,6 +135,36 @@ export function NoteTypeColorProvider({ children }) {
         setDefaultStartPage(normalizeDefaultStartPage(data.defaultStartPage));
         setDefaultStartPagePhone(normalizeDefaultStartPage(data.defaultStartPagePhone));
         setMarkdownListAlternatingShades(data.markdownListAlternatingShades !== false);
+
+        const themeFromServer = data.theme === 'dark' ? 'dark' : 'light';
+        if (data.settingsThemeWasSet === true) {
+          setTheme(themeFromServer);
+          skipThemeSave.current = true;
+        } else {
+          const localT = readThemeFromLocalStorage();
+          setTheme(localT);
+          skipThemeSave.current = true;
+          try {
+            await patchUserSettings({ theme: localT });
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        if (data.settingsHoverInsightWasSet === true) {
+          setHoverInsightState(normalizeHoverInsightFromApi(data.hoverInsight));
+          skipHoverInsightSave.current = true;
+        } else {
+          const seed = readHoverInsightLocalSeed();
+          setHoverInsightState(seed);
+          skipHoverInsightSave.current = true;
+          try {
+            await patchUserSettings({ hoverInsight: seed });
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
         if (Object.keys(serverParsed).length === 0 && Object.keys(local).length > 0) {
           setColors(local);
           skipNoteTypeColorsSave.current = true;
@@ -130,6 +204,8 @@ export function NoteTypeColorProvider({ children }) {
         skipDefaultStartPageSave.current = true;
         skipDefaultStartPagePhoneSave.current = true;
         skipMarkdownListAlternatingShadesSave.current = true;
+        skipThemeSave.current = true;
+        skipHoverInsightSave.current = true;
       } finally {
         if (!cancelled) setServerReady(true);
       }
@@ -155,6 +231,8 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPage('stream');
       setDefaultStartPagePhone('stream');
       setMarkdownListAlternatingShades(true);
+      setTheme('light');
+      setHoverInsightState(defaultHoverInsightForAccount());
       skipNoteTypeColorsSave.current = true;
       skipSimilarNotesSave.current = true;
       skipInboxSave.current = true;
@@ -164,6 +242,8 @@ export function NoteTypeColorProvider({ children }) {
       skipDefaultStartPageSave.current = true;
       skipDefaultStartPagePhoneSave.current = true;
       skipMarkdownListAlternatingShadesSave.current = true;
+      skipThemeSave.current = true;
+      skipHoverInsightSave.current = true;
     }
   }, [user]);
 
@@ -173,6 +253,18 @@ export function NoteTypeColorProvider({ children }) {
       markdownListAlternatingShades
     );
   }, [markdownListAlternatingShades]);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('hermes.theme', theme);
+    } catch {
+      /* ignore */
+    }
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_META[theme]);
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', theme);
+  }, [theme]);
 
   useLayoutEffect(() => {
     applyNoteTypeColorVars(colors);
@@ -335,6 +427,38 @@ export function NoteTypeColorProvider({ children }) {
     };
   }, [markdownListAlternatingShades, user?.id, serverReady]);
 
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipThemeSave.current) {
+      skipThemeSave.current = false;
+      return;
+    }
+    if (themeSaveTimer.current) clearTimeout(themeSaveTimer.current);
+    themeSaveTimer.current = setTimeout(() => {
+      themeSaveTimer.current = null;
+      patchUserSettings({ theme }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (themeSaveTimer.current) clearTimeout(themeSaveTimer.current);
+    };
+  }, [theme, user?.id, serverReady]);
+
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipHoverInsightSave.current) {
+      skipHoverInsightSave.current = false;
+      return;
+    }
+    if (hoverInsightSaveTimer.current) clearTimeout(hoverInsightSaveTimer.current);
+    hoverInsightSaveTimer.current = setTimeout(() => {
+      hoverInsightSaveTimer.current = null;
+      patchUserSettings({ hoverInsight }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (hoverInsightSaveTimer.current) clearTimeout(hoverInsightSaveTimer.current);
+    };
+  }, [hoverInsight, user?.id, serverReady]);
+
   const setDefaultStartPageSetting = useCallback((id) => {
     setDefaultStartPage(normalizeDefaultStartPage(id));
   }, []);
@@ -345,6 +469,22 @@ export function NoteTypeColorProvider({ children }) {
 
   const setCalendarLookoutDaysSetting = useCallback((n) => {
     setCalendarLookoutDays(normalizeCalendarLookoutDays(n));
+  }, []);
+
+  const setThemeSetting = useCallback((t) => {
+    setTheme(t === 'dark' ? 'dark' : 'light');
+  }, []);
+
+  const patchHoverInsight = useCallback((partial) => {
+    if (!partial || typeof partial !== 'object') return;
+    setHoverInsightState((prev) => ({
+      ...prev,
+      ...partial,
+      ragdollContext:
+        partial.ragdollContext != null && typeof partial.ragdollContext === 'object'
+          ? { ...prev.ragdollContext, ...partial.ragdollContext }
+          : prev.ragdollContext,
+    }));
   }, []);
 
   const setTypeColor = useCallback((type, hexOrNull) => {
@@ -447,6 +587,10 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPagePhone: setDefaultStartPagePhoneSetting,
       markdownListAlternatingShades,
       setMarkdownListAlternatingShades: setMarkdownListAlternatingShadesSetting,
+      theme,
+      setTheme: setThemeSetting,
+      hoverInsight,
+      patchHoverInsight,
       serverReady,
     }),
     [
@@ -475,6 +619,10 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPagePhoneSetting,
       markdownListAlternatingShades,
       setMarkdownListAlternatingShadesSetting,
+      theme,
+      setThemeSetting,
+      hoverInsight,
+      patchHoverInsight,
       serverReady,
     ]
   );

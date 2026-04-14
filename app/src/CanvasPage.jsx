@@ -25,6 +25,7 @@ import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import NoteTypeIcon from './NoteTypeIcon';
 import ComposeCalendarPills from './ComposeCalendarPills';
+import ComposeExpandableField from './ComposeExpandableField';
 import {
   eventFieldsToPayload,
   NOTE_TYPE_OPTIONS,
@@ -369,6 +370,7 @@ export default function CanvasPage() {
   const [pendingReplyFiles, setPendingReplyFiles] = useState([]);
   const [pendingRootFiles, setPendingRootFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [composeExpanded, setComposeExpanded] = useState(false);
 
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
@@ -1223,6 +1225,7 @@ export default function CanvasPage() {
       await syncTagsFromContent(note.id, text, [], '');
       if (pendingReplyFiles.length > 0) await uploadNoteFiles(note.id, pendingReplyFiles);
       setReplyContent('');
+      setComposeExpanded(false);
       setPendingReplyFiles([]);
       resetComposeMeta();
       if (canvasReplyFileRef.current) canvasReplyFileRef.current.value = '';
@@ -1265,6 +1268,7 @@ export default function CanvasPage() {
               attachments: note.attachments || [],
             };
       setNewRootContent('');
+      setComposeExpanded(false);
       setPendingRootFiles([]);
       resetComposeMeta();
       if (canvasRootFileRef.current) canvasRootFileRef.current.value = '';
@@ -1899,19 +1903,25 @@ export default function CanvasPage() {
                     >
                       <NoteTypeIcon type={composeNoteType} className="mentions-compose-type-icon" />
                     </button>
-                    <MentionsTextarea
-                      placeholder={
-                        replyParentId === threadRootId
-                          ? 'Reply to thread… (@ link note, # tag)'
-                          : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”… (@ #)`
-                      }
-                      value={replyContent}
-                      onChange={setReplyContent}
-                      rows={2}
+                    <ComposeExpandableField
+                      expanded={composeExpanded}
+                      onToggle={() => setComposeExpanded((v) => !v)}
                       disabled={submitting}
-                      allowMentionCreate
-                      mentionCreateParentId={replyParentId}
-                    />
+                    >
+                      <MentionsTextarea
+                        placeholder={
+                          replyParentId === threadRootId
+                            ? 'Reply to thread… (@ link note, # tag)'
+                            : `Reply to “${focusSnippet.slice(0, 36)}${focusSnippet.length > 36 ? '…' : ''}”… (@ #)`
+                        }
+                        value={replyContent}
+                        onChange={setReplyContent}
+                        rows={composeExpanded ? 14 : 2}
+                        disabled={submitting}
+                        allowMentionCreate
+                        mentionCreateParentId={replyParentId}
+                      />
+                    </ComposeExpandableField>
                   </div>
                   <NoteTypeEventFields
                     idPrefix="canvas-reply"
@@ -1974,15 +1984,21 @@ export default function CanvasPage() {
                     >
                       <NoteTypeIcon type={composeNoteType} className="mentions-compose-type-icon" />
                     </button>
-                    <MentionsTextarea
-                      placeholder="New thread… @ link note, # tag"
-                      value={newRootContent}
-                      onChange={setNewRootContent}
-                      rows={2}
+                    <ComposeExpandableField
+                      expanded={composeExpanded}
+                      onToggle={() => setComposeExpanded((v) => !v)}
                       disabled={submitting}
-                      allowMentionCreate
-                      mentionCreateParentId={null}
-                    />
+                    >
+                      <MentionsTextarea
+                        placeholder="New thread… @ link note, # tag"
+                        value={newRootContent}
+                        onChange={setNewRootContent}
+                        rows={composeExpanded ? 14 : 2}
+                        disabled={submitting}
+                        allowMentionCreate
+                        mentionCreateParentId={null}
+                      />
+                    </ComposeExpandableField>
                   </div>
                   <NoteTypeEventFields
                     idPrefix="canvas-root"

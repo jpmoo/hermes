@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearStreamNavMemory, getLastStreamSearch } from './streamNavMemory';
+import { useNoteTypeColors } from './NoteTypeColorContext';
 import './Layout.css';
 import {
   LayoutNavIcon,
@@ -12,12 +13,6 @@ import {
 import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 import SettingsModal from './SettingsModal';
 
-const THEME_STORAGE_KEY = 'hermes.theme';
-const THEME_META = {
-  light: '#f4f3f0',
-  dark: '#15181c',
-};
-
 export default function Layout({
   title,
   noteTypeFilterEnabled = false,
@@ -28,26 +23,7 @@ export default function Layout({
   const location = useLocation();
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    try {
-      const v = localStorage.getItem(THEME_STORAGE_KEY);
-      return v === 'dark' ? 'dark' : 'light';
-    } catch {
-      return 'light';
-    }
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      /* ignore storage failures */
-    }
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_META[theme]);
-    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', theme);
-  }, [theme, location.pathname]);
+  const { theme, setTheme } = useNoteTypeColors();
 
   return (
     <div className="layout">
@@ -120,7 +96,7 @@ export default function Layout({
             <button
               type="button"
               className="layout-logout"
-              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
             >

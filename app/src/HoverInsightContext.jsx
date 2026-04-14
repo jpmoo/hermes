@@ -26,6 +26,7 @@ import { ALL_NOTE_TYPES, NOTE_TYPE_HEADER_ORDER } from './noteTypeFilter';
 import { insightPointerPathShouldKeepOpen, pointerEventTargetElement } from './pointerEventUtils';
 import { HERMES_COMPACT_VIEWPORT_QUERY } from './canvasLayoutApi';
 import { useMediaQuery } from './useMediaQuery';
+import { useNoteTypeColors } from './NoteTypeColorContext';
 import HoverInsightMobileSheet from './HoverInsightMobileSheet';
 import './HoverInsight.css';
 
@@ -38,81 +39,12 @@ function noteIdSame(a, b) {
   return String(a) === String(b);
 }
 
-const SIMILAR_MIN_LS_KEY = 'hermes.insightSimilarMinPct';
-const SIMILAR_TYPES_LS_KEY = 'hermes.insightSimilarVisibleTypes';
-const RAGDOLL_CONTEXT_LS_KEY = 'hermes.ragdollContextOptions';
-const RAGDOLL_QUERY_SIMILARITY_MIN_LS_KEY = 'hermes.ragdollQuerySimilarityMinPct';
-
 const SIMILAR_TYPE_FILTER_LABELS = {
   note: 'Notes',
   event: 'Events',
   person: 'People',
   organization: 'Organizations',
 };
-
-const defaultRagdollContext = Object.freeze({
-  includeParent: false,
-  includeSiblings: false,
-  includeChildren: false,
-  includeConnected: true,
-});
-
-function readStoredRagdollContext() {
-  try {
-    const raw = localStorage.getItem(RAGDOLL_CONTEXT_LS_KEY);
-    if (!raw) return { ...defaultRagdollContext };
-    const o = JSON.parse(raw);
-    if (!o || typeof o !== 'object') return { ...defaultRagdollContext };
-    return {
-      includeParent: Boolean(o.includeParent),
-      includeSiblings: Boolean(o.includeSiblings),
-      includeChildren: Boolean(o.includeChildren),
-      includeConnected: o.includeConnected !== false,
-    };
-  } catch {
-    return { ...defaultRagdollContext };
-  }
-}
-
-function readStoredSimilarMinPct() {
-  try {
-    const raw = localStorage.getItem(SIMILAR_MIN_LS_KEY);
-    const n = raw != null ? parseInt(raw, 10) : 25;
-    if (!Number.isFinite(n)) return 25;
-    return Math.min(95, Math.max(5, n));
-  } catch {
-    return 25;
-  }
-}
-
-/** Default 45% matches typical RAGDoll / env default of 0.45. */
-function readStoredRagdollQuerySimilarityMinPct() {
-  try {
-    const raw = localStorage.getItem(RAGDOLL_QUERY_SIMILARITY_MIN_LS_KEY);
-    const n = raw != null ? parseInt(raw, 10) : 45;
-    if (!Number.isFinite(n)) return 45;
-    return Math.min(95, Math.max(5, n));
-  } catch {
-    return 45;
-  }
-}
-
-function readStoredSimilarVisibleTypes() {
-  try {
-    const raw = localStorage.getItem(SIMILAR_TYPES_LS_KEY);
-    if (!raw) return new Set(ALL_NOTE_TYPES);
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr) || arr.length === 0) return new Set(ALL_NOTE_TYPES);
-    const next = new Set();
-    for (const t of arr) {
-      if (typeof t === 'string' && ALL_NOTE_TYPES.has(t)) next.add(t);
-    }
-    if (next.size === 0) return new Set(ALL_NOTE_TYPES);
-    return next;
-  } catch {
-    return new Set(ALL_NOTE_TYPES);
-  }
-}
 
 /** Stable id + paths for persisted link rows (API may use snake_case or alternate keys). */
 function normalizePersistedLinkItem(p) {
@@ -299,6 +231,10 @@ export function useHoverInsight() {
 }
 
 export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
+  const { hoverInsight, patchHoverInsight } = useNoteTypeColors();
+  const hoverInsightRef = useRef(hoverInsight);
+  hoverInsightRef.current = hoverInsight;
+
   const [hover, setHover] = useState(null);
   const [insight, setInsight] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -318,56 +254,59 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
   const [ragdollLoading, setRagdollLoading] = useState(false);
   const [ragdollDocs, setRagdollDocs] = useState([]);
   const [ragdollError, setRagdollError] = useState(null);
-  const [ragdollContext, setRagdollContext] = useState(readStoredRagdollContext);
+  const ragdollContext = hoverInsight.ragdollContext;
   const ragdollIncludeParent = ragdollContext.includeParent;
   const ragdollIncludeSiblings = ragdollContext.includeSiblings;
   const ragdollIncludeChildren = ragdollContext.includeChildren;
   const ragdollIncludeConnected = ragdollContext.includeConnected;
 
   const setRagdollIncludeParent = useCallback((next) => {
-    setRagdollContext((prev) => ({
-      ...prev,
-      includeParent: typeof next === 'function' ? next(prev.includeParent) : next,
-    }));
-  }, []);
+    const prev = hoverInsightRef.current.ragdollContext;
+    patchHoverInsight({
+      ragdollContext: {
+        ...prev,
+        includeParent: typeof next === 'function' ? next(prev.includeParent) : next,
+      },
+    });
+  }, [patchHoverInsight]);
   const setRagdollIncludeSiblings = useCallback((next) => {
-    setRagdollContext((prev) => ({
-      ...prev,
-      includeSiblings: typeof next === 'function' ? next(prev.includeSiblings) : next,
-    }));
-  }, []);
+    const prev = hoverInsightRef.current.ragdollContext;
+    patchHoverInsight({
+      ragdollContext: {
+        ...prev,
+        includeSiblings: typeof next === 'function' ? next(prev.includeSiblings) : next,
+      },
+    });
+  }, [patchHoverInsight]);
   const setRagdollIncludeChildren = useCallback((next) => {
-    setRagdollContext((prev) => ({
-      ...prev,
-      includeChildren: typeof next === 'function' ? next(prev.includeChildren) : next,
-    }));
-  }, []);
+    const prev = hoverInsightRef.current.ragdollContext;
+    patchHoverInsight({
+      ragdollContext: {
+        ...prev,
+        includeChildren: typeof next === 'function' ? next(prev.includeChildren) : next,
+      },
+    });
+  }, [patchHoverInsight]);
   const setRagdollIncludeConnected = useCallback((next) => {
-    setRagdollContext((prev) => ({
-      ...prev,
-      includeConnected: typeof next === 'function' ? next(prev.includeConnected) : next,
-    }));
-  }, []);
+    const prev = hoverInsightRef.current.ragdollContext;
+    patchHoverInsight({
+      ragdollContext: {
+        ...prev,
+        includeConnected: typeof next === 'function' ? next(prev.includeConnected) : next,
+      },
+    });
+  }, [patchHoverInsight]);
 
-  const [ragdollQuerySimilarityMinPct, setRagdollQuerySimilarityMinPct] = useState(
-    readStoredRagdollQuerySimilarityMinPct
+  const ragdollQuerySimilarityMinPct = hoverInsight.ragdollQuerySimilarityMinPct;
+  const setRagdollQuerySimilarityMinPct = useCallback(
+    (next) => {
+      const prev = hoverInsightRef.current.ragdollQuerySimilarityMinPct;
+      patchHoverInsight({
+        ragdollQuerySimilarityMinPct: typeof next === 'function' ? next(prev) : next,
+      });
+    },
+    [patchHoverInsight]
   );
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RAGDOLL_CONTEXT_LS_KEY, JSON.stringify(ragdollContext));
-    } catch {
-      /* ignore */
-    }
-  }, [ragdollContext]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RAGDOLL_QUERY_SIMILARITY_MIN_LS_KEY, String(ragdollQuerySimilarityMinPct));
-    } catch {
-      /* ignore */
-    }
-  }, [ragdollQuerySimilarityMinPct]);
 
   useEffect(() => {
     fetchRagdollConfig()
@@ -797,6 +736,7 @@ export function HoverInsightProvider({ children, onNoteUpdated, onGoToNote }) {
 
 function HoverInsightPanels() {
   const ctx = useHoverInsight();
+  const { hoverInsight, patchHoverInsight } = useNoteTypeColors();
   if (!ctx) return null;
 
   const {
@@ -851,38 +791,36 @@ function HoverInsightPanels() {
   }, []);
 
   const [layoutRev, setLayoutRev] = useState(0);
-  const [similarMinPct, setSimilarMinPct] = useState(readStoredSimilarMinPct);
-  const [similarVisibleTypes, setSimilarVisibleTypes] = useState(readStoredSimilarVisibleTypes);
+  const similarMinPct = hoverInsight.similarMinPct;
+  const similarVisibleTypes = useMemo(
+    () => new Set(hoverInsight.similarVisibleTypes),
+    [hoverInsight.similarVisibleTypes]
+  );
 
-  const toggleSimilarVisibleNoteType = useCallback((type) => {
-    if (!ALL_NOTE_TYPES.has(type)) return;
-    setSimilarVisibleTypes((prev) => {
-      const next = new Set(prev);
+  const setSimilarMinPct = useCallback(
+    (next) => {
+      const prev = hoverInsight.similarMinPct;
+      const v = typeof next === 'function' ? next(prev) : next;
+      patchHoverInsight({ similarMinPct: v });
+    },
+    [hoverInsight.similarMinPct, patchHoverInsight]
+  );
+
+  const toggleSimilarVisibleNoteType = useCallback(
+    (type) => {
+      if (!ALL_NOTE_TYPES.has(type)) return;
+      const arr = [...hoverInsight.similarVisibleTypes];
+      const next = new Set(arr);
       if (next.has(type)) {
-        if (next.size <= 1) return prev;
+        if (next.size <= 1) return;
         next.delete(type);
       } else {
         next.add(type);
       }
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SIMILAR_MIN_LS_KEY, String(similarMinPct));
-    } catch {
-      /* ignore */
-    }
-  }, [similarMinPct]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SIMILAR_TYPES_LS_KEY, JSON.stringify([...similarVisibleTypes].sort()));
-    } catch {
-      /* ignore */
-    }
-  }, [similarVisibleTypes]);
+      patchHoverInsight({ similarVisibleTypes: [...next] });
+    },
+    [hoverInsight.similarVisibleTypes, patchHoverInsight]
+  );
 
   useEffect(() => {
     if (!hover?.note || !isNarrowStream) return undefined;
