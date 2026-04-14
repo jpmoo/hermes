@@ -206,6 +206,15 @@
   gap: 0.5rem;
 }
 
+/* Scroll region above the pinned meta/actions row (canvas uses overflow on this block). */
+.note-card-body-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0.5rem;
+}
+
 .note-card-content {
   margin: 0;
   font-size: 1rem;

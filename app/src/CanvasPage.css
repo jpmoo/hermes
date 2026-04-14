@@ -486,9 +486,21 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  overflow: hidden;
 }
 
+/* Long note text scrolls here; meta/actions stay pinned below (see NoteCard body structure). */
+.canvas-card-body .note-card-body-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Dropdown lives under meta; keep ancestors from clipping while open. */
 .canvas-card-body .note-card-body:has(.note-card-tag-dropdown) {
   overflow: visible;
 }

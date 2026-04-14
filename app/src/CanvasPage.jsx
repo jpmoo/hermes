@@ -328,6 +328,41 @@ function isCanvasDragInteractiveTarget(target) {
   );
 }
 
+/**
+ * Nested scrollports (long note body, textarea, etc.): let the browser handle wheel/trackpad so we do not
+ * steal the gesture for canvas pan. When at scroll limits, the next wheel can still pan the canvas.
+ */
+function wheelEventShouldScrollNestedTarget(target, rootViewport, deltaX, deltaY) {
+  if (!(target instanceof Node) || !rootViewport?.contains(target)) return false;
+  let node = target;
+  while (node && rootViewport.contains(node)) {
+    if (node === rootViewport) break;
+    if (!(node instanceof Element)) {
+      node = node.parentNode;
+      continue;
+    }
+    const cs = window.getComputedStyle(node);
+    const oy = cs.overflowY;
+    const ox = cs.overflowX;
+    const canY =
+      (oy === 'auto' || oy === 'scroll' || oy === 'overlay') && node.scrollHeight > node.clientHeight + 1;
+    const canX =
+      (ox === 'auto' || ox === 'scroll' || ox === 'overlay') && node.scrollWidth > node.clientWidth + 1;
+    if (canY && Math.abs(deltaY) > 0.5) {
+      const atTop = node.scrollTop <= 0;
+      const atBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 1;
+      if ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom)) return true;
+    }
+    if (canX && Math.abs(deltaX) > 0.5) {
+      const atLeft = node.scrollLeft <= 0;
+      const atRight = node.scrollLeft + node.clientWidth >= node.scrollWidth - 1;
+      if ((deltaX < 0 && !atLeft) || (deltaX > 0 && !atRight)) return true;
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
+
 const SAVE_DEBOUNCE_MS = 200;
 /** Room for Edit / Delete / + Tag / star without wrapping at narrow widths. */
 const MIN_W = 280;
@@ -902,8 +937,14 @@ export default function CanvasPage() {
   const handleWheelNative = useCallback(
     (e) => {
       if (!viewportRef.current) return;
+      const root = viewportRef.current;
+      if (!(e.ctrlKey || e.metaKey)) {
+        if (wheelEventShouldScrollNestedTarget(e.target, root, e.deltaX, e.deltaY)) {
+          return;
+        }
+      }
       e.preventDefault();
-      const rect = viewportRef.current.getBoundingClientRect();
+      const rect = root.getBoundingClientRect();
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       if (e.ctrlKey || e.metaKey) {

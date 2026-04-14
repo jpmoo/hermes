@@ -527,6 +527,7 @@ export default function NoteCard({
         <NoteTypeIcon type={note.note_type || 'note'} className="note-card-type-icon" />
       )}
       <div className="note-card-body">
+        <div className="note-card-body-main">
         {editing ? (
           <form className="note-card-edit" onSubmit={handleSaveEdit} onClick={(e) => e.stopPropagation()}>
             <MentionsTextarea
@@ -610,6 +611,7 @@ export default function NoteCard({
             )}
           </>
         )}
+        </div>
         <div className="note-card-meta">
           <div className="note-card-actions" onClick={(e) => e.stopPropagation()}>
             {!editing && (
