@@ -415,19 +415,26 @@
   padding-right: var(--hermes-compose-inset-x);
 }
 
-/* Triangle-expanded composer: ~80vw, centered (breaks out of the narrow column) */
+/* Expanded composer: wide column — center with flex, not transform (sticky + transform + overflow clips / shifts). */
 .stream-page:has(.stream-page-compose-field--expanded),
 .canvas-page:has(.stream-page-compose-field--expanded) {
+  overflow: visible;
+}
+
+.layout-main:has(.stream-page-compose-field--expanded) {
   overflow-x: visible;
 }
 
 .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
 .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
-  width: 80vw;
-  max-width: 80vw;
+  width: min(80vw, calc(100vw - 2rem));
+  max-width: min(80vw, calc(100vw - 2rem));
+  align-self: center;
+  margin-left: auto;
+  margin-right: auto;
   position: relative;
-  left: 50%;
-  transform: translateX(-50%);
+  left: auto;
+  transform: none;
 }
 
 /* Sticky composer chrome only on Stream (canvas uses the same width rules but not this bar). */
@@ -440,6 +447,10 @@
   padding-top: 1rem;
   padding-bottom: 0.5rem;
   background: linear-gradient(to top, var(--bg) 85%, transparent);
+}
+
+.stream-page > .stream-page-compose-wrap:has(.stream-page-compose-field--expanded) {
+  z-index: 12;
 }
 
 .canvas-page-compose-wrap {
@@ -716,8 +727,8 @@
 
   .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
   .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
-    width: 80vw;
-    max-width: 80vw;
+    width: min(80vw, calc(100vw - 2rem));
+    max-width: min(80vw, calc(100vw - 2rem));
   }
 
   /* Focus / drill float lands at column width — match 90% cards, not --hermes-stream-column-max (50vw) */

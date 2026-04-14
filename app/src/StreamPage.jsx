@@ -130,7 +130,7 @@ function streamNoteAttrEscaped(id) {
  * right overflow ancestor (.stream-page-scroll). Avoid manual scrollTop during thread/level-drop
  * animations — rects are wrong until ~400–500ms after focus changes, which caused “stuck at top +
  * bump” behavior.
- * @param {'start' | 'center'} [block] — `start` for drill-down (head at top of list); `center` for drill-up / reply visibility.
+ * @param {'start' | 'center' | 'end' | 'nearest'} [block] — `end` for new reply near composer; `start` for drill-down.
  */
 function scrollStreamListToNote(_streamEl, listEl, noteId, block = 'center') {
   if (!listEl || noteId == null) return false;
@@ -1335,6 +1335,18 @@ export default function StreamPage() {
       resetComposeMeta();
       if (replyFileRef.current) replyFileRef.current.value = '';
       await loadThread(true);
+      await new Promise((r) => {
+        requestAnimationFrame(() => requestAnimationFrame(r));
+      });
+      const scrollNewReplyIntoView = () => {
+        const sc = streamScrollRef.current;
+        const listEl = threadListRef.current;
+        if (sc && listEl && note?.id) {
+          scrollStreamListToNote(sc, listEl, note.id, 'end');
+        }
+      };
+      scrollNewReplyIntoView();
+      [60, 180, 400].forEach((ms) => window.setTimeout(scrollNewReplyIntoView, ms));
     } catch (err) {
       console.error(err);
     } finally {
