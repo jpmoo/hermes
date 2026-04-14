@@ -415,6 +415,13 @@
   padding-right: var(--hermes-compose-inset-x);
 }
 
+/* Triangle-expanded composer: wider surface for typing / inking */
+.stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
+.canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
+  width: 80vw;
+  max-width: 80vw;
+}
+
 /* Sticky composer chrome only on Stream (canvas uses the same width rules but not this bar). */
 .stream-page > .stream-page-compose-wrap {
   position: sticky;
@@ -695,6 +702,12 @@
     padding-left: max(0.25rem, env(safe-area-inset-left, 0px));
     padding-right: max(0.25rem, env(safe-area-inset-right, 0px));
     box-sizing: border-box;
+  }
+
+  .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
+  .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
+    width: 80vw;
+    max-width: 80vw;
   }
 
   /* Focus / drill float lands at column width — match 90% cards, not --hermes-stream-column-max (50vw) */
