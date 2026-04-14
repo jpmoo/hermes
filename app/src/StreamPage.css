@@ -415,11 +415,19 @@
   padding-right: var(--hermes-compose-inset-x);
 }
 
-/* Triangle-expanded composer: wider surface for typing / inking */
+/* Triangle-expanded composer: ~80vw, centered (breaks out of the narrow column) */
+.stream-page:has(.stream-page-compose-field--expanded),
+.canvas-page:has(.stream-page-compose-field--expanded) {
+  overflow-x: visible;
+}
+
 .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
 .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
   width: 80vw;
   max-width: 80vw;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 /* Sticky composer chrome only on Stream (canvas uses the same width rules but not this bar). */

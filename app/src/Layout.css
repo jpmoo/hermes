@@ -6,6 +6,11 @@
   overflow: hidden;
 }
 
+/* Let expanded Stream/Canvas composer (80vw) paint past the column edge */
+.layout:has(.stream-page-compose-field--expanded) {
+  overflow-x: visible;
+}
+
 .layout-header {
   position: sticky;
   top: 0;

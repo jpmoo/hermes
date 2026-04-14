@@ -661,13 +661,26 @@ export default function StreamPage() {
     }
   }, [focusId, thread, threadRootId, visibleNoteTypes, setSearchParams]);
 
+  /**
+   * Drop focus when the note is gone or hidden by type filters. Use `treeFull` + flat `thread` so we
+   * don’t clear focus in the render after a reply before `pinnedTree` includes the new note (race).
+   */
   useEffect(() => {
     if (!threadRootId || !focusId || !tree.length) return;
+    const inThread = thread.some((n) => noteIdEq(n.id, focusId));
+    if (!inThread) {
+      focusFromUrlApplied.current = '';
+      setFocusId(null);
+      setSearchParams({ thread: threadRootId });
+      return;
+    }
+    const inFullTree = findNode(treeFull, focusId);
+    if (!inFullTree) return;
     if (findNode(pinnedTree, focusId)) return;
     focusFromUrlApplied.current = '';
     setFocusId(null);
     setSearchParams({ thread: threadRootId });
-  }, [threadRootId, focusId, pinnedTree, setSearchParams]);
+  }, [threadRootId, focusId, pinnedTree, treeFull, thread, tree.length, setSearchParams]);
 
   useLayoutEffect(() => {
     if (!streamScrollIntent) return;
@@ -1190,6 +1203,9 @@ export default function StreamPage() {
         }
         if (threadRootId) {
           await loadThread(true);
+          await new Promise((r) => {
+            requestAnimationFrame(() => requestAnimationFrame(r));
+          });
           applyFocusImmediate(note.id);
         } else {
           const full = {
@@ -1295,6 +1311,9 @@ export default function StreamPage() {
       resetComposeMeta();
       if (replyFileRef.current) replyFileRef.current.value = '';
       await loadThread(true);
+      await new Promise((r) => {
+        requestAnimationFrame(() => requestAnimationFrame(r));
+      });
       applyFocusImmediate(note.id);
     } catch (err) {
       console.error(err);
