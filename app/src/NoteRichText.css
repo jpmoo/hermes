@@ -88,7 +88,7 @@
 
 .note-rich-markdown li + li,
 .note-rich-markdown .note-rich-li + .note-rich-li {
-  margin-top: 0 !important;
+  margin-top: 5px !important;
 }
 
 .note-rich-markdown p + ul,
@@ -149,7 +149,7 @@
 .note-rich-markdown ol.contains-task-list > li.task-list-item + li.task-list-item,
 .note-rich-markdown .note-rich-ul.contains-task-list > .note-rich-li.task-list-item + .note-rich-li.task-list-item,
 .note-rich-markdown .note-rich-ol.contains-task-list > .note-rich-li.task-list-item + .note-rich-li.task-list-item {
-  margin-top: 0.35rem !important;
+  margin-top: calc(0.35rem + 5px) !important;
 }
 
 /* Alternating: only every other row gets a whisper of tint vs card background */
@@ -184,33 +184,6 @@ html.hermes-list-alternating-shades
     #000 10%,
     var(--hermes-list-stripe-base, var(--bg-card, var(--bg)))
   );
-}
-
-/* Bullet / ordered lists (not GFM task lists): alternating odd rows */
-html.hermes-list-alternating-shades
-  .note-rich-markdown
-  ul:not(.contains-task-list)
-  > li:nth-child(odd):not(.task-list-item),
-html.hermes-list-alternating-shades
-  .note-rich-markdown
-  ol:not(.contains-task-list)
-  > li:nth-child(odd):not(.task-list-item),
-html.hermes-list-alternating-shades
-  .note-rich-markdown
-  .note-rich-ul:not(.contains-task-list)
-  > .note-rich-li:nth-child(odd):not(.task-list-item),
-html.hermes-list-alternating-shades
-  .note-rich-markdown
-  .note-rich-ol:not(.contains-task-list)
-  > .note-rich-li:nth-child(odd):not(.task-list-item) {
-  background: color-mix(
-    in srgb,
-    #000 10%,
-    var(--hermes-list-stripe-base, var(--bg-card, var(--bg)))
-  ) !important;
-  padding: 0.2rem 0.35rem !important;
-  border-radius: 4px;
-  box-sizing: border-box;
 }
 
 /* GFM: float + BFC so checkbox, inline runs, and wrapped lines share one text column (flex breaks multi-node lines) */

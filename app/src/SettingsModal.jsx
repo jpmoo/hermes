@@ -295,12 +295,12 @@ export default function SettingsModal({ onClose }) {
               className="settings-modal-similar-notes-checkbox-label"
               htmlFor="settings-markdown-list-alternating"
             >
-              Alternating row shading for ordered and bullet lists (including checklists)
+              Alternating row shading for checklists
             </label>
           </div>
           <p id="settings-markdown-list-alternating-hint" className="settings-modal-similar-notes-hint">
-            When on, odd rows are slightly darker than the note-type background from the colors above (same tint
-            as the card). Saved to your account.
+            When on, odd checklist rows are slightly darker than the note-type background from the colors above
+            (same tint as the card). Saved to your account.
           </p>
         </section>
 
