@@ -239,7 +239,9 @@
 }
 
 .stream-page-float--move {
-  top: 4.25rem;
+  /* Measured from the sticky thread nav row in JS (`--fp-move-top`) so wrapping / async icons
+     cannot push the float under the real nav chrome. */
+  top: var(--fp-move-top, 4.25rem);
   left: 50%;
   width: var(--hermes-stream-column-max);
   transform: translateX(-50%);

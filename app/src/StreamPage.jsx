@@ -181,6 +181,54 @@ function streamReplyDepthFromLi(li) {
   return d;
 }
 
+function readCssRemVarPx(varName, fallbackRem) {
+  try {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    if (raw) {
+      const m = raw.match(/^([0-9.]+)rem$/i);
+      if (m) {
+        const rem = Number(m[1]);
+        if (Number.isFinite(rem)) {
+          const fs = Number.parseFloat(getComputedStyle(document.documentElement).fontSize || '16') || 16;
+          return rem * fs;
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  const fs = Number.parseFloat(getComputedStyle(document.documentElement).fontSize || '16') || 16;
+  return fallbackRem * fs;
+}
+
+/**
+ * Where the drill/open-thread float should land vertically (viewport px) for `.stream-page-float--move`.
+ * Prefer measuring the sticky thread nav row; fall back to layout CSS vars if not mounted yet.
+ */
+function measureStreamFloatMoveTopPx(streamScrollEl) {
+  const nav =
+    streamScrollEl?.querySelector?.(':scope > .stream-page-nav-row') ??
+    document.querySelector('.stream-page-scroll > .stream-page-nav-row');
+  if (nav && typeof nav.getBoundingClientRect === 'function') {
+    const br = nav.getBoundingClientRect();
+    if (br.height > 2) {
+      // Small breathing room below the sticky nav chrome (esp. when it wraps to two rows).
+      return Math.max(0, Math.round(br.bottom + 10));
+    }
+  }
+  const isCompact =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(
+      '(max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px)'
+    ).matches;
+  const sticky = isCompact
+    ? readCssRemVarPx('--stream-nav-sticky-top-mobile', 3.65)
+    : readCssRemVarPx('--stream-nav-sticky-top', 3.5);
+  const approxNav = isCompact ? 72 : 68;
+  return Math.max(0, Math.round(sticky + approxNav));
+}
+
 /** Parent row is always a direct child of the thread list; replies live in ul.stream-page-replies (one UI level). */
 function findDrillUpDestinationLi(listEl, parentId, leavingId) {
   if (!listEl || parentId == null || leavingId == null) return null;
@@ -799,7 +847,10 @@ export default function StreamPage() {
       });
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setFloatOpen((prev) => (prev && prev.note.id === rootId ? { ...prev, phase: 'move' } : prev));
+          setFloatOpen((prev) => {
+            if (!prev || prev.note.id !== rootId) return prev;
+            return { ...prev, phase: 'move', moveTop: measureStreamFloatMoveTopPx(streamScrollRef.current) };
+          });
         });
       });
       floatTimerRef.current = setTimeout(() => {
@@ -1152,7 +1203,10 @@ export default function StreamPage() {
       });
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setFloatOpen((prev) => (prev && prev.note.id === id ? { ...prev, phase: 'move' } : prev));
+          setFloatOpen((prev) => {
+            if (!prev || prev.note.id !== id) return prev;
+            return { ...prev, phase: 'move', moveTop: measureStreamFloatMoveTopPx(streamScrollRef.current) };
+          });
         });
       });
       floatTimerRef.current = setTimeout(() => {
@@ -1524,6 +1578,12 @@ export default function StreamPage() {
               '--fp-top': `${floatOpen.top}px`,
               '--fp-left': `${floatOpen.left}px`,
               '--fp-w': `${floatOpen.width}px`,
+              ...(floatOpen.phase === 'move' &&
+                floatOpen.kind !== 'up' &&
+                typeof floatOpen.moveTop === 'number' &&
+                Number.isFinite(floatOpen.moveTop)
+                ? { '--fp-move-top': `${floatOpen.moveTop}px` }
+                : {}),
               ...(floatOpen.kind === 'up' &&
                 floatOpen.phase === 'move' &&
                 floatOpen.endTop != null && {
