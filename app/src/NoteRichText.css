@@ -113,11 +113,12 @@
 }
 
 /* Non-checklist lists: add visible vertical space between rows */
-.note-rich-markdown ul:not(.contains-task-list) > li + li,
-.note-rich-markdown ol:not(.contains-task-list) > li + li,
-.note-rich-markdown .note-rich-ul:not(.contains-task-list) > .note-rich-li + .note-rich-li,
-.note-rich-markdown .note-rich-ol:not(.contains-task-list) > .note-rich-li + .note-rich-li {
+.note-rich-markdown ul:not(.contains-task-list) > li:not(.task-list-item),
+.note-rich-markdown ol:not(.contains-task-list) > li:not(.task-list-item),
+.note-rich-markdown .note-rich-ul:not(.contains-task-list) > .note-rich-li:not(.task-list-item),
+.note-rich-markdown .note-rich-ol:not(.contains-task-list) > .note-rich-li:not(.task-list-item) {
   margin-top: 5px !important;
+  margin-bottom: 5px !important;
 }
 
 /* Second+ paragraphs in the same list item align with the first line’s text column */
@@ -147,19 +148,13 @@
   content: '' !important;
 }
 
-/* Vertical rhythm between checklist rows */
-.note-rich-markdown ul.contains-task-list > li.task-list-item + li.task-list-item,
-.note-rich-markdown ol.contains-task-list > li.task-list-item + li.task-list-item,
-.note-rich-markdown .note-rich-ul.contains-task-list > .note-rich-li.task-list-item + .note-rich-li.task-list-item,
-.note-rich-markdown .note-rich-ol.contains-task-list > .note-rich-li.task-list-item + .note-rich-li.task-list-item {
-  margin-top: calc(0.35rem + 5px) !important;
-}
-
 /* Alternating: only every other row gets a whisper of tint vs card background */
 .note-rich-markdown ul.contains-task-list > li.task-list-item,
 .note-rich-markdown ol.contains-task-list > li.task-list-item,
 .note-rich-markdown .note-rich-ul.contains-task-list > .note-rich-li.task-list-item,
 .note-rich-markdown .note-rich-ol.contains-task-list > .note-rich-li.task-list-item {
+  margin-top: 5px !important;
+  margin-bottom: 5px !important;
   padding: 0.35rem 0.5rem !important;
   border-radius: 5px;
   box-sizing: border-box;
