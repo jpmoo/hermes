@@ -167,6 +167,20 @@ function findStreamLiByNoteId(listEl, noteId) {
   );
 }
 
+/** Depth in the Stream thread UI (0 = thread head row; each nested `ul.stream-page-replies` adds 1). */
+function streamReplyDepthFromLi(li) {
+  if (!li) return 0;
+  let d = 0;
+  let cur = li.parentElement;
+  while (cur) {
+    if (cur instanceof HTMLElement && cur.tagName === 'UL' && cur.classList.contains('stream-page-replies')) {
+      d += 1;
+    }
+    cur = cur.parentElement;
+  }
+  return d;
+}
+
 /** Parent row is always a direct child of the thread list; replies live in ul.stream-page-replies (one UI level). */
 function findDrillUpDestinationLi(listEl, parentId, leavingId) {
   if (!listEl || parentId == null || leavingId == null) return null;
@@ -777,6 +791,7 @@ export default function StreamPage() {
       });
       setFloatOpen({
         note: { ...n },
+        depth: 0,
         top: r.top,
         left: r.left,
         width: r.width,
@@ -925,6 +940,7 @@ export default function StreamPage() {
       setFloatOpen({
         kind: 'up',
         note,
+        depth: streamReplyDepthFromLi(headLi),
         top: fr.top,
         left: fr.left,
         width: fr.width,
@@ -1128,6 +1144,7 @@ export default function StreamPage() {
       };
       setFloatOpen({
         note,
+        depth: streamReplyDepthFromLi(targetLi),
         top: r.top,
         left: r.left,
         width: r.width,
@@ -1519,9 +1536,12 @@ export default function StreamPage() {
           >
             <NoteCard
               note={floatOpen.note}
-              depth={0}
-              hideStar
+              depth={typeof floatOpen.depth === 'number' ? floatOpen.depth : 0}
+              hideStar={typeof floatOpen.depth === 'number' ? floatOpen.depth === 0 : true}
               hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
+              hoverInsightEnabled
+              drillOnSingleClick
+              onOpenThread={() => {}}
               onStarredChange={() => {}}
               onNoteUpdate={() => {}}
               onNoteDelete={() => {}}
