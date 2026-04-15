@@ -49,6 +49,15 @@
   line-height: 1.12 !important;
 }
 
+/* Keep paragraph -> first list-item gap predictable:
+   10px paragraph bottom + 10px first item top = 20px total. */
+.note-rich-markdown p:has(+ ul),
+.note-rich-markdown p:has(+ ol),
+.note-rich-markdown .note-rich-p:has(+ .note-rich-ul),
+.note-rich-markdown .note-rich-p:has(+ .note-rich-ol) {
+  margin-bottom: 10px !important;
+}
+
 .note-rich-markdown h1,
 .note-rich-markdown h2,
 .note-rich-markdown h3,
@@ -87,7 +96,9 @@
 }
 
 .note-rich-markdown p + ul,
-.note-rich-markdown p + ol {
+.note-rich-markdown p + ol,
+.note-rich-markdown .note-rich-p + .note-rich-ul,
+.note-rich-markdown .note-rich-p + .note-rich-ol {
   margin-top: 0 !important;
 }
 
