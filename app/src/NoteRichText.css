@@ -52,6 +52,12 @@
   line-height: 1.12 !important;
 }
 
+/* Render paragraph breaks (blank lines) in markdown body. */
+.note-rich-markdown p + p,
+.note-rich-markdown .note-rich-p + .note-rich-p {
+  margin-top: 10px !important;
+}
+
 /* Keep paragraph -> first list-item gap predictable:
    10px paragraph bottom + 10px first item top = 20px total. */
 .note-rich-markdown p:has(+ ul),
