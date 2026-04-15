@@ -86,11 +86,6 @@
   white-space: normal;
 }
 
-.note-rich-markdown li + li,
-.note-rich-markdown .note-rich-li + .note-rich-li {
-  margin-top: 5px !important;
-}
-
 .note-rich-markdown p + ul,
 .note-rich-markdown p + ol {
   margin-top: 0 !important;
@@ -115,6 +110,14 @@
   padding: 0 !important;
   line-height: 1.12 !important;
   list-style-position: outside;
+}
+
+/* Non-checklist lists: add visible vertical space between rows */
+.note-rich-markdown ul:not(.contains-task-list) > li + li,
+.note-rich-markdown ol:not(.contains-task-list) > li + li,
+.note-rich-markdown .note-rich-ul:not(.contains-task-list) > .note-rich-li + .note-rich-li,
+.note-rich-markdown .note-rich-ol:not(.contains-task-list) > .note-rich-li + .note-rich-li {
+  margin-top: 5px !important;
 }
 
 /* Second+ paragraphs in the same list item align with the first line’s text column */
