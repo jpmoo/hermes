@@ -4,6 +4,9 @@
   display: block;
   line-height: 1.12;
   text-align: start;
+  /* Parent containers may use pre-wrap; force normal block flow here
+     so paragraph/list spacing comes only from explicit margins. */
+  white-space: normal;
 }
 
 /*
