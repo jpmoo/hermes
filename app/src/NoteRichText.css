@@ -117,8 +117,8 @@
 .note-rich-markdown ol:not(.contains-task-list) > li:not(.task-list-item),
 .note-rich-markdown .note-rich-ul:not(.contains-task-list) > .note-rich-li:not(.task-list-item),
 .note-rich-markdown .note-rich-ol:not(.contains-task-list) > .note-rich-li:not(.task-list-item) {
-  margin-top: 5px !important;
-  margin-bottom: 5px !important;
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
 }
 
 /* Second+ paragraphs in the same list item align with the first line’s text column */
@@ -153,8 +153,8 @@
 .note-rich-markdown ol.contains-task-list > li.task-list-item,
 .note-rich-markdown .note-rich-ul.contains-task-list > .note-rich-li.task-list-item,
 .note-rich-markdown .note-rich-ol.contains-task-list > .note-rich-li.task-list-item {
-  margin-top: 5px !important;
-  margin-bottom: 5px !important;
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
   padding: 0.35rem 0.5rem !important;
   border-radius: 5px;
   box-sizing: border-box;
