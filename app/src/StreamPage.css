@@ -243,7 +243,10 @@
      cannot push the float under the real nav chrome. */
   top: var(--fp-move-top, 4.25rem);
   left: 50%;
-  width: var(--hermes-stream-column-max);
+  /* Width is driven by `--fp-w` (measured card width capped to the stream column max) so text wraps
+     the same as the real card — otherwise a wider float looks “taller” due to reflow. */
+  width: var(--fp-w, var(--hermes-stream-column-max));
+  max-width: min(var(--fp-w, 100vw), var(--hermes-stream-column-max));
   transform: translateX(-50%);
   transition:
     top 0.44s cubic-bezier(0.22, 1, 0.36, 1),
@@ -738,10 +741,9 @@
     margin-right: calc(50% - var(--compose-exp-w) / 2);
   }
 
-  /* Focus / drill float lands at column width — match 90% cards, not --hermes-stream-column-max (50vw) */
+  /* Narrow viewports: cap float width like inset cards; keep `--fp-w` as the primary width driver. */
   .stream-page-float--move {
-    width: 90%;
-    max-width: 90%;
+    max-width: min(90%, var(--hermes-stream-column-max));
     box-sizing: border-box;
   }
 }

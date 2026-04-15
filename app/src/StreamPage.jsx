@@ -229,6 +229,31 @@ function measureStreamFloatMoveTopPx(streamScrollEl) {
   return Math.max(0, Math.round(sticky + approxNav));
 }
 
+function isCompactStreamViewport() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia(
+    '(max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px)'
+  ).matches;
+}
+
+/** Mirrors `index.css` `--hermes-stream-column-max: min(50vw, calc(100vw - 2rem))` in px. */
+function streamColumnMaxWidthPx() {
+  if (typeof window === 'undefined' || !Number.isFinite(window.innerWidth)) return 720;
+  const vw = window.innerWidth;
+  return Math.max(0, Math.round(Math.min(vw * 0.5, vw - 32)));
+}
+
+function streamMoveFloatTargetWidthPx(naturalCardWidthPx) {
+  const w = Number(naturalCardWidthPx);
+  if (!Number.isFinite(w) || w <= 0) return streamColumnMaxWidthPx();
+  if (isCompactStreamViewport()) {
+    const cap = Math.max(0, Math.round(window.innerWidth * 0.9));
+    return Math.max(1, Math.min(w, cap));
+  }
+  const cap = streamColumnMaxWidthPx();
+  return Math.max(1, Math.min(w, cap));
+}
+
 /** Parent row is always a direct child of the thread list; replies live in ul.stream-page-replies (one UI level). */
 function findDrillUpDestinationLi(listEl, parentId, leavingId) {
   if (!listEl || parentId == null || leavingId == null) return null;
@@ -849,7 +874,12 @@ export default function StreamPage() {
         requestAnimationFrame(() => {
           setFloatOpen((prev) => {
             if (!prev || prev.note.id !== rootId) return prev;
-            return { ...prev, phase: 'move', moveTop: measureStreamFloatMoveTopPx(streamScrollRef.current) };
+            return {
+              ...prev,
+              phase: 'move',
+              moveTop: measureStreamFloatMoveTopPx(streamScrollRef.current),
+              width: streamMoveFloatTargetWidthPx(prev.width),
+            };
           });
         });
       });
@@ -1205,7 +1235,12 @@ export default function StreamPage() {
         requestAnimationFrame(() => {
           setFloatOpen((prev) => {
             if (!prev || prev.note.id !== id) return prev;
-            return { ...prev, phase: 'move', moveTop: measureStreamFloatMoveTopPx(streamScrollRef.current) };
+            return {
+              ...prev,
+              phase: 'move',
+              moveTop: measureStreamFloatMoveTopPx(streamScrollRef.current),
+              width: streamMoveFloatTargetWidthPx(prev.width),
+            };
           });
         });
       });
