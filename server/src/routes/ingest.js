@@ -5,6 +5,7 @@ import pool from '../db/pool.js';
 import { requireIngestAuth } from '../middleware/ingestAuth.js';
 import { embedNote } from '../services/embedding.js';
 import { MAX_BYTES } from '../services/noteFileBlobs.js';
+import { resolveNoteContentFromIngestFile } from '../services/ingestFileNoteContent.js';
 
 const router = Router();
 
@@ -24,13 +25,126 @@ function inboxRootFromSettings(settingsJson) {
 }
 
 /**
- * POST /api/ingest/notes
- * Body: { content: string, parent_id?: string | null, external_anchor?: string | null }
- * If parent_id is omitted, uses Settings → Inbox root thread (must be set).
+ * @param {string} userId
+ * @param {Record<string, unknown>} body
+ * @returns {Promise<{ ok: true, parentId: string } | { ok: false, status: number, error: string }>}
  */
-router.post('/notes', express.json({ limit: '4mb' }), requireIngestAuth, async (req, res) => {
+async function resolveIngestParentId(userId, body) {
+  const sr = await pool.query('SELECT settings_json FROM users WHERE id = $1', [userId]);
+  const sj = sr.rows[0]?.settings_json;
+  const inboxRoot = inboxRootFromSettings(sj);
+
+  let parentId;
+  if (Object.prototype.hasOwnProperty.call(body, 'parent_id')) {
+    const p = body.parent_id;
+    if (p == null || p === '') {
+      parentId = null;
+    } else if (typeof p === 'string') {
+      parentId = p.trim() || null;
+    } else {
+      return { ok: false, status: 400, error: 'parent_id must be a string, null, or omitted' };
+    }
+  } else {
+    parentId = inboxRoot;
+  }
+
+  if (!parentId) {
+    return {
+      ok: false,
+      status: 400,
+      error:
+        'No parent for new note: set Inbox root thread in Settings, or send parent_id (UUID of the note to reply under).',
+    };
+  }
+
+  const pc = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [parentId, userId]);
+  if (pc.rows.length === 0) {
+    return { ok: false, status: 400, error: 'parent_id not found or not yours' };
+  }
+
+  return { ok: true, parentId };
+}
+
+function ingestNotesBodyParser(req, res, next) {
+  const ct = req.headers['content-type'] || '';
+  if (ct.includes('multipart/form-data')) {
+    return upload.fields([
+      { name: 'file', maxCount: 1 },
+      { name: 'files', maxCount: 20 },
+    ])(req, res, (err) => {
+      if (err?.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: `File exceeds ${MAX_BYTES} bytes` });
+      }
+      if (err) return next(err);
+      next();
+    });
+  }
+  return express.json({ limit: '4mb' })(req, res, next);
+}
+
+/**
+ * POST /api/ingest/notes
+ * JSON: { content, parent_id?, external_anchor? } — text note (same as before).
+ * multipart/form-data: fields parent_id?, external_anchor? and file or files[] — one note per file;
+ * PDF/images are OCR’d and summarized when possible; note body is the summary or the raw filename.
+ * Each created note includes the uploaded bytes as an attachment.
+ */
+router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res) => {
   try {
     const userId = req.userId;
+
+    if (req.is('multipart/form-data')) {
+      const raw = req.files;
+      const fileList = [...(raw?.file || []), ...(raw?.files || [])];
+      if (fileList.length === 0) {
+        return res.status(400).json({ error: 'No file (multipart fields: file or files)' });
+      }
+
+      const body = req.body ?? {};
+      const parentRes = await resolveIngestParentId(userId, body);
+      if (!parentRes.ok) {
+        return res.status(parentRes.status).json({ error: parentRes.error });
+      }
+      const { parentId } = parentRes;
+
+      const externalAnchor =
+        typeof body.external_anchor === 'string' && body.external_anchor.trim()
+          ? body.external_anchor.trim()
+          : null;
+
+      const notesOut = [];
+      for (const f of fileList) {
+        const buf = f.buffer;
+        if (!buf?.length) continue;
+        const filename = f.originalname?.slice(0, 512) || 'file';
+        const mime = f.mimetype || 'application/octet-stream';
+        const content = await resolveNoteContentFromIngestFile(buf, filename, mime);
+
+        const r = await pool.query(
+          `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at)
+           VALUES ($1, $2, $3, $4, 'note', NULL, NULL)
+           RETURNING ${NOTE_RETURNING}`,
+          [parentId, content, externalAnchor, userId]
+        );
+        const note = r.rows[0];
+        embedNote(note.id, note.content).catch(() => {});
+
+        const ins = await pool.query(
+          `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, filename, mime_type, byte_size`,
+          [note.id, userId, filename, mime, buf.length, buf]
+        );
+        notesOut.push({ ...note, attachments: [ins.rows[0]] });
+      }
+
+      if (notesOut.length === 0) {
+        return res.status(400).json({ error: 'No valid files' });
+      }
+
+      return res.status(201).json(notesOut);
+    }
+
     const body = req.body ?? {};
     const content = typeof body.content === 'string' ? body.content : '';
     const text = content.trim();
@@ -39,35 +153,11 @@ router.post('/notes', express.json({ limit: '4mb' }), requireIngestAuth, async (
         ? body.external_anchor.trim()
         : null;
 
-    const sr = await pool.query('SELECT settings_json FROM users WHERE id = $1', [userId]);
-    const sj = sr.rows[0]?.settings_json;
-    const inboxRoot = inboxRootFromSettings(sj);
-
-    let parentId;
-    if (Object.prototype.hasOwnProperty.call(body, 'parent_id')) {
-      const p = body.parent_id;
-      if (p == null || p === '') {
-        parentId = null;
-      } else if (typeof p === 'string') {
-        parentId = p.trim() || null;
-      } else {
-        return res.status(400).json({ error: 'parent_id must be a string, null, or omitted' });
-      }
-    } else {
-      parentId = inboxRoot;
+    const parentRes = await resolveIngestParentId(userId, body);
+    if (!parentRes.ok) {
+      return res.status(parentRes.status).json({ error: parentRes.error });
     }
-
-    if (!parentId) {
-      return res.status(400).json({
-        error:
-          'No parent for new note: set Inbox root thread in Settings, or send parent_id (UUID of the note to reply under).',
-      });
-    }
-
-    const pc = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [parentId, userId]);
-    if (pc.rows.length === 0) {
-      return res.status(400).json({ error: 'parent_id not found or not yours' });
-    }
+    const { parentId } = parentRes;
 
     const r = await pool.query(
       `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at)

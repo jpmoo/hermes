@@ -614,9 +614,12 @@ export default function SettingsModal({ onClose }) {
             Set a long secret (16+ characters). Use{' '}
             <code className="settings-modal-code">Authorization: Bearer &lt;secret&gt;</code> or header{' '}
             <code className="settings-modal-code">X-Hermes-Ingest-Key</code> on requests to{' '}
-            <code className="settings-modal-code">POST …/api/ingest/notes</code> (JSON body:{' '}
+            <code className="settings-modal-code">POST …/api/ingest/notes</code> with JSON (
             <code className="settings-modal-code">content</code>, optional{' '}
-            <code className="settings-modal-code">parent_id</code>) and{' '}
+            <code className="settings-modal-code">parent_id</code>) or multipart (
+            <code className="settings-modal-code">file</code> / <code className="settings-modal-code">files</code>
+            — PDFs and images are OCR&apos;d and summarized when possible; each upload creates a note plus attachment)
+            and{' '}
             <code className="settings-modal-code">POST …/api/ingest/notes/&lt;id&gt;/attachments</code> (multipart
             field <code className="settings-modal-code">files</code>). If you omit <code className="settings-modal-code">
               parent_id

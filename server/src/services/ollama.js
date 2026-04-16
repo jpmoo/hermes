@@ -1,6 +1,8 @@
 const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/$/, '');
 const EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
 const TAG_MODEL = process.env.OLLAMA_TAG_MODEL || 'mistral';
+/** Thread summaries, ingest OCR summaries, etc. Defaults to TAG_MODEL when unset. */
+const SUMMARY_MODEL = process.env.OLLAMA_SUMMARY_MODEL || TAG_MODEL;
 
 /**
  * Nomic models are trained for asymmetric retrieval: index with search_document:,
@@ -56,11 +58,12 @@ export async function embed(text) {
 
 export async function generate(prompt, options = {}) {
   try {
+    const model = options.model ?? TAG_MODEL;
     const r = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: TAG_MODEL,
+        model,
         prompt,
         stream: false,
         options: { temperature: options.temperature ?? 0.3, num_predict: options.num_predict ?? 200 },
@@ -75,4 +78,4 @@ export async function generate(prompt, options = {}) {
   }
 }
 
-export { OLLAMA_URL, EMBED_MODEL, TAG_MODEL };
+export { OLLAMA_URL, EMBED_MODEL, TAG_MODEL, SUMMARY_MODEL };

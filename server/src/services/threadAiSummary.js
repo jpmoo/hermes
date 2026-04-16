@@ -1,5 +1,5 @@
 import pool from '../db/pool.js';
-import { generate } from './ollama.js';
+import { generate, SUMMARY_MODEL } from './ollama.js';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -463,12 +463,16 @@ ${context}
 
 Your response (summary or the honest “not enough context” message):`;
 
-  const summary = await generate(prompt, { temperature: 0.35, num_predict: 520 });
+  const summary = await generate(prompt, {
+    temperature: 0.35,
+    num_predict: 520,
+    model: SUMMARY_MODEL,
+  });
   if (!summary) {
     return {
       ok: false,
       status: 503,
-      error: 'AI summary unavailable (check the local model server and tag model env)',
+      error: 'AI summary unavailable (check the local model server and OLLAMA_SUMMARY_MODEL / OLLAMA_TAG_MODEL)',
     };
   }
 

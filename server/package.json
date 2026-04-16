@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
@@ -18,8 +21,10 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.1.1",
     "node-ical": "^0.20.1",
+    "pdf-to-img": "^6.0.0",
     "pg": "^8.13.0",
     "pgvector": "^0.2.0",
+    "tesseract.js": "^7.0.0",
     "ws": "^8.18.0",
     "zod": "^3.25.0"
   }
