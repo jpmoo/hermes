@@ -621,7 +621,9 @@ export default function SettingsModal({ onClose }) {
             — PDFs and images are OCR&apos;d and summarized when possible; each upload creates a note plus attachment)
             and{' '}
             <code className="settings-modal-code">POST …/api/ingest/notes/&lt;id&gt;/attachments</code> (multipart
-            field <code className="settings-modal-code">files</code>). If you omit <code className="settings-modal-code">
+            field <code className="settings-modal-code">files</code>
+            — if that note&apos;s body is still empty, PDFs/images get the same OCR pipeline as the main API). If you omit{' '}
+            <code className="settings-modal-code">
               parent_id
             </code>
             , new notes are created as replies under your <strong>Inbox root thread</strong> above—set that first.

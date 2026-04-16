@@ -5,7 +5,11 @@ import pool from '../db/pool.js';
 import { requireIngestAuth } from '../middleware/ingestAuth.js';
 import { embedNote } from '../services/embedding.js';
 import { MAX_BYTES } from '../services/noteFileBlobs.js';
-import { resolveNoteContentFromIngestFile } from '../services/ingestFileNoteContent.js';
+import {
+  resolveNoteContentFromIngestFile,
+  runIngestOcrPipeline,
+} from '../services/ingestFileNoteContent.js';
+import { logOcr } from '../services/ingestOcrLog.js';
 
 const router = Router();
 
@@ -177,6 +181,8 @@ router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res)
 /**
  * POST /api/ingest/notes/:id/attachments
  * Multipart field name: files (same as main API).
+ * If the note body is empty, runs the same PDF/image OCR + summary pipeline as JWT /api/notes/…/attachments
+ * (ingest is API-only — no X-Hermes-Attachment-Ocr header required).
  */
 router.post(
   '/notes/:id/attachments',
@@ -198,36 +204,67 @@ router.post(
       if (files.length === 0) {
         return res.status(400).json({ error: 'No files (use multipart field name files)' });
       }
-      const noteCheck = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [
+      const noteCheck = await pool.query('SELECT id, content FROM notes WHERE id = $1 AND user_id = $2', [
         noteId,
         userId,
       ]);
       if (noteCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Note not found' });
       }
+      const priorContent = noteCheck.rows[0]?.content;
+      const contentWasEmpty = !String(priorContent ?? '').trim();
+      const runOcr = contentWasEmpty;
+
+      if (!contentWasEmpty) {
+        logOcr('attachments_skip_ocr', { noteId, source: 'ingest', reason: 'note_already_has_content' });
+      }
+
       const inserted = [];
+      const ocrPieces = [];
+      const ocrStats = [];
       for (const f of files) {
         const buf = f.buffer;
         if (!buf?.length) continue;
+        const filename = f.originalname?.slice(0, 512) || 'file';
+        const mime = f.mimetype || 'application/octet-stream';
         const ins = await pool.query(
           `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id, filename, mime_type, byte_size`,
-          [
-            noteId,
-            userId,
-            f.originalname?.slice(0, 512) || 'file',
-            f.mimetype || 'application/octet-stream',
-            buf.length,
-            buf,
-          ]
+          [noteId, userId, filename, mime, buf.length, buf]
         );
         inserted.push(ins.rows[0]);
+        if (runOcr) {
+          const { noteText, stats } = await runIngestOcrPipeline(buf, filename, mime, {
+            source: 'ingest_attachments',
+            noteId,
+          });
+          ocrPieces.push(noteText);
+          ocrStats.push(stats);
+        }
       }
       if (inserted.length === 0) {
         return res.status(400).json({ error: 'No valid files' });
       }
-      res.status(201).json(inserted);
+
+      if (runOcr && ocrPieces.length > 0) {
+        const combined = ocrPieces
+          .map((s) => String(s ?? '').trim())
+          .filter(Boolean)
+          .join('\n\n');
+        if (combined) {
+          await pool.query('UPDATE notes SET content = $1 WHERE id = $2 AND user_id = $3', [
+            combined,
+            noteId,
+            userId,
+          ]);
+          embedNote(noteId, combined).catch(() => {});
+        }
+      }
+
+      const payload =
+        ocrStats.length > 0 ? { inserted, ocr: ocrStats } : { inserted };
+      res.status(201).json(payload);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Upload failed' });
