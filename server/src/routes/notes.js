@@ -17,6 +17,7 @@ import {
   createSpaztickExternalTask,
 } from '../services/spaztickTask.js';
 import { appendHermesLinkToNotes, buildHermesStreamUrl } from '../services/hermesNoteLink.js';
+import { resolveNoteContentFromIngestFile } from '../services/ingestFileNoteContent.js';
 
 const router = Router();
 
@@ -139,21 +140,49 @@ router.post('/:id/attachments', (req, res, next) => {
     const userId = req.userId;
     const files = req.files || [];
     if (files.length === 0) return res.status(400).json({ error: 'No files (use field name files)' });
-    const noteCheck = await pool.query('SELECT id FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+    const noteCheck = await pool.query('SELECT id, content FROM notes WHERE id = $1 AND user_id = $2', [
+      noteId,
+      userId,
+    ]);
     if (noteCheck.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+    const priorContent = noteCheck.rows[0]?.content;
+    const contentWasEmpty = !String(priorContent ?? '').trim();
+
     const inserted = [];
+    const ocrPieces = [];
     for (const f of files) {
       const buf = f.buffer;
       if (!buf?.length) continue;
+      const filename = f.originalname?.slice(0, 512) || 'file';
+      const mime = f.mimetype || 'application/octet-stream';
       const ins = await pool.query(
         `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, filename, mime_type, byte_size`,
-        [noteId, userId, f.originalname?.slice(0, 512) || 'file', f.mimetype || 'application/octet-stream', buf.length, buf]
+        [noteId, userId, filename, mime, buf.length, buf]
       );
       inserted.push(ins.rows[0]);
+      if (contentWasEmpty) {
+        ocrPieces.push(await resolveNoteContentFromIngestFile(buf, filename, mime));
+      }
     }
     if (inserted.length === 0) return res.status(400).json({ error: 'No valid files' });
+
+    if (contentWasEmpty && ocrPieces.length > 0) {
+      const combined = ocrPieces
+        .map((s) => String(s ?? '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+      if (combined) {
+        await pool.query('UPDATE notes SET content = $1 WHERE id = $2 AND user_id = $3', [
+          combined,
+          noteId,
+          userId,
+        ]);
+        embedNote(noteId, combined).catch(() => {});
+      }
+    }
+
     res.status(201).json(inserted);
   } catch (err) {
     console.error(err);
