@@ -8,9 +8,14 @@ const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.t
 const MAX_OCR_CHARS_FOR_LLM = 24000;
 /** When summarization fails but OCR succeeded, store this much raw OCR in the note (not the filename). */
 const MAX_OCR_FALLBACK_NOTE_CHARS = 12000;
+/** Below this length (after trim), skip the LLM and use OCR text as the note body. */
+const MIN_OCR_CHARS_FOR_SUMMARY = 200;
 
 const OCR_SUMMARY_PROMPT_PREFIX =
-  'You are summarizing an extracted document for a note taking app. Here is the text extracted via OCR from the document. If the text looks like gibberish or is unreadable, return only the word FAIL. If the text is meaningful, return a concise summary.\n\n---\n\n';
+  'You summarize OCR text for a note-taking app.\n' +
+  '- If the text is readable and meaningful, output ONE concise summary only (no preamble).\n' +
+  '- If it is gibberish or unreadable, output exactly the single word FAIL and nothing else—no sentences, no explanation.\n\n' +
+  'OCR text:\n\n---\n\n';
 
 /**
  * @typedef {object} IngestOcrStats
@@ -78,8 +83,18 @@ async function ocrPdfOrImage(buf, kind) {
 }
 
 function isFailResponse(s) {
-  const t = (s || '').trim().replace(/\.$/, '');
-  return t.toUpperCase() === 'FAIL';
+  const raw = String(s ?? '').trim();
+  if (!raw) return false;
+  const t = raw.replace(/\.$/, '').trim();
+  if (t.toUpperCase() === 'FAIL') return true;
+  const lower = raw.toLowerCase();
+  // Local models often reply with prose instead of a lone "FAIL".
+  if (/\bmark (?:this |it )?as\s+fail\b/i.test(raw)) return true;
+  if (/\breturn (?:only )?(?:the word )?fail\b/i.test(lower)) return true;
+  if (/\bunreadable\b.*\bfail\b/i.test(lower)) return true;
+  if (/\bgibberish\b.*\bfail\b/i.test(lower)) return true;
+  if (/\bso I will\b.*\bfail\b/i.test(lower) && /unreadable|gibberish/i.test(lower)) return true;
+  return false;
 }
 
 function noteTextFromOcrWhenLlMUnavailable(ocrText) {
@@ -134,9 +149,10 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
   }
 
   logOcrVerbose('Full OCR text', ocrText);
-  logOcr('ocr_done', { ...base, kind, ocrChars: ocrText.length });
+  const trimmedOcr = (ocrText || '').trim();
+  logOcr('ocr_done', { ...base, kind, ocrChars: trimmedOcr.length });
 
-  if (!ocrText) {
+  if (!trimmedOcr.length) {
     logOcr('pipeline_done', { ...base, kind, outcome: 'empty_ocr', noteText: 'filename_fallback' });
     return {
       noteText: filename,
@@ -144,10 +160,28 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
     };
   }
 
+  if (trimmedOcr.length < MIN_OCR_CHARS_FOR_SUMMARY) {
+    logOcr('pipeline_done', {
+      ...base,
+      kind,
+      outcome: 'short_ocr_direct',
+      ocrChars: trimmedOcr.length,
+    });
+    return {
+      noteText: trimmedOcr,
+      stats: {
+        outcome: 'short_ocr_direct',
+        kind,
+        filename,
+        ocrChars: trimmedOcr.length,
+      },
+    };
+  }
+
   const forLlm =
-    ocrText.length > MAX_OCR_CHARS_FOR_LLM
-      ? `${ocrText.slice(0, MAX_OCR_CHARS_FOR_LLM)}\n[truncated]`
-      : ocrText;
+    trimmedOcr.length > MAX_OCR_CHARS_FOR_LLM
+      ? `${trimmedOcr.slice(0, MAX_OCR_CHARS_FOR_LLM)}\n[truncated]`
+      : trimmedOcr;
   const prompt = `${OCR_SUMMARY_PROMPT_PREFIX}${forLlm}`;
 
   let summary;
@@ -159,13 +193,13 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const fallback = noteTextFromOcrWhenLlMUnavailable(ocrText);
+    const fallback = noteTextFromOcrWhenLlMUnavailable(trimmedOcr);
     logOcr('pipeline_done', {
       ...base,
       kind,
       outcome: fallback ? 'llm_threw_ocr_fallback' : 'llm_threw',
       error: msg,
-      ocrChars: ocrText.length,
+      ocrChars: trimmedOcr.length,
       noteText: fallback ? 'ocr_raw_fallback' : 'filename_fallback',
     });
     console.error('[Hermes OCR] Ingest OCR summary error:', err);
@@ -175,7 +209,7 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
         outcome: fallback ? 'llm_threw_ocr_fallback' : 'llm_threw',
         kind,
         filename,
-        ocrChars: ocrText.length,
+        ocrChars: trimmedOcr.length,
         error: msg,
       },
     };
@@ -184,12 +218,12 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
   logOcrVerbose('Raw LLM response', summary);
 
   if (!summary || !summary.trim()) {
-    const fallback = noteTextFromOcrWhenLlMUnavailable(ocrText);
+    const fallback = noteTextFromOcrWhenLlMUnavailable(trimmedOcr);
     logOcr('pipeline_done', {
       ...base,
       kind,
       outcome: fallback ? 'llm_empty_ocr_fallback' : 'llm_empty_response',
-      ocrChars: ocrText.length,
+      ocrChars: trimmedOcr.length,
       noteText: fallback ? 'ocr_raw_fallback' : 'filename_fallback',
     });
     return {
@@ -198,24 +232,27 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
         outcome: fallback ? 'llm_empty_ocr_fallback' : 'llm_empty_response',
         kind,
         filename,
-        ocrChars: ocrText.length,
+        ocrChars: trimmedOcr.length,
       },
     };
   }
 
   if (isFailResponse(summary)) {
     const lr = summary.trim();
+    const fallback = noteTextFromOcrWhenLlMUnavailable(trimmedOcr);
+    const noteText = fallback ?? filename;
+    const outcome = fallback ? 'llm_fail_ocr_fallback' : 'llm_fail';
     logOcr('pipeline_done', {
       ...base,
       kind,
-      outcome: 'llm_fail',
-      ocrChars: ocrText.length,
+      outcome,
+      ocrChars: trimmedOcr.length,
       llmReply: lr,
-      noteText: 'filename_fallback',
+      noteText: fallback ? 'ocr_raw_fallback' : 'filename_fallback',
     });
     return {
-      noteText: filename,
-      stats: { outcome: 'llm_fail', kind, filename, ocrChars: ocrText.length, llmReply: lr },
+      noteText,
+      stats: { outcome, kind, filename, ocrChars: trimmedOcr.length, llmReply: lr },
     };
   }
 
@@ -224,7 +261,7 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
     ...base,
     kind,
     outcome: 'summary',
-    ocrChars: ocrText.length,
+    ocrChars: trimmedOcr.length,
     summaryChars: trimmed.length,
   });
   return {
@@ -233,7 +270,7 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
       outcome: 'summary',
       kind,
       filename,
-      ocrChars: ocrText.length,
+      ocrChars: trimmedOcr.length,
       summaryChars: trimmed.length,
     },
   };
