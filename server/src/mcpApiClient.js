@@ -26,6 +26,8 @@ export function hermesApiFetcher(baseUrl, getToken) {
 
 /**
  * Multipart upload to POST /api/notes/:id/attachments (MCP: base64-encoded files).
+ * Resolves to the full JSON body: `{ inserted: [...] }`, and when the note had empty text,
+ * `{ inserted, ocr }` with per-file OCR outcomes (same as curl).
  * @param {string} baseUrl e.g. http://127.0.0.1:3000
  * @param {string | (() => string)} getToken JWT
  * @param {string} noteId
@@ -66,7 +68,8 @@ export async function uploadNoteAttachmentsMultipart(baseUrl, getToken, noteId, 
     fd.append('files', blob, (f.filename || 'upload').slice(0, 512));
   }
   const url = `${String(baseUrl).replace(/\/$/, '')}/api/notes/${noteId}/attachments`;
-  const headers = {};
+  // Web UI does not send this header; OCR + note fill only run when it is set (API/MCP/scripts).
+  const headers = { 'X-Hermes-Attachment-Ocr': '1' };
   if (token) headers.Authorization = `Bearer ${token}`;
   const r = await fetch(url, { method: 'POST', headers, body: fd });
   const data = await r.json().catch(() => ({}));
@@ -75,6 +78,5 @@ export async function uploadNoteAttachmentsMultipart(baseUrl, getToken, noteId, 
     e.status = r.status;
     throw e;
   }
-  if (data?.inserted && Array.isArray(data.inserted)) return data.inserted;
   return data;
 }

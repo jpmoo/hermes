@@ -136,7 +136,7 @@ A note-taking system built around conversation and tree structure. Specification
 - `GET /api/notes/roots?starred=true|false` — root feed (requires `Authorization: Bearer <token>`)
 - `GET /api/notes/thread/:id?starred=` — full thread
 - `POST /api/notes` — create note `{ content, parent_id?, external_anchor? }`
-- **`POST /api/notes/:id/attachments`** — **multipart/form-data**, field name **`files`** (one or more parts, up to 20 per request). Same as the web Stream UI. **`Authorization: Bearer <jwt>`** required. Use this for **large images/PDFs**; no base64, streams straight into Postgres. Max size per file: `HERMES_MAX_ATTACHMENT_BYTES` (default 20MB).
+- **`POST /api/notes/:id/attachments`** — **multipart/form-data**, field name **`files`** (one or more parts, up to 20 per request). Same upload shape as the web Stream UI. **`Authorization: Bearer <jwt>`** required. Use this for **large images/PDFs**; no base64, streams straight into Postgres. Max size per file: `HERMES_MAX_ATTACHMENT_BYTES` (default 20MB). **OCR + LLM note fill** (PDF/image when the note body is still empty) runs only if you send **`X-Hermes-Attachment-Ocr: 1`**. The Stream web app and MCP (`hermes_attach_files`) send it; plain `curl` must add the header yourself.
 - `PATCH /api/notes/:id` — update `{ content?, starred?, external_anchor? }`
 - `POST /api/notes/:id/star`, `DELETE /api/notes/:id/star`
 - `GET /api/tags` — tags with ≥1 **approved** use on **your** notes only (typeahead / Tags page). `DELETE /api/tags/:id` removes that tag from **your** notes only; the global tag row is deleted only if no one else still has an approved link. `GET/POST/DELETE /api/tags/relationships` only expose or mutate pairs where **both** tags are in approved use on **your** notes. `POST /api/notes/:id/tags` with **`tag_id`** (no `name`) is allowed only if the tag is already on your notes or has no approved links anywhere yet (so you can’t attach another user’s tag IDs). **`name`** continues to resolve/create by normalized name.
@@ -189,6 +189,7 @@ export TOKEN="…"   # same JWT as hermes_token / HERMES_MCP_TOKEN
 export NOTE_ID="uuid-from-step-1"
 curl -sS -X POST "${HERMES_URL}/api/notes/${NOTE_ID}/attachments" \
   -H "Authorization: Bearer ${TOKEN}" \
+  -H "X-Hermes-Attachment-Ocr: 1" \
   -F "files=@/path/to/photo.jpg"
 ```
 

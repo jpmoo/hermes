@@ -127,6 +127,12 @@ const upload = multer({
   limits: { fileSize: MAX_BYTES, files: 20 },
 });
 
+/** OCR + LLM note fill on this route is opt-in so the web UI (plain multipart) only stores files. */
+function wantsAttachmentOcrApi(req) {
+  const v = String(req.get('x-hermes-attachment-ocr') ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
 router.post('/:id/attachments', (req, res, next) => {
   upload.array('files', 20)(req, res, (err) => {
     if (err?.code === 'LIMIT_FILE_SIZE') {
@@ -148,6 +154,9 @@ router.post('/:id/attachments', (req, res, next) => {
     if (noteCheck.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
     const priorContent = noteCheck.rows[0]?.content;
     const contentWasEmpty = !String(priorContent ?? '').trim();
+    const apiWantsOcr = wantsAttachmentOcrApi(req);
+    const runOcr = contentWasEmpty && apiWantsOcr;
+
     if (!contentWasEmpty) {
       logOcr('attachments_skip_ocr', { noteId, reason: 'note_already_has_content' });
     }
@@ -167,7 +176,7 @@ router.post('/:id/attachments', (req, res, next) => {
         [noteId, userId, filename, mime, buf.length, buf]
       );
       inserted.push(ins.rows[0]);
-      if (contentWasEmpty) {
+      if (runOcr) {
         const { noteText, stats } = await runIngestOcrPipeline(buf, filename, mime, {
           source: 'attachments',
           noteId,
@@ -178,7 +187,7 @@ router.post('/:id/attachments', (req, res, next) => {
     }
     if (inserted.length === 0) return res.status(400).json({ error: 'No valid files' });
 
-    if (contentWasEmpty && ocrPieces.length > 0) {
+    if (runOcr && ocrPieces.length > 0) {
       const combined = ocrPieces
         .map((s) => String(s ?? '').trim())
         .filter(Boolean)

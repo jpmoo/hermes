@@ -328,7 +328,10 @@ export async function uploadNoteFiles(noteId, files) {
   const t = getToken();
   const r = await fetch(`${API}/notes/${noteId}/attachments`, {
     method: 'POST',
-    headers: t ? { Authorization: `Bearer ${t}` } : {},
+    headers: {
+      ...(t ? { Authorization: `Bearer ${t}` } : {}),
+      'X-Hermes-Attachment-Ocr': '1',
+    },
     body: fd,
   });
   const data = await r.json().catch(() => ({}));

@@ -14,6 +14,7 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { existsSync } from 'fs';
 import { mountMcpHttp } from './mcpHttp.js';
+import { httpRequestLog } from './middleware/httpRequestLog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -29,6 +30,8 @@ app.use((req, _res, next) => {
   }
   next();
 });
+
+app.use(httpRequestLog);
 
 // Allow Vite/React app to load (inline styles and scripts); override strict CSP from proxies
 app.use((_req, res, next) => {

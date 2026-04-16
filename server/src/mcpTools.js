@@ -319,7 +319,11 @@ export async function callTool(ctx, req) {
           path_pattern: '/api/notes/{note_id}/attachments',
           multipart_form_field: 'files',
           headers: { Authorization: 'Bearer <same JWT as Hermes web app / HERMES_MCP_TOKEN>' },
-          curl_example: `curl -X POST "BASE${pathSuffix}" -H "Authorization: Bearer TOKEN" -F "files=@/path/to/file.jpg"`,
+          curl_example: `curl -X POST "BASE${pathSuffix}" -H "Authorization: Bearer TOKEN" -H "X-Hermes-Attachment-Ocr: 1" -F "files=@/path/to/file.jpg"`,
+          ocr_opt_in_header:
+            'Send X-Hermes-Attachment-Ocr: 1 to run OCR/summary into an empty note (the web app and MCP send it; curl must include the header).',
+          response_json:
+            'JSON body: { inserted: [...] }. If OCR ran, also ocr: [{ outcome, kind, filename, ocrChars, ... }].',
           url_examples: {
             web_app_typical:
               'If the Hermes UI is at https://HOST/hermes/ then the API is usually https://HOST/hermes/api/notes/{note_id}/attachments',

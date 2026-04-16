@@ -4,3 +4,5 @@ node_modules/
 app/dist/
 client/dist/
 .DS_Store
+# Tesseract.js may download eng.traineddata next to cwd during dev
+*.traineddata

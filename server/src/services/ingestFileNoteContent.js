@@ -6,6 +6,8 @@ import { logOcr, logOcrVerbose } from './ingestOcrLog.js';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff']);
 const MAX_OCR_CHARS_FOR_LLM = 24000;
+/** When summarization fails but OCR succeeded, store this much raw OCR in the note (not the filename). */
+const MAX_OCR_FALLBACK_NOTE_CHARS = 12000;
 
 const OCR_SUMMARY_PROMPT_PREFIX =
   'You are summarizing an extracted document for a note taking app. Here is the text extracted via OCR from the document. If the text looks like gibberish or is unreadable, return only the word FAIL. If the text is meaningful, return a concise summary.\n\n---\n\n';
@@ -80,6 +82,13 @@ function isFailResponse(s) {
   return t.toUpperCase() === 'FAIL';
 }
 
+function noteTextFromOcrWhenLlMUnavailable(ocrText) {
+  const t = (ocrText || '').trim();
+  if (t.length === 0) return null;
+  if (t.length <= MAX_OCR_FALLBACK_NOTE_CHARS) return t;
+  return `${t.slice(0, MAX_OCR_FALLBACK_NOTE_CHARS)}\n\n[OCR truncated…]`;
+}
+
 /**
  * @param {Buffer} buf
  * @param {string} rawFilename
@@ -150,32 +159,47 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    const fallback = noteTextFromOcrWhenLlMUnavailable(ocrText);
     logOcr('pipeline_done', {
       ...base,
       kind,
-      outcome: 'llm_threw',
+      outcome: fallback ? 'llm_threw_ocr_fallback' : 'llm_threw',
       error: msg,
+      ocrChars: ocrText.length,
+      noteText: fallback ? 'ocr_raw_fallback' : 'filename_fallback',
     });
     console.error('[Hermes OCR] Ingest OCR summary error:', err);
     return {
-      noteText: filename,
-      stats: { outcome: 'llm_threw', kind, filename, ocrChars: ocrText.length, error: msg },
+      noteText: fallback ?? filename,
+      stats: {
+        outcome: fallback ? 'llm_threw_ocr_fallback' : 'llm_threw',
+        kind,
+        filename,
+        ocrChars: ocrText.length,
+        error: msg,
+      },
     };
   }
 
   logOcrVerbose('Raw LLM response', summary);
 
   if (!summary || !summary.trim()) {
+    const fallback = noteTextFromOcrWhenLlMUnavailable(ocrText);
     logOcr('pipeline_done', {
       ...base,
       kind,
-      outcome: 'llm_empty_response',
+      outcome: fallback ? 'llm_empty_ocr_fallback' : 'llm_empty_response',
       ocrChars: ocrText.length,
-      noteText: 'filename_fallback',
+      noteText: fallback ? 'ocr_raw_fallback' : 'filename_fallback',
     });
     return {
-      noteText: filename,
-      stats: { outcome: 'llm_empty_response', kind, filename, ocrChars: ocrText.length },
+      noteText: fallback ?? filename,
+      stats: {
+        outcome: fallback ? 'llm_empty_ocr_fallback' : 'llm_empty_response',
+        kind,
+        filename,
+        ocrChars: ocrText.length,
+      },
     };
   }
 
