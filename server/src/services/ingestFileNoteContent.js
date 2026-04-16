@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { pdf } from 'pdf-to-img';
 import Tesseract from 'tesseract.js';
-import { generate, SUMMARY_MODEL } from './ollama.js';
+import { generate, SUMMARY_MODEL, transcribeImageWithVisionOcr, OCR_VISION_MODEL } from './ollama.js';
 import { logOcr, logOcrVerbose } from './ingestOcrLog.js';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff']);
@@ -43,6 +43,14 @@ function classifyIngestFileKind(filename, mimetype) {
   return null;
 }
 
+/** JPEG/PNG: use Ollama vision OCR (GLM-OCR). Other image types still use Tesseract. */
+function isJpegOrPng(filename, mimetype) {
+  const ext = path.extname(filename || '').toLowerCase();
+  if (ext === '.jpg' || ext === '.jpeg' || ext === '.png') return true;
+  const mt = (mimetype || '').toLowerCase();
+  return mt === 'image/jpeg' || mt === 'image/jpg' || mt === 'image/png';
+}
+
 async function tesseractFromImageBuffer(buf) {
   const {
     data: { text },
@@ -50,6 +58,29 @@ async function tesseractFromImageBuffer(buf) {
     logger: () => {},
   });
   return (text || '').trim();
+}
+
+/**
+ * @param {Buffer} buf
+ * @param {string} filename
+ * @param {string} [mimetype]
+ */
+async function ocrImageBuffer(buf, filename, mimetype) {
+  if (isJpegOrPng(filename, mimetype)) {
+    logOcr('vision_ocr_start', { filename, model: OCR_VISION_MODEL });
+    try {
+      const text = await transcribeImageWithVisionOcr(buf);
+      logOcr('vision_ocr_done', { filename, ocrChars: text.length });
+      return text;
+    } catch (err) {
+      console.error('[Hermes OCR] Vision OCR failed, using Tesseract:', err.message);
+      logOcr('vision_ocr_fallback_tesseract', {
+        filename,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return tesseractFromImageBuffer(buf);
 }
 
 /**
@@ -73,11 +104,13 @@ async function ocrPdfBuffer(buf) {
 /**
  * @param {Buffer} buf
  * @param {'pdf' | 'image'} kind
+ * @param {string} filename
+ * @param {string} [mimetype]
  * @returns {Promise<string>}
  */
-async function ocrPdfOrImage(buf, kind) {
+async function ocrPdfOrImage(buf, kind, filename, mimetype) {
   if (kind === 'image') {
-    return tesseractFromImageBuffer(buf);
+    return ocrImageBuffer(buf, filename, mimetype);
   }
   return ocrPdfBuffer(buf);
 }
@@ -132,7 +165,7 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
 
   let ocrText = '';
   try {
-    ocrText = await ocrPdfOrImage(buf, kind);
+    ocrText = await ocrPdfOrImage(buf, kind, filename, mimetype);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logOcr('pipeline_done', {
