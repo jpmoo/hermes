@@ -75,5 +75,6 @@ export async function uploadNoteAttachmentsMultipart(baseUrl, getToken, noteId, 
     e.status = r.status;
     throw e;
   }
+  if (data?.inserted && Array.isArray(data.inserted)) return data.inserted;
   return data;
 }

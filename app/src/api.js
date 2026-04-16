@@ -333,7 +333,9 @@ export async function uploadNoteFiles(noteId, files) {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Upload failed');
-  return Array.isArray(data) ? data : [];
+  if (Array.isArray(data)) return data;
+  if (data?.inserted && Array.isArray(data.inserted)) return data.inserted;
+  return [];
 }
 
 export async function deleteNoteFile(attachmentId) {

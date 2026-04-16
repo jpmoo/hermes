@@ -17,7 +17,8 @@ import {
   createSpaztickExternalTask,
 } from '../services/spaztickTask.js';
 import { appendHermesLinkToNotes, buildHermesStreamUrl } from '../services/hermesNoteLink.js';
-import { resolveNoteContentFromIngestFile } from '../services/ingestFileNoteContent.js';
+import { runIngestOcrPipeline } from '../services/ingestFileNoteContent.js';
+import { logOcr } from '../services/ingestOcrLog.js';
 
 const router = Router();
 
@@ -147,9 +148,13 @@ router.post('/:id/attachments', (req, res, next) => {
     if (noteCheck.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
     const priorContent = noteCheck.rows[0]?.content;
     const contentWasEmpty = !String(priorContent ?? '').trim();
+    if (!contentWasEmpty) {
+      logOcr('attachments_skip_ocr', { noteId, reason: 'note_already_has_content' });
+    }
 
     const inserted = [];
     const ocrPieces = [];
+    const ocrStats = [];
     for (const f of files) {
       const buf = f.buffer;
       if (!buf?.length) continue;
@@ -163,7 +168,12 @@ router.post('/:id/attachments', (req, res, next) => {
       );
       inserted.push(ins.rows[0]);
       if (contentWasEmpty) {
-        ocrPieces.push(await resolveNoteContentFromIngestFile(buf, filename, mime));
+        const { noteText, stats } = await runIngestOcrPipeline(buf, filename, mime, {
+          source: 'attachments',
+          noteId,
+        });
+        ocrPieces.push(noteText);
+        ocrStats.push(stats);
       }
     }
     if (inserted.length === 0) return res.status(400).json({ error: 'No valid files' });
@@ -183,7 +193,9 @@ router.post('/:id/attachments', (req, res, next) => {
       }
     }
 
-    res.status(201).json(inserted);
+    const payload =
+      ocrStats.length > 0 ? { inserted, ocr: ocrStats } : { inserted };
+    res.status(201).json(payload);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Upload failed' });

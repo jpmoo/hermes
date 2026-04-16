@@ -118,7 +118,7 @@ router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res)
         if (!buf?.length) continue;
         const filename = f.originalname?.slice(0, 512) || 'file';
         const mime = f.mimetype || 'application/octet-stream';
-        const content = await resolveNoteContentFromIngestFile(buf, filename, mime);
+        const content = await resolveNoteContentFromIngestFile(buf, filename, mime, { source: 'ingest' });
 
         const r = await pool.query(
           `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at)

@@ -2,12 +2,24 @@ import path from 'node:path';
 import { pdf } from 'pdf-to-img';
 import Tesseract from 'tesseract.js';
 import { generate, SUMMARY_MODEL } from './ollama.js';
+import { logOcr, logOcrVerbose } from './ingestOcrLog.js';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff']);
 const MAX_OCR_CHARS_FOR_LLM = 24000;
 
 const OCR_SUMMARY_PROMPT_PREFIX =
   'You are summarizing an extracted document for a note taking app. Here is the text extracted via OCR from the document. If the text looks like gibberish or is unreadable, return only the word FAIL. If the text is meaningful, return a concise summary.\n\n---\n\n';
+
+/**
+ * @typedef {object} IngestOcrStats
+ * @property {string} outcome
+ * @property {'pdf' | 'image' | null} [kind]
+ * @property {string} filename
+ * @property {number} [ocrChars]
+ * @property {number} [summaryChars]
+ * @property {string} [error]
+ * @property {string} [llmReply]
+ */
 
 /**
  * @param {string} filename
@@ -39,9 +51,13 @@ async function tesseractFromImageBuffer(buf) {
  */
 async function ocrPdfBuffer(buf) {
   const doc = await pdf(buf, { scale: 2 });
+  logOcr('pdf_rendered', { pageCount: doc.length });
   const parts = [];
+  let pageIndex = 0;
   for await (const pageBuf of doc) {
+    pageIndex += 1;
     const t = await tesseractFromImageBuffer(pageBuf);
+    logOcrVerbose(`PDF page ${pageIndex} OCR`, t);
     if (t) parts.push(t);
   }
   return parts.join('\n\n').trim();
@@ -68,25 +84,55 @@ function isFailResponse(s) {
  * @param {Buffer} buf
  * @param {string} rawFilename
  * @param {string} [mimetype]
- * @returns {Promise<string>} Note body text (filename fallback or summary).
+ * @param {{ source?: string, noteId?: string }} [ctx]
+ * @returns {Promise<{ noteText: string, stats: IngestOcrStats }>}
  */
-export async function resolveNoteContentFromIngestFile(buf, rawFilename, mimetype) {
+export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {}) {
   const filename = typeof rawFilename === 'string' && rawFilename.trim() ? rawFilename.trim() : 'file';
+  const base = {
+    source: ctx.source || 'unknown',
+    noteId: ctx.noteId || null,
+    filename,
+    mimeType: mimetype || null,
+    bytes: buf?.length ?? 0,
+  };
+
   const kind = classifyIngestFileKind(filename, mimetype);
   if (!kind) {
-    return filename;
+    const stats = { outcome: 'skipped_not_pdf_or_image', kind: null, filename };
+    logOcr('pipeline_done', { ...base, ...stats });
+    return { noteText: filename, stats };
   }
+
+  logOcr('pipeline_start', { ...base, kind, summaryModel: SUMMARY_MODEL });
 
   let ocrText = '';
   try {
     ocrText = await ocrPdfOrImage(buf, kind);
   } catch (err) {
-    console.error('Ingest OCR error:', err.message);
-    return filename;
+    const msg = err instanceof Error ? err.message : String(err);
+    logOcr('pipeline_done', {
+      ...base,
+      kind,
+      outcome: 'ocr_threw',
+      error: msg,
+    });
+    console.error('[Hermes OCR] Ingest OCR error:', err);
+    return {
+      noteText: filename,
+      stats: { outcome: 'ocr_threw', kind, filename, error: msg },
+    };
   }
 
+  logOcrVerbose('Full OCR text', ocrText);
+  logOcr('ocr_done', { ...base, kind, ocrChars: ocrText.length });
+
   if (!ocrText) {
-    return filename;
+    logOcr('pipeline_done', { ...base, kind, outcome: 'empty_ocr', noteText: 'filename_fallback' });
+    return {
+      noteText: filename,
+      stats: { outcome: 'empty_ocr', kind, filename, ocrChars: 0 },
+    };
   }
 
   const forLlm =
@@ -103,13 +149,80 @@ export async function resolveNoteContentFromIngestFile(buf, rawFilename, mimetyp
       num_predict: 520,
     });
   } catch (err) {
-    console.error('Ingest OCR summary error:', err.message);
-    return filename;
+    const msg = err instanceof Error ? err.message : String(err);
+    logOcr('pipeline_done', {
+      ...base,
+      kind,
+      outcome: 'llm_threw',
+      error: msg,
+    });
+    console.error('[Hermes OCR] Ingest OCR summary error:', err);
+    return {
+      noteText: filename,
+      stats: { outcome: 'llm_threw', kind, filename, ocrChars: ocrText.length, error: msg },
+    };
   }
 
-  if (!summary || !summary.trim() || isFailResponse(summary)) {
-    return filename;
+  logOcrVerbose('Raw LLM response', summary);
+
+  if (!summary || !summary.trim()) {
+    logOcr('pipeline_done', {
+      ...base,
+      kind,
+      outcome: 'llm_empty_response',
+      ocrChars: ocrText.length,
+      noteText: 'filename_fallback',
+    });
+    return {
+      noteText: filename,
+      stats: { outcome: 'llm_empty_response', kind, filename, ocrChars: ocrText.length },
+    };
   }
 
-  return summary.trim();
+  if (isFailResponse(summary)) {
+    const lr = summary.trim();
+    logOcr('pipeline_done', {
+      ...base,
+      kind,
+      outcome: 'llm_fail',
+      ocrChars: ocrText.length,
+      llmReply: lr,
+      noteText: 'filename_fallback',
+    });
+    return {
+      noteText: filename,
+      stats: { outcome: 'llm_fail', kind, filename, ocrChars: ocrText.length, llmReply: lr },
+    };
+  }
+
+  const trimmed = summary.trim();
+  logOcr('pipeline_done', {
+    ...base,
+    kind,
+    outcome: 'summary',
+    ocrChars: ocrText.length,
+    summaryChars: trimmed.length,
+  });
+  return {
+    noteText: trimmed,
+    stats: {
+      outcome: 'summary',
+      kind,
+      filename,
+      ocrChars: ocrText.length,
+      summaryChars: trimmed.length,
+    },
+  };
+}
+
+/**
+ * @param {Buffer} buf
+ * @param {string} rawFilename
+ * @param {string} [mimetype]
+ * @param {{ source?: string, noteId?: string }} [ctx]
+ * @returns {Promise<string>} Note body text (filename fallback or summary).
+ */
+export async function resolveNoteContentFromIngestFile(buf, rawFilename, mimetype, ctx = {}) {
+  const { noteText } = await runIngestOcrPipeline(buf, rawFilename, mimetype, ctx);
+  return noteText;
 }
