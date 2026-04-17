@@ -646,10 +646,12 @@ export default function StreamPage() {
         .then((rows) => {
           setThread(rows);
           if (rows.length === 0) setSearchParams({});
+          return rows;
         })
         .catch(() => {
           setThread([]);
           setSearchParams({});
+          return null;
         })
         .finally(() => {
           if (!soft) setLoadingThread(false);
@@ -1160,7 +1162,7 @@ export default function StreamPage() {
           parentIdToFocus = row.parent_id;
         }
       }
-      loadThread(true).then(() => {
+      loadThread(true).then((rows) => {
         loadRoots();
         if (parentIdToFocus != null) {
           applyFocusImmediate(parentIdToFocus);

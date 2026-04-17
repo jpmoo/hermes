@@ -403,7 +403,7 @@ export default function NoteCard({
     const el = raw instanceof Element ? raw : raw?.parentElement;
     return Boolean(
       el?.closest(
-        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn'
+        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments'
       )
     );
   }, []);
