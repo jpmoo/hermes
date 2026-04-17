@@ -19,6 +19,7 @@ import {
 import { appendHermesLinkToNotes, buildHermesStreamUrl } from '../services/hermesNoteLink.js';
 import { runIngestOcrPipeline } from '../services/ingestFileNoteContent.js';
 import { logOcr } from '../services/ingestOcrLog.js';
+import { proposeTagsForNote } from '../services/aiTags.js';
 
 const router = Router();
 
@@ -199,6 +200,7 @@ router.post('/:id/attachments', (req, res, next) => {
           userId,
         ]);
         embedNote(noteId, combined).catch(() => {});
+        proposeTagsForNote(noteId, combined, userId).catch(() => {});
       }
     }
 

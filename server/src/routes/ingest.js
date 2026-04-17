@@ -10,6 +10,7 @@ import {
   runIngestOcrPipeline,
 } from '../services/ingestFileNoteContent.js';
 import { logOcr } from '../services/ingestOcrLog.js';
+import { proposeTagsForNote } from '../services/aiTags.js';
 
 const router = Router();
 
@@ -132,6 +133,7 @@ router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res)
         );
         const note = r.rows[0];
         embedNote(note.id, note.content).catch(() => {});
+        proposeTagsForNote(note.id, note.content, userId).catch(() => {});
 
         const ins = await pool.query(
           `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
@@ -259,6 +261,7 @@ router.post(
             userId,
           ]);
           embedNote(noteId, combined).catch(() => {});
+          proposeTagsForNote(noteId, combined, userId).catch(() => {});
         }
       }
 

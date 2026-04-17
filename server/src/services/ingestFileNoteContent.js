@@ -1,7 +1,12 @@
 import path from 'node:path';
 import { pdf } from 'pdf-to-img';
 import Tesseract from 'tesseract.js';
-import { generate, SUMMARY_MODEL, transcribeImageWithVisionOcr, OCR_VISION_MODEL } from './ollama.js';
+import {
+  generate,
+  TAG_MODEL,
+  transcribeImageWithVisionOcr,
+  OCR_VISION_MODEL,
+} from './ollama.js';
 import { logOcr, logOcrVerbose } from './ingestOcrLog.js';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff']);
@@ -161,7 +166,7 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
     return { noteText: filename, stats };
   }
 
-  logOcr('pipeline_start', { ...base, kind, summaryModel: SUMMARY_MODEL });
+  logOcr('pipeline_start', { ...base, kind, ocrSummaryModel: TAG_MODEL });
 
   let ocrText = '';
   try {
@@ -193,6 +198,7 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
     };
   }
 
+  // Short text from OCR (PDF or image): use as-is; do not call the tag model.
   if (trimmedOcr.length < MIN_OCR_CHARS_FOR_SUMMARY) {
     logOcr('pipeline_done', {
       ...base,
@@ -220,7 +226,7 @@ export async function runIngestOcrPipeline(buf, rawFilename, mimetype, ctx = {})
   let summary;
   try {
     summary = await generate(prompt, {
-      model: SUMMARY_MODEL,
+      model: TAG_MODEL,
       temperature: 0.3,
       num_predict: 520,
     });
