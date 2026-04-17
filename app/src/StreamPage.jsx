@@ -384,8 +384,8 @@ function StreamList({
   threadById,
   /** When true, up-to-root exit owns motion — inline stagger delays must not override it. */
   exitToRoot = false,
-  /** Drilled below thread root: omit delete on the visible head note (depth 0) only. */
-  hideDeleteOnStreamHead = false,
+  /** Hide delete on the NoteCard for this note id at list depth 0 (stream focus target). */
+  streamFocusHideDeleteId = null,
 }) {
   return (
     <>
@@ -420,7 +420,11 @@ function StreamList({
               note={n}
               depth={depth}
               hideStar={depth === 0}
-              hideDelete={hideDeleteOnStreamHead && depth === 0}
+              hideDelete={
+                streamFocusHideDeleteId != null &&
+                depth === 0 &&
+                noteIdEq(n.id, streamFocusHideDeleteId)
+              }
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
               drillOnSingleClick
@@ -444,7 +448,7 @@ function StreamList({
                   staggerDelays={staggerDelays}
                   levelDropDelays={levelDropDelays}
                   exitToRoot={exitToRoot}
-                  hideDeleteOnStreamHead={hideDeleteOnStreamHead}
+                  streamFocusHideDeleteId={streamFocusHideDeleteId}
                 />
               </ul>
             )}
@@ -736,11 +740,6 @@ export default function StreamPage() {
     }
     return pinnedTree;
   }, [pinnedTree, focusForDisplay, actualRootId]);
-  /** Match drill UI: one top-level card that is not the thread root → hide delete on that head. */
-  const hideDeleteOnStreamHead = useMemo(() => {
-    if (!actualRootId || displayTree.length !== 1) return false;
-    return !noteIdEq(displayTree[0].id, actualRootId);
-  }, [displayTree, actualRootId]);
   const summaryVisibleIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
   const summaryFocusNoteId =
     focusForDisplay && actualRootId && !noteIdEq(focusForDisplay, actualRootId)
@@ -1654,7 +1653,13 @@ export default function StreamPage() {
               depth={typeof floatOpen.depth === 'number' ? floatOpen.depth : 0}
               hideStar={typeof floatOpen.depth === 'number' ? floatOpen.depth === 0 : true}
               hideDelete={
-                Boolean(threadRootId && floatOpen.note && !noteIdEq(floatOpen.note.id, actualRootId))
+                Boolean(
+                  threadRootId &&
+                    floatOpen.note &&
+                    (!noteIdEq(floatOpen.note.id, actualRootId) ||
+                      (focusForDisplay != null &&
+                        noteIdEq(floatOpen.note.id, focusForDisplay)))
+                )
               }
               hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
               hoverInsightEnabled
@@ -1720,7 +1725,7 @@ export default function StreamPage() {
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
                       exitToRoot={branchHeadExiting}
-                      hideDeleteOnStreamHead={hideDeleteOnStreamHead}
+                      streamFocusHideDeleteId={focusForDisplay}
                     />
                   </ul>
                 </div>
