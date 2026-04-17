@@ -515,6 +515,8 @@ export default function StreamPage() {
   const [submitting, setSubmitting] = useState(false);
   const [composeExpanded, setComposeExpanded] = useState(false);
   const [focusId, setFocusId] = useState(null);
+  /** Animated drill target until `focusId` / URL catch up (avoids stale `focus` param vs state). */
+  const [drillPendingFocusId, setDrillPendingFocusId] = useState(null);
 
   const rootFileRef = useRef(null);
   const replyFileRef = useRef(null);
@@ -692,6 +694,7 @@ export default function StreamPage() {
       loadRoots();
       setThread([]);
       setFocusId(null);
+      setDrillPendingFocusId(null);
       setReplyStagger(false);
       if (floatTimerRef.current) {
         clearTimeout(floatTimerRef.current);
@@ -715,6 +718,7 @@ export default function StreamPage() {
   useEffect(() => {
     focusFromUrlApplied.current = '';
     setFocusId(null);
+    setDrillPendingFocusId(null);
   }, [threadRootId]);
 
   const threadReady = Boolean(threadRootId && !loadingThread && thread.length > 0);
@@ -730,8 +734,10 @@ export default function StreamPage() {
   }, [roots, visibleNoteTypes]);
   /** URL `thread` is the canonical root; do not use `thread[0]` (API orders by created_at, not tree root). */
   const actualRootId = threadRootId;
-  /** URL `focus` can lead React state by a tick; keep tree + chrome aligned with what the user sees. */
+  /** URL `focus` can lead state by a tick; `displayTree` must not use drill-pending (would skip drill animation). */
   const focusForDisplay = focusId ?? focusParam;
+  /** Includes pending drill target so delete hides on the head during/after animated drill when URL lags. */
+  const focusForHideDelete = focusId ?? focusParam ?? drillPendingFocusId;
   const displayTree = useMemo(() => {
     const fn =
       focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
@@ -747,6 +753,14 @@ export default function StreamPage() {
       : null;
   const focusedNode =
     focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
+
+  useEffect(() => {
+    if (drillPendingFocusId == null) return;
+    const match =
+      (focusId != null && noteIdEq(focusId, drillPendingFocusId)) ||
+      (focusParam != null && noteIdEq(focusParam, drillPendingFocusId));
+    if (match) setDrillPendingFocusId(null);
+  }, [focusId, focusParam, drillPendingFocusId]);
 
   useEffect(() => {
     if (!threadReady || !focusParam || !thread.length) return;
@@ -774,6 +788,7 @@ export default function StreamPage() {
     const t = row.note_type || 'note';
     if (!visibleNoteTypes.has(t)) {
       setFocusId(null);
+      setDrillPendingFocusId(null);
       setSearchParams({ thread: threadRootId });
     }
   }, [focusId, thread, threadRootId, visibleNoteTypes, setSearchParams]);
@@ -788,6 +803,7 @@ export default function StreamPage() {
     if (!inThread) {
       focusFromUrlApplied.current = '';
       setFocusId(null);
+      setDrillPendingFocusId(null);
       setSearchParams({ thread: threadRootId });
       return;
     }
@@ -796,6 +812,7 @@ export default function StreamPage() {
     if (findNode(pinnedTree, focusId)) return;
     focusFromUrlApplied.current = '';
     setFocusId(null);
+    setDrillPendingFocusId(null);
     setSearchParams({ thread: threadRootId });
   }, [threadRootId, focusId, pinnedTree, treeFull, thread, tree.length, setSearchParams]);
 
@@ -854,6 +871,7 @@ export default function StreamPage() {
       flushSync(() => {
         setSearchParams({ thread: rootId });
         setFocusId(null);
+        setDrillPendingFocusId(null);
       });
       setStreamScrollIntent({ kind: 'note', id: rootId, block: 'start' });
     },
@@ -909,6 +927,7 @@ export default function StreamPage() {
         flushSync(() => {
           setSearchParams({ thread: rootId });
           setFocusId(null);
+          setDrillPendingFocusId(null);
         });
         setStreamScrollIntent({ kind: 'note', id: rootId, block: 'start' });
       }, 480);
@@ -921,6 +940,7 @@ export default function StreamPage() {
     setTimeout(() => {
       setSearchParams({});
       setFocusId(null);
+      setDrillPendingFocusId(null);
       setThreadExiting(false);
       setReplyStagger(false);
       loadRoots();
@@ -947,6 +967,7 @@ export default function StreamPage() {
       setBranchHeadExiting(false);
       flushSync(() => {
         setFocusId(null);
+        setDrillPendingFocusId(null);
         setSearchParams({ thread: threadRootId });
       });
       setStreamScrollIntent({ kind: 'note', id: actualRootId, block: 'start' });
@@ -965,6 +986,7 @@ export default function StreamPage() {
       return;
     }
     levelNavBusyRef.current = true;
+    setDrillPendingFocusId(null);
     // Do not clear focusFromUrlApplied here — the URL sync effect would re-run with a stale
     // focus= param (still the child) before React Router updates, resetting focusId and breaking scroll.
     const leavingHeadId = focusId;
@@ -1145,6 +1167,7 @@ export default function StreamPage() {
 
   const applyFocusImmediate = useCallback(
     (id) => {
+      setDrillPendingFocusId(null);
       if (threadRootId) {
         if (id && !noteIdEq(id, actualRootId)) {
           setStreamScrollIntent({ kind: 'note', id, block: 'start' });
@@ -1242,6 +1265,7 @@ export default function StreamPage() {
         ...row,
         reply_count: node?.children?.length ?? row.reply_count ?? 0,
       };
+      setDrillPendingFocusId(id);
       setFloatOpen({
         note,
         depth: streamReplyDepthFromLi(targetLi),
@@ -1301,6 +1325,7 @@ export default function StreamPage() {
         } else {
           flushSync(() => {
             setFocusId(null);
+            setDrillPendingFocusId(null);
             setSearchParams({ thread: threadRootId });
           });
           setStreamScrollIntent({ kind: 'note', id: actualRootId, block: 'start' });
@@ -1657,8 +1682,8 @@ export default function StreamPage() {
                   threadRootId &&
                     floatOpen.note &&
                     (!noteIdEq(floatOpen.note.id, actualRootId) ||
-                      (focusForDisplay != null &&
-                        noteIdEq(floatOpen.note.id, focusForDisplay)))
+                      (focusForHideDelete != null &&
+                        noteIdEq(floatOpen.note.id, focusForHideDelete)))
                 )
               }
               hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
@@ -1725,7 +1750,7 @@ export default function StreamPage() {
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
                       exitToRoot={branchHeadExiting}
-                      streamFocusHideDeleteId={focusForDisplay}
+                      streamFocusHideDeleteId={focusForHideDelete}
                     />
                   </ul>
                 </div>
