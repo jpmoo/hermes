@@ -243,6 +243,23 @@ export default function NoteCard({
     e.preventDefault();
     e.stopPropagation();
     if (!window.confirm('Delete this note and all its replies? This cannot be undone.')) return;
+    const subCount = effectiveDescendantCount(note);
+    if (
+      subCount > 0 &&
+      !window.confirm(
+        `This will also delete ${subCount} subnote${subCount === 1 ? '' : 's'}. Are you sure?`
+      )
+    ) {
+      return;
+    }
+    if (
+      note.parent_id == null &&
+      !window.confirm(
+        'This is a root note: deleting it removes the entire thread starting from this note (including all nested replies). This cannot be undone.'
+      )
+    ) {
+      return;
+    }
     try {
       await deleteNote(note.id);
       onNoteDelete?.(note.id);
