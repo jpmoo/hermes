@@ -70,6 +70,16 @@ function noteIdEq(a, b) {
   return String(a) === String(b);
 }
 
+/** `useSearchParams` can lag `flushSync` + `setSearchParams`; read the real bar URL for focus. */
+function getFocusIdFromLocation() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return new URLSearchParams(window.location.search).get('focus')?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 function findNode(nodes, id) {
   for (const n of nodes) {
     if (noteIdEq(n.id, id)) return n;
@@ -736,8 +746,6 @@ export default function StreamPage() {
   const actualRootId = threadRootId;
   /** URL `focus` can lead state by a tick; `displayTree` must not use drill-pending (would skip drill animation). */
   const focusForDisplay = focusId ?? focusParam;
-  /** Includes pending drill target so delete hides on the head during/after animated drill when URL lags. */
-  const focusForHideDelete = focusId ?? focusParam ?? drillPendingFocusId;
   const displayTree = useMemo(() => {
     const fn =
       focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
@@ -753,6 +761,18 @@ export default function StreamPage() {
       : null;
   const focusedNode =
     focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
+
+  /**
+   * Stream head must never show delete (PERIOD). Merge every focus source + bar URL + single-head
+   * display (only one top-level card ⇒ that card is the head).
+   */
+  const streamHeadHideDeleteId = useMemo(() => {
+    const urlFocus = focusParam ?? getFocusIdFromLocation();
+    const merged = focusId ?? drillPendingFocusId ?? urlFocus;
+    if (merged != null) return merged;
+    if (displayTree.length === 1) return displayTree[0].id;
+    return null;
+  }, [focusId, focusParam, drillPendingFocusId, displayTree, searchParams]);
 
   useEffect(() => {
     if (drillPendingFocusId == null) return;
@@ -1681,9 +1701,8 @@ export default function StreamPage() {
                 Boolean(
                   threadRootId &&
                     floatOpen.note &&
-                    (!noteIdEq(floatOpen.note.id, actualRootId) ||
-                      (focusForHideDelete != null &&
-                        noteIdEq(floatOpen.note.id, focusForHideDelete)))
+                    streamHeadHideDeleteId != null &&
+                    noteIdEq(floatOpen.note.id, streamHeadHideDeleteId)
                 )
               }
               hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
@@ -1750,7 +1769,7 @@ export default function StreamPage() {
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
                       exitToRoot={branchHeadExiting}
-                      streamFocusHideDeleteId={focusForHideDelete}
+                      streamFocusHideDeleteId={streamHeadHideDeleteId}
                     />
                   </ul>
                 </div>
