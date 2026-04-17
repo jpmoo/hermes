@@ -726,17 +726,28 @@ export default function StreamPage() {
   }, [roots, visibleNoteTypes]);
   /** URL `thread` is the canonical root; do not use `thread[0]` (API orders by created_at, not tree root). */
   const actualRootId = threadRootId;
+  /** URL `focus` can lead React state by a tick; keep tree + chrome aligned with what the user sees. */
+  const focusForDisplay = focusId ?? focusParam;
   const displayTree = useMemo(() => {
-    const fn = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
-    if (fn && !noteIdEq(focusId, actualRootId)) {
+    const fn =
+      focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
+    if (fn && !noteIdEq(focusForDisplay, actualRootId)) {
       return [{ ...fn, children: fn.children || [] }];
     }
     return pinnedTree;
-  }, [pinnedTree, focusId, actualRootId]);
+  }, [pinnedTree, focusForDisplay, actualRootId]);
+  /** Match drill UI: one top-level card that is not the thread root → hide delete on that head. */
+  const hideDeleteOnStreamHead = useMemo(() => {
+    if (!actualRootId || displayTree.length !== 1) return false;
+    return !noteIdEq(displayTree[0].id, actualRootId);
+  }, [displayTree, actualRootId]);
   const summaryVisibleIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
   const summaryFocusNoteId =
-    focusId && actualRootId && !noteIdEq(focusId, actualRootId) ? focusId : null;
-  const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
+    focusForDisplay && actualRootId && !noteIdEq(focusForDisplay, actualRootId)
+      ? focusForDisplay
+      : null;
+  const focusedNode =
+    focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
 
   useEffect(() => {
     if (!threadReady || !focusParam || !thread.length) return;
@@ -1189,7 +1200,10 @@ export default function StreamPage() {
         applyFocusImmediate(id);
         return;
       }
-      const displayRoot = focusId && !noteIdEq(focusId, actualRootId) ? focusId : actualRootId;
+      const displayRoot =
+        focusForDisplay && !noteIdEq(focusForDisplay, actualRootId)
+          ? focusForDisplay
+          : actualRootId;
       const idx = fullPath.findIndex((x) => noteIdEq(x, displayRoot));
       const drillPath = idx >= 0 ? fullPath.slice(idx) : fullPath;
       if (drillPath.length < 2) {
@@ -1271,7 +1285,7 @@ export default function StreamPage() {
       displayTree,
       pinnedTree,
       actualRootId,
-      focusId,
+      focusForDisplay,
       threadRootId,
       applyFocusImmediate,
       setSearchParams,
@@ -1313,7 +1327,7 @@ export default function StreamPage() {
     ]
   );
 
-  const replyParentId = focusId && focusedNode ? focusId : threadRootId;
+  const replyParentId = focusForDisplay && focusedNode ? focusForDisplay : threadRootId;
   const focusSnippet = focusedNode?.content?.slice(0, 50) || '';
 
   const handleCalendarPick = useCallback(
@@ -1706,9 +1720,7 @@ export default function StreamPage() {
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
                       exitToRoot={branchHeadExiting}
-                      hideDeleteOnStreamHead={
-                        Boolean(focusId && actualRootId && !noteIdEq(focusId, actualRootId))
-                      }
+                      hideDeleteOnStreamHead={hideDeleteOnStreamHead}
                     />
                   </ul>
                 </div>
