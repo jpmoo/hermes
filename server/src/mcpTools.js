@@ -321,7 +321,7 @@ export async function callTool(ctx, req) {
           headers: { Authorization: 'Bearer <same JWT as Hermes web app / HERMES_MCP_TOKEN>' },
           curl_example: `curl -X POST "BASE${pathSuffix}" -H "Authorization: Bearer TOKEN" -H "X-Hermes-Attachment-Ocr: 1" -F "files=@/path/to/file.jpg"`,
           ocr_opt_in_header:
-            'Send X-Hermes-Attachment-Ocr: 1 to run OCR/summary into an empty note (the web app and MCP send it; curl must include the header).',
+            'Send X-Hermes-Attachment-Ocr: 1 to run OCR/summary into an empty note (browser uploads do not; MCP attach and curl must add the header).',
           response_json:
             'JSON body: { inserted: [...] }. If OCR ran, also ocr: [{ outcome, kind, filename, ocrChars, ... }].',
           url_examples: {
