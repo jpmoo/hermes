@@ -384,6 +384,8 @@ function StreamList({
   threadById,
   /** When true, up-to-root exit owns motion — inline stagger delays must not override it. */
   exitToRoot = false,
+  /** Drilled below thread root: omit delete on the visible head note (depth 0) only. */
+  hideDeleteOnStreamHead = false,
 }) {
   return (
     <>
@@ -418,6 +420,7 @@ function StreamList({
               note={n}
               depth={depth}
               hideStar={depth === 0}
+              hideDelete={hideDeleteOnStreamHead && depth === 0}
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
               drillOnSingleClick
@@ -441,6 +444,7 @@ function StreamList({
                   staggerDelays={staggerDelays}
                   levelDropDelays={levelDropDelays}
                   exitToRoot={exitToRoot}
+                  hideDeleteOnStreamHead={hideDeleteOnStreamHead}
                 />
               </ul>
             )}
@@ -1635,6 +1639,9 @@ export default function StreamPage() {
               note={floatOpen.note}
               depth={typeof floatOpen.depth === 'number' ? floatOpen.depth : 0}
               hideStar={typeof floatOpen.depth === 'number' ? floatOpen.depth === 0 : true}
+              hideDelete={
+                Boolean(threadRootId && floatOpen.note && !noteIdEq(floatOpen.note.id, actualRootId))
+              }
               hasReplies={(floatOpen.note.reply_count ?? 0) > 0}
               hoverInsightEnabled
               drillOnSingleClick
@@ -1699,6 +1706,9 @@ export default function StreamPage() {
                       staggerDelays={replyStaggerDelays}
                       levelDropDelays={levelDropDelays}
                       exitToRoot={branchHeadExiting}
+                      hideDeleteOnStreamHead={
+                        Boolean(focusId && actualRootId && !noteIdEq(focusId, actualRootId))
+                      }
                     />
                   </ul>
                 </div>

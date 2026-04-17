@@ -55,6 +55,8 @@ export default function NoteCard({
   hideStar = false,
   /** Stream thread: drill on first click (canvas/search keep double-click). */
   drillOnSingleClick = false,
+  /** Stream: hide delete (and trailing spacer) on the subtree head when drilled below thread root. */
+  hideDelete = false,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
@@ -753,16 +755,20 @@ export default function NoteCard({
                     <NoteCardIconTag className="note-card-icon-btn__svg" />
                   </button>
                 </div>
-                <span className="note-card-action-spacer" aria-hidden="true" />
-                <button
-                  type="button"
-                  className="note-card-icon-btn note-card-icon-btn--danger"
-                  onClick={handleDelete}
-                  title="Delete"
-                  aria-label="Delete"
-                >
-                  <NoteCardIconDelete className="note-card-icon-btn__svg" />
-                </button>
+                {!hideDelete ? (
+                  <>
+                    <span className="note-card-action-spacer" aria-hidden="true" />
+                    <button
+                      type="button"
+                      className="note-card-icon-btn note-card-icon-btn--danger"
+                      onClick={handleDelete}
+                      title="Delete"
+                      aria-label="Delete"
+                    >
+                      <NoteCardIconDelete className="note-card-icon-btn__svg" />
+                    </button>
+                  </>
+                ) : null}
               </>
             )}
           </div>
