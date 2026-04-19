@@ -562,6 +562,22 @@ export default function StreamPage() {
   const [streamScrollIntent, setStreamScrollIntent] = useState(null);
   const composeWrapRef = useRef(null);
   const focusFromUrlApplied = useRef('');
+
+  useLayoutEffect(() => {
+    const el = composeWrapRef.current;
+    if (!el) return undefined;
+    const apply = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      document.documentElement.style.setProperty('--stream-compose-reserve', `${h}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty('--stream-compose-reserve');
+    };
+  }, []);
   const floatTimerRef = useRef(null);
   const { logout, user } = useAuth();
 
@@ -1946,7 +1962,6 @@ export default function StreamPage() {
             </>
           )}
           </div>
-        </div>
 
         <div className="stream-page-compose-wrap" data-stream-compose ref={composeWrapRef}>
           {threadRootId ? (
@@ -2108,6 +2123,7 @@ export default function StreamPage() {
               </div>
             </form>
           )}
+        </div>
         </div>
       </div>
         <ThreadSummaryModal

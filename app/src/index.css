@@ -144,32 +144,28 @@ html.hermes-viewport-bg-active .stream-page-scroll-main {
   background: transparent;
 }
 
-/* No backdrop-filter here — it blurs the fixed background image into frosted blocks; use tint only. */
+/*
+ * Tinted strips composite with the portal image (z-index below #root). Thread/canvas *content* only
+ * lines up behind chrome if the composer/nav sit over the scroll/viewport (see StreamPage/Canvas).
+ */
 html.hermes-viewport-bg-active .layout-header {
-  background: color-mix(in srgb, var(--bg) 52%, transparent);
+  background: transparent;
   border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-row {
-  background: color-mix(in srgb, var(--bg) 48%, transparent);
-  box-shadow: 0 6px 12px -8px rgba(28, 27, 24, 0.08);
+  background: transparent;
+  box-shadow: none;
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-btn {
-  background: color-mix(in srgb, var(--bg-card) 62%, transparent);
+  background: var(--bg-card);
 }
 
-/*
- * Default composer chrome uses linear-gradient(..., var(--bg) 85%, transparent): the solid band is
- * 85% of the *element* height. Expanded composer (~50vh textarea) turns that into a huge opaque
- * block and hides the viewport background in the lower third — use a short fixed fade instead.
- */
-html.hermes-viewport-bg-active .stream-page > .stream-page-compose-wrap {
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--bg) 44%, transparent) 0%,
-    transparent min(5.5rem, 22vh)
-  );
+/* Strip is clear; notes/canvas show through — controls keep their own fills below. */
+html.hermes-viewport-bg-active .stream-page-scroll > .stream-page-compose-wrap,
+html.hermes-viewport-bg-active .canvas-page-main > .canvas-page-compose-wrap {
+  background: transparent;
 }
 
 html.hermes-viewport-bg-active .stream-page-compose textarea,

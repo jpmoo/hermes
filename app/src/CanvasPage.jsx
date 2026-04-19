@@ -487,6 +487,7 @@ export default function CanvasPage() {
   const saveTimerRef = useRef(null);
   const canvasReplyFileRef = useRef(null);
   const canvasRootFileRef = useRef(null);
+  const canvasComposeWrapRef = useRef(null);
   const focusFromUrl = useRef('');
   const historyBtnRef = useRef(null);
   const historyMenuRef = useRef(null);
@@ -2232,10 +2233,12 @@ export default function CanvasPage() {
             </aside>
             </>
           )}
-          </div>
-
           {showCompose ? (
-            <div className="stream-page-compose-wrap canvas-page-compose-wrap" data-canvas-compose>
+            <div
+              className="stream-page-compose-wrap canvas-page-compose-wrap"
+              data-canvas-compose
+              ref={canvasComposeWrapRef}
+            >
               {threadRootId ? (
                 <form className="stream-page-compose" onSubmit={handleCanvasReply}>
                   <div className="stream-page-compose-mentions">
@@ -2397,6 +2400,7 @@ export default function CanvasPage() {
               )}
             </div>
           ) : null}
+          </div>
 
           <ThreadSummaryModal
             open={summaryOpen}

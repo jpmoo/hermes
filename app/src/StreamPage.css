@@ -34,6 +34,15 @@
   background: var(--bg);
   position: relative;
   z-index: 1;
+  /* Reserve space for the absolutely positioned composer so the last notes stay scrollable above it. */
+  padding-bottom: var(--stream-compose-reserve, 10rem);
+  /* Hide scrollbar; scrolling still works (wheel, touch, trackpad, keyboard). */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.stream-page-scroll-main::-webkit-scrollbar {
+  display: none;
 }
 
 .stream-page-scroll-main--thread-bg {
@@ -448,31 +457,32 @@
 
 .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
 .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
-  /* Sticky flex children ignore align-self:center reliably; center with margins (equal overflow L/R when wider than parent). */
+  /* Center expanded width while staying anchored to the bottom (absolute in stream scroll / canvas main). */
   --compose-exp-w: min(80vw, calc(100vw - 2rem));
   box-sizing: border-box;
   width: var(--compose-exp-w);
   max-width: var(--compose-exp-w);
-  margin-left: calc(50% - var(--compose-exp-w) / 2);
-  margin-right: calc(50% - var(--compose-exp-w) / 2);
-  position: relative;
-  left: auto;
-  transform: none;
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-/* Sticky composer chrome only on Stream (canvas uses the same width rules but not this bar). */
-.stream-page > .stream-page-compose-wrap {
-  position: sticky;
+/* Composer overlays the scroll/viewport so thread notes + canvas paint behind the strip. */
+.stream-page-scroll > .stream-page-compose-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
   bottom: 0;
   /* Above .stream-page-replies (z-index:5) and insight-selected cards (z-index:2) so notes don’t paint over the reply box while scrolling */
   z-index: 8;
-  margin-top: auto;
+  margin-top: 0;
   padding-top: 1rem;
   padding-bottom: 0.5rem;
   background: linear-gradient(to top, var(--bg) 85%, transparent);
 }
 
-.stream-page > .stream-page-compose-wrap:has(.stream-page-compose-field--expanded) {
+.stream-page-scroll > .stream-page-compose-wrap:has(.stream-page-compose-field--expanded) {
   z-index: 12;
 }
 
