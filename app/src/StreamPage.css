@@ -43,13 +43,13 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 26rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 18rem)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 26rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 18rem)),
     transparent 100%
   );
   mask-repeat: no-repeat;
@@ -59,6 +59,22 @@
   /* Hide scrollbar; scrolling still works (wheel, touch, trackpad, keyboard). */
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+/* Expanded composer: taller reply box — extend fade so it stays above the field. */
+.stream-page-scroll:has(.stream-page-compose-field--expanded) .stream-page-scroll-main {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--hermes-compose-content-fade-expanded, 34rem)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--hermes-compose-content-fade-expanded, 34rem)),
+    transparent 100%
+  );
 }
 
 .stream-page-scroll-main::-webkit-scrollbar {
@@ -115,23 +131,18 @@
 }
 
 /*
- * First child inside scroll-main: sticky overlay like .canvas-toolbar — notes scroll underneath so they
- * stay visible through the strip (between controls); buttons stay clickable.
+ * Sibling above .stream-page-scroll-main: full layout width (viewport edge + safe-area padding like
+ * .canvas-toolbar), not confined to the centered note column.
  */
-/*
- * Stay inside the scroll column — full-viewport 100vw + negative margin was clipped by .layout { overflow: hidden }.
- * Same horizontal padding as .canvas-toolbar (edge + safe area) within the column width.
- */
-.stream-page-scroll-main > .stream-page-nav-row {
+.stream-page-scroll > .stream-page-nav-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 0.75rem;
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 9;
+  position: relative;
+  z-index: 2;
   transition: opacity 0.2s ease;
   width: 100%;
   margin: 0 0 0.5rem;
@@ -143,7 +154,7 @@
   pointer-events: none;
 }
 
-.stream-page-scroll-main > .stream-page-nav-row * {
+.stream-page-scroll > .stream-page-nav-row * {
   pointer-events: auto;
 }
 

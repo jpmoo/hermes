@@ -477,19 +477,34 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 26rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 18rem)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 26rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 18rem)),
     transparent 100%
   );
   mask-repeat: no-repeat;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: 100% 100%;
+}
+
+.canvas-page-main:has(.stream-page-compose-field--expanded) .canvas-viewport {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--hermes-compose-content-fade-expanded, 34rem)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--hermes-compose-content-fade-expanded, 34rem)),
+    transparent 100%
+  );
 }
 
 .canvas-viewport:active {

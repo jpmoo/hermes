@@ -50,8 +50,10 @@ html {
   /* Stream note column + stream/canvas compose: 60% of viewport width (never wider than full width minus margin). */
   --hermes-stream-column-max: min(60vw, calc(100vw - 2rem));
   --hermes-compose-inset-x: 0.75rem;
-  /* Bottom mask fade on thread list / canvas viewport — large band so content softens well above reply/new. */
-  --hermes-compose-content-fade: 26rem;
+  /* Bottom mask fade on thread list / canvas viewport (reverted from 26rem bump). */
+  --hermes-compose-content-fade: 18rem;
+  /* When reply/new is expanded, mask starts higher — tune with expanded textarea height. */
+  --hermes-compose-content-fade-expanded: 34rem;
 }
 
 html[data-theme='dark'] {
