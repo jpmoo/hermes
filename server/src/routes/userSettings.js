@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
+import { MAX_BYTES } from '../services/noteFileBlobs.js';
 import {
   similarNotesMinCharsEnvDefault,
   sanitizeSimilarNotesMinChars,
@@ -15,6 +17,13 @@ import { createSpaztickExternalTask } from '../services/spaztickTask.js';
 import { appendHermesLinkToNotes, buildHermesStreamUrl } from '../services/hermesNoteLink.js';
 
 const router = Router();
+
+const userBgUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: Math.min(MAX_BYTES, 25 * 1024 * 1024) },
+});
+
+const USER_BG_IMAGE_MIME = /^image\/(jpeg|png|gif|webp|avif|bmp)$/i;
 
 const MAX_CALENDAR_FEEDS = 12;
 const MAX_FEED_URL_LEN = 2048;
@@ -107,6 +116,52 @@ function themeFromStored(raw) {
   if (!raw || typeof raw !== 'object') return 'light';
   const t = sanitizeTheme(raw.theme);
   return t === 'dark' ? 'dark' : 'light';
+}
+
+function streamThreadImageBgOpacityFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return 0.28;
+  const n = Number(raw.streamThreadImageBgOpacity);
+  if (!Number.isFinite(n)) return 0.28;
+  return Math.min(1, Math.max(0, n));
+}
+
+function streamThreadImageBgEnabledFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return false;
+  return raw.streamThreadImageBgEnabled === true;
+}
+
+/** Default true: slow drift animation; false = fixed centered cover. */
+function streamBackgroundAnimateFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return true;
+  return raw.streamBackgroundAnimate !== false;
+}
+
+/** Horizontal scanline mask on background image (CRT-style). */
+function streamBackgroundCrtEffectFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return false;
+  return raw.streamBackgroundCrtEffect === true;
+}
+
+function streamRootBackgroundOpacityFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return 0.28;
+  const n = Number(raw.streamRootBackgroundOpacity);
+  if (!Number.isFinite(n)) return 0.28;
+  return Math.min(1, Math.max(0, n));
+}
+
+function canvasUseStreamRootBackgroundFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return false;
+  return raw.canvasUseStreamRootBackground === true;
+}
+
+async function streamRootBackgroundPresentForUser(userId) {
+  try {
+    const r = await pool.query('SELECT 1 FROM user_background_blobs WHERE user_id = $1 LIMIT 1', [userId]);
+    return r.rows.length > 0;
+  } catch (e) {
+    if (e && e.code === '42P01') return false;
+    throw e;
+  }
 }
 
 const HOVER_INSIGHT_TYPES = new Set(['note', 'organization', 'person', 'event']);
@@ -463,6 +518,13 @@ router.get('/settings', requireAuth, async (req, res) => {
     const outTheme = themeFromStored(raw);
     const outHoverInsight = hoverInsightFromStored(raw);
     const streamThreadSort = sanitizeStreamThreadSortMap(raw.streamThreadSort);
+    const streamThreadImageBgEnabled = streamThreadImageBgEnabledFromStored(raw);
+    const streamThreadImageBgOpacity = streamThreadImageBgOpacityFromStored(raw);
+    const streamBackgroundAnimate = streamBackgroundAnimateFromStored(raw);
+    const streamBackgroundCrtEffect = streamBackgroundCrtEffectFromStored(raw);
+    const streamRootBackgroundOpacity = streamRootBackgroundOpacityFromStored(raw);
+    const canvasUseStreamRootBackground = canvasUseStreamRootBackgroundFromStored(raw);
+    const streamRootBackgroundPresent = await streamRootBackgroundPresentForUser(req.userId);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
@@ -485,6 +547,13 @@ router.get('/settings', requireAuth, async (req, res) => {
       settingsThemeWasSet: settingsJsonHasKey(raw, 'theme'),
       settingsHoverInsightWasSet: settingsJsonHasKey(raw, 'hoverInsight'),
       streamThreadSort,
+      streamThreadImageBgEnabled,
+      streamThreadImageBgOpacity,
+      streamBackgroundAnimate,
+      streamBackgroundCrtEffect,
+      streamRootBackgroundPresent,
+      streamRootBackgroundOpacity,
+      canvasUseStreamRootBackground,
     });
   } catch (err) {
     console.error(err);
@@ -513,6 +582,12 @@ router.patch('/settings', requireAuth, async (req, res) => {
       theme,
       hoverInsight,
       streamThreadSort,
+      streamThreadImageBgEnabled,
+      streamThreadImageBgOpacity,
+      streamBackgroundAnimate,
+      streamBackgroundCrtEffect,
+      streamRootBackgroundOpacity,
+      canvasUseStreamRootBackground,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -713,6 +788,82 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (streamThreadImageBgEnabled !== undefined) {
+      if (streamThreadImageBgEnabled === null) {
+        delete cur.streamThreadImageBgEnabled;
+      } else if (streamThreadImageBgEnabled !== true && streamThreadImageBgEnabled !== false) {
+        return res
+          .status(400)
+          .json({ error: 'streamThreadImageBgEnabled must be true, false, or null' });
+      } else {
+        cur.streamThreadImageBgEnabled = streamThreadImageBgEnabled;
+      }
+    }
+
+    if (streamThreadImageBgOpacity !== undefined) {
+      if (streamThreadImageBgOpacity === null) {
+        delete cur.streamThreadImageBgOpacity;
+      } else {
+        const n = Number(streamThreadImageBgOpacity);
+        if (!Number.isFinite(n)) {
+          return res
+            .status(400)
+            .json({ error: 'streamThreadImageBgOpacity must be a number from 0 to 1, or null' });
+        }
+        cur.streamThreadImageBgOpacity = Math.min(1, Math.max(0, n));
+      }
+    }
+
+    if (streamBackgroundAnimate !== undefined) {
+      if (streamBackgroundAnimate === null) {
+        delete cur.streamBackgroundAnimate;
+      } else if (streamBackgroundAnimate !== true && streamBackgroundAnimate !== false) {
+        return res
+          .status(400)
+          .json({ error: 'streamBackgroundAnimate must be true, false, or null' });
+      } else {
+        cur.streamBackgroundAnimate = streamBackgroundAnimate;
+      }
+    }
+
+    if (streamBackgroundCrtEffect !== undefined) {
+      if (streamBackgroundCrtEffect === null) {
+        delete cur.streamBackgroundCrtEffect;
+      } else if (streamBackgroundCrtEffect !== true && streamBackgroundCrtEffect !== false) {
+        return res
+          .status(400)
+          .json({ error: 'streamBackgroundCrtEffect must be true, false, or null' });
+      } else {
+        cur.streamBackgroundCrtEffect = streamBackgroundCrtEffect;
+      }
+    }
+
+    if (streamRootBackgroundOpacity !== undefined) {
+      if (streamRootBackgroundOpacity === null) {
+        delete cur.streamRootBackgroundOpacity;
+      } else {
+        const n = Number(streamRootBackgroundOpacity);
+        if (!Number.isFinite(n)) {
+          return res
+            .status(400)
+            .json({ error: 'streamRootBackgroundOpacity must be a number from 0 to 1, or null' });
+        }
+        cur.streamRootBackgroundOpacity = Math.min(1, Math.max(0, n));
+      }
+    }
+
+    if (canvasUseStreamRootBackground !== undefined) {
+      if (canvasUseStreamRootBackground === null) {
+        delete cur.canvasUseStreamRootBackground;
+      } else if (canvasUseStreamRootBackground !== true && canvasUseStreamRootBackground !== false) {
+        return res
+          .status(400)
+          .json({ error: 'canvasUseStreamRootBackground must be true, false, or null' });
+      } else {
+        cur.canvasUseStreamRootBackground = canvasUseStreamRootBackground;
+      }
+    }
+
     if (theme !== undefined) {
       if (theme === null) {
         delete cur.theme;
@@ -776,6 +927,13 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outTheme = themeFromStored(cur);
     const outHoverInsight = hoverInsightFromStored(cur);
     const outStreamThreadSort = sanitizeStreamThreadSortMap(cur.streamThreadSort);
+    const outStreamThreadImageBgEnabled = streamThreadImageBgEnabledFromStored(cur);
+    const outStreamThreadImageBgOpacity = streamThreadImageBgOpacityFromStored(cur);
+    const outStreamBackgroundAnimate = streamBackgroundAnimateFromStored(cur);
+    const outStreamBackgroundCrtEffect = streamBackgroundCrtEffectFromStored(cur);
+    const outStreamRootBackgroundOpacity = streamRootBackgroundOpacityFromStored(cur);
+    const outCanvasUseStreamRootBackground = canvasUseStreamRootBackgroundFromStored(cur);
+    const outStreamRootBackgroundPresent = await streamRootBackgroundPresentForUser(req.userId);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
@@ -797,10 +955,99 @@ router.patch('/settings', requireAuth, async (req, res) => {
       settingsThemeWasSet: settingsJsonHasKey(cur, 'theme'),
       settingsHoverInsightWasSet: settingsJsonHasKey(cur, 'hoverInsight'),
       streamThreadSort: outStreamThreadSort,
+      streamThreadImageBgEnabled: outStreamThreadImageBgEnabled,
+      streamThreadImageBgOpacity: outStreamThreadImageBgOpacity,
+      streamBackgroundAnimate: outStreamBackgroundAnimate,
+      streamBackgroundCrtEffect: outStreamBackgroundCrtEffect,
+      streamRootBackgroundPresent: outStreamRootBackgroundPresent,
+      streamRootBackgroundOpacity: outStreamRootBackgroundOpacity,
+      canvasUseStreamRootBackground: outCanvasUseStreamRootBackground,
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
+/** GET account background image (auth); use with fetch + blob URL in the app. */
+router.get('/background', requireAuth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT data, mime_type, filename FROM user_background_blobs WHERE user_id = $1`,
+      [req.userId]
+    );
+    if (r.rows.length === 0) return res.status(404).end();
+    const row = r.rows[0];
+    const safeName = (row.filename || 'background').replace(/[^\w.\-()+ ]/g, '_');
+    res.setHeader('Content-Type', row.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=120');
+    res.send(row.data);
+  } catch (err) {
+    if (err && err.code === '42P01') {
+      return res.status(503).json({ error: 'Background storage not initialized' });
+    }
+    console.error(err);
+    res.status(500).end();
+  }
+});
+
+router.post(
+  '/background',
+  requireAuth,
+  (req, res, next) => {
+    userBgUpload.single('file')(req, res, (err) => {
+      if (err?.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: `File exceeds upload size limit` });
+      }
+      if (err) return next(err);
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const f = req.file;
+      if (!f?.buffer?.length) {
+        return res.status(400).json({ error: 'No file (multipart field name: file)' });
+      }
+      if (!USER_BG_IMAGE_MIME.test(f.mimetype || '')) {
+        return res.status(400).json({
+          error: 'Background must be an image (JPEG, PNG, GIF, WebP, AVIF, or BMP)',
+        });
+      }
+      const filename = (f.originalname || 'background').slice(0, 512);
+      await pool.query(
+        `INSERT INTO user_background_blobs (user_id, filename, mime_type, byte_size, data, updated_at)
+         VALUES ($1, $2, $3, $4, $5, now())
+         ON CONFLICT (user_id) DO UPDATE SET
+           filename = EXCLUDED.filename,
+           mime_type = EXCLUDED.mime_type,
+           byte_size = EXCLUDED.byte_size,
+           data = EXCLUDED.data,
+           updated_at = now()`,
+        [req.userId, filename, f.mimetype, f.buffer.length, f.buffer]
+      );
+      res.status(201).json({ ok: true, streamRootBackgroundPresent: true });
+    } catch (err) {
+      if (err && err.code === '42P01') {
+        return res.status(503).json({ error: 'Background storage not initialized' });
+      }
+      console.error(err);
+      res.status(500).json({ error: 'Upload failed' });
+    }
+  }
+);
+
+router.delete('/background', requireAuth, async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM user_background_blobs WHERE user_id = $1`, [req.userId]);
+    res.status(204).send();
+  } catch (err) {
+    if (err && err.code === '42P01') {
+      return res.status(503).json({ error: 'Background storage not initialized' });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Failed to remove background' });
   }
 });
 

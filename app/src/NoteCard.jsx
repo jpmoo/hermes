@@ -490,7 +490,6 @@ export default function NoteCard({
   const cardClassNames = [
     cardClass,
     'note-card--has-type-icon',
-    streamThreadSortSlot ? 'note-card--has-stream-sort' : '',
     editing ? 'note-card--editing' : '',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
@@ -806,7 +805,7 @@ export default function NoteCard({
       {streamThreadSortSlot ? (
         <div className="note-card-stream-thread-sort">{streamThreadSortSlot}</div>
       ) : null}
-      {descendantBadge != null ? (
+      {descendantBadge != null && !streamThreadSortSlot ? (
         <span
           className="note-card-descendant-count"
           title={`${descendantBadge} nested ${descendantBadge === 1 ? 'reply' : 'replies'} under this note (all depths)`}

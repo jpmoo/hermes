@@ -1,0 +1,56 @@
+.stream-thread-image-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.stream-thread-image-bg--static .stream-thread-image-bg__pan {
+  will-change: auto;
+}
+
+/* Keep PAN_FRAC in StreamThreadImageBackground.jsx in sync with this overscan (1.22). */
+.stream-thread-image-bg__pan {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 122%;
+  height: 122%;
+  margin-left: -61%;
+  margin-top: -61%;
+  will-change: transform;
+}
+
+.stream-thread-image-bg__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--stream-thread-bg-opacity, 0.35);
+  filter: saturate(1.02);
+}
+
+/*
+ * CRT: alternating fully transparent horizontal lines — mask hides image on those rows so --bg shows through.
+ * Period 4px: 2px image, 2px transparent (tweak for stronger/weaker scanlines).
+ */
+.stream-thread-image-bg--crt .stream-thread-image-bg__img {
+  -webkit-mask-image: repeating-linear-gradient(
+    to bottom,
+    #000 0,
+    #000 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  mask-image: repeating-linear-gradient(
+    to bottom,
+    #000 0,
+    #000 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  -webkit-mask-size: 100% 4px;
+  mask-size: 100% 4px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}

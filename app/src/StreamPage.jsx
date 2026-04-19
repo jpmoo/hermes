@@ -39,6 +39,9 @@ import {
 } from './noteThreadSort';
 import StreamThreadSortControl from './StreamThreadSortControl';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
+import { useNoteTypeColors } from './NoteTypeColorContext';
+import { firstImageAttachment, userBackgroundFileUrl, noteFileUrl } from './attachmentUtils';
+import StreamThreadImageBackground from './StreamThreadImageBackground';
 import {
   NavIconAttach,
   NavIconBrain,
@@ -580,6 +583,15 @@ export default function StreamPage() {
   const [levelDropDelays, setLevelDropDelays] = useState(null);
   const levelNavBusyRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
+  const {
+    streamThreadImageBgEnabled,
+    streamThreadImageBgOpacity,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+    streamRootBackgroundPresent,
+    streamRootBackgroundOpacity,
+    userBackgroundFetchRevision,
+  } = useNoteTypeColors();
 
   useLayoutEffect(() => {
     const listEl = threadListRef.current;
@@ -1244,6 +1256,32 @@ export default function StreamPage() {
 
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
 
+  const threadBgHeadNote = useMemo(() => {
+    if (!threadRootId || streamHeadHideDeleteId == null) return null;
+    return (
+      threadById.get(streamHeadHideDeleteId) ??
+      thread.find((n) => noteIdEq(n.id, streamHeadHideDeleteId)) ??
+      null
+    );
+  }, [threadRootId, streamHeadHideDeleteId, threadById, thread]);
+
+  const threadBgImageAtt = useMemo(() => firstImageAttachment(threadBgHeadNote), [threadBgHeadNote]);
+
+  const showStreamNoteAttachmentBg = Boolean(
+    threadRootId && streamThreadImageBgEnabled && threadBgImageAtt?.id
+  );
+  const showStreamRootUploadBg = streamRootBackgroundPresent && !showStreamNoteAttachmentBg;
+
+  const streamBackgroundFetchUrl = useMemo(() => {
+    if (showStreamNoteAttachmentBg) return noteFileUrl(threadBgImageAtt.id);
+    if (showStreamRootUploadBg) return userBackgroundFileUrl(userBackgroundFetchRevision);
+    return null;
+  }, [showStreamNoteAttachmentBg, showStreamRootUploadBg, threadBgImageAtt?.id, userBackgroundFetchRevision]);
+
+  const streamBackgroundOpacity = showStreamNoteAttachmentBg
+    ? streamThreadImageBgOpacity
+    : streamRootBackgroundOpacity;
+
   const replyStaggerDelays = useMemo(() => {
     if (!replyStagger || !thread.length) return null;
     const m = new Map();
@@ -1794,7 +1832,21 @@ export default function StreamPage() {
             />
           </div>
         )}
-        <div ref={streamScrollRef} className="stream-page-scroll">
+        <div className="stream-page-scroll">
+          {streamBackgroundFetchUrl ? (
+            <StreamThreadImageBackground
+              fetchUrl={streamBackgroundFetchUrl}
+              imageOpacity={streamBackgroundOpacity}
+              animate={streamBackgroundAnimate}
+              crtEffect={streamBackgroundCrtEffect}
+            />
+          ) : null}
+          <div
+            ref={streamScrollRef}
+            className={`stream-page-scroll-main ${
+              streamBackgroundFetchUrl ? 'stream-page-scroll-main--thread-bg' : ''
+            }`}
+          >
           {threadRootId ? (
             <>
               <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
@@ -1893,6 +1945,7 @@ export default function StreamPage() {
               ) : null}
             </>
           )}
+          </div>
         </div>
 
         <div className="stream-page-compose-wrap" data-stream-compose ref={composeWrapRef}>

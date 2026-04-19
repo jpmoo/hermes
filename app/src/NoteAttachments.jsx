@@ -1,17 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getToken } from './api';
+import { isImageMime, noteFileUrl } from './attachmentUtils';
 import './NoteAttachments.css';
-
-const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '';
-
-function isImageMime(m, filename) {
-  if (typeof m === 'string' && m.startsWith('image/')) return true;
-  if (typeof filename === 'string' && /\.(jpe?g|png|gif|webp|avif|bmp|svg|heic)$/i.test(filename)) {
-    return true;
-  }
-  return false;
-}
 
 function isPdfMime(m, filename) {
   if (m === 'application/pdf') return true;
@@ -102,10 +93,6 @@ function AttachmentIcon(props) {
   );
 }
 
-function fileUrl(id) {
-  return `${BASE.replace(/\/$/, '')}/api/note-files/${id}`;
-}
-
 function AttachmentItem({ att, onDeleted }) {
   const [imgSrc, setImgSrc] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -121,7 +108,7 @@ function AttachmentItem({ att, onDeleted }) {
     let objectUrl;
     let cancelled = false;
     const t = getToken();
-    fetch(fileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+    fetch(noteFileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} })
       .then((r) => (r.ok ? r.blob() : null))
       .then((blob) => {
         if (cancelled || !blob) return;
@@ -149,7 +136,7 @@ function AttachmentItem({ att, onDeleted }) {
         e.stopPropagation();
       }
       const t = getToken();
-      const r = await fetch(fileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
+      const r = await fetch(noteFileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
       if (!r.ok) return;
       const blob = await r.blob();
       const a = document.createElement('a');
@@ -182,7 +169,7 @@ function AttachmentItem({ att, onDeleted }) {
       setPdfLoading(true);
       try {
         const t = getToken();
-        const r = await fetch(fileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
+        const r = await fetch(noteFileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
         if (!r.ok) throw new Error('fetch failed');
         const blob = await r.blob();
         const url = URL.createObjectURL(blob);

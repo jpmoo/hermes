@@ -16,6 +16,9 @@ import {
   sortNotesByStreamOrderNoStarBias,
 } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
+import { useNoteTypeColors } from './NoteTypeColorContext';
+import StreamThreadImageBackground from './StreamThreadImageBackground';
+import { userBackgroundFileUrl } from './attachmentUtils';
 import {
   getThread,
   getRoots,
@@ -399,6 +402,15 @@ const PINCH_ZOOM_EXP = 1.22;
 
 export default function CanvasPage() {
   const { logout, user } = useAuth();
+  const {
+    streamRootBackgroundPresent,
+    streamRootBackgroundOpacity,
+    canvasUseStreamRootBackground,
+    userBackgroundFetchRevision,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+  } = useNoteTypeColors();
+  const showCanvasRootBg = canvasUseStreamRootBackground && streamRootBackgroundPresent;
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
@@ -1904,7 +1916,15 @@ export default function CanvasPage() {
   return (
     <Layout title={layoutTitle} noteTypeFilterEnabled onLogout={logout} viewLinks={navLinks}>
       <HoverInsightProvider onNoteUpdated={refreshThread} onGoToNote={onGoToNote}>
-        <div className="canvas-page">
+        <div className={`canvas-page${showCanvasRootBg ? ' canvas-page--root-bg' : ''}`}>
+          {showCanvasRootBg ? (
+            <StreamThreadImageBackground
+              fetchUrl={userBackgroundFileUrl(userBackgroundFetchRevision)}
+              imageOpacity={streamRootBackgroundOpacity}
+              animate={streamBackgroundAnimate}
+              crtEffect={streamBackgroundCrtEffect}
+            />
+          ) : null}
           <div className="canvas-toolbar">
             <div className="canvas-toolbar-left">
               {focusId && !noteIdEq(focusId, actualRootId) ? (
@@ -2018,7 +2038,7 @@ export default function CanvasPage() {
             </div>
           </div>
 
-          <div className="canvas-page-main">
+          <div className={`canvas-page-main${showCanvasRootBg ? ' canvas-page-main--root-bg' : ''}`}>
           {loadingThread ? (
             <p className="canvas-muted">Loading…</p>
           ) : threadRootId && thread.length === 0 ? (

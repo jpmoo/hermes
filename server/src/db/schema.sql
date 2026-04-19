@@ -63,6 +63,19 @@ CREATE TABLE IF NOT EXISTS note_file_blobs (
 CREATE INDEX IF NOT EXISTS idx_note_file_blobs_note ON note_file_blobs(note_id);
 CREATE INDEX IF NOT EXISTS idx_note_file_blobs_user ON note_file_blobs(user_id);
 
+-- Optional account background image (Stream default / Canvas)
+CREATE TABLE IF NOT EXISTS user_background_blobs (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  filename   TEXT NOT NULL,
+  mime_type  TEXT NOT NULL DEFAULT 'application/octet-stream',
+  byte_size  BIGINT NOT NULL,
+  data       BYTEA NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_background_blobs_user ON user_background_blobs(user_id);
+
 -- Tags (governed vocabulary)
 CREATE TABLE IF NOT EXISTS tags (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),

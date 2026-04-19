@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { NOTE_TYPE_OPTIONS } from './noteEventUtils';
 import { NOTE_TYPE_COLOR_DEFAULTS } from './noteTypeColorSettings';
 import { useNoteTypeColors } from './NoteTypeColorContext';
@@ -39,7 +39,24 @@ export default function SettingsModal({ onClose }) {
     setDefaultStartPagePhone,
     markdownListAlternatingShades,
     setMarkdownListAlternatingShades,
+    streamThreadImageBgEnabled,
+    setStreamThreadImageBgEnabled,
+    streamThreadImageBgOpacity,
+    setStreamThreadImageBgOpacity,
+    streamBackgroundAnimate,
+    setStreamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+    setStreamBackgroundCrtEffect,
+    streamRootBackgroundPresent,
+    streamRootBackgroundOpacity,
+    setStreamRootBackgroundOpacity,
+    canvasUseStreamRootBackground,
+    setCanvasUseStreamRootBackground,
+    uploadStreamRootBackgroundFile,
+    removeStreamRootBackgroundFile,
   } = useNoteTypeColors();
+  const rootBackgroundFileRef = useRef(null);
+  const [rootBgUploadBusy, setRootBgUploadBusy] = useState(false);
   const [rootThreads, setRootThreads] = useState([]);
   const [spaztickKeyInput, setSpaztickKeyInput] = useState('');
   const [ingestKeyInput, setIngestKeyInput] = useState('');
@@ -240,6 +257,201 @@ export default function SettingsModal({ onClose }) {
               ))}
             </select>
           </div>
+        </section>
+
+        <section className="settings-modal-section" aria-labelledby="settings-stream-thread-bg-heading">
+          <h3 id="settings-stream-thread-bg-heading" className="settings-modal-section-title">
+            Stream &amp; canvas backgrounds
+          </h3>
+          <p className="settings-modal-section-lead">
+            Optional backgrounds behind Stream and Canvas. Thread images take priority over the uploaded
+            default when both apply.
+          </p>
+          <h4 className="settings-modal-subsection-title">Thread head image</h4>
+          <p className="settings-modal-section-lead settings-modal-subsection-lead">
+            In a thread, when this is on, the first image attached to the <strong>focused</strong> note (the
+            thread head you are viewing) is drawn behind the message list. It slowly pans and picks a new
+            direction when it reaches the edge.
+          </p>
+          <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
+            <input
+              id="settings-stream-thread-image-bg"
+              type="checkbox"
+              className="settings-modal-similar-notes-checkbox"
+              checked={streamThreadImageBgEnabled}
+              onChange={(e) => setStreamThreadImageBgEnabled(e.target.checked)}
+              aria-describedby="settings-stream-thread-image-bg-hint"
+            />
+            <label
+              className="settings-modal-similar-notes-checkbox-label"
+              htmlFor="settings-stream-thread-image-bg"
+            >
+              Use first image on focused note as thread background
+            </label>
+          </div>
+          <div className="settings-modal-similar-notes-row">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-stream-thread-image-bg-opacity">
+              Image visibility
+            </label>
+            <input
+              id="settings-stream-thread-image-bg-opacity"
+              type="range"
+              className="settings-modal-similar-notes-input"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(streamThreadImageBgOpacity * 100)}
+              disabled={!streamThreadImageBgEnabled}
+              onChange={(e) => setStreamThreadImageBgOpacity(Number(e.target.value) / 100)}
+              aria-valuetext={`${Math.round(streamThreadImageBgOpacity * 100)} percent`}
+            />
+          </div>
+          <p id="settings-stream-thread-image-bg-hint" className="settings-modal-similar-notes-hint">
+            0% is invisible; 100% is full strength. Saved to your account.
+          </p>
+          <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
+            <input
+              id="settings-stream-bg-animate"
+              type="checkbox"
+              className="settings-modal-similar-notes-checkbox"
+              checked={streamBackgroundAnimate}
+              onChange={(e) => setStreamBackgroundAnimate(e.target.checked)}
+              aria-describedby="settings-stream-bg-animate-hint"
+            />
+            <label
+              className="settings-modal-similar-notes-checkbox-label"
+              htmlFor="settings-stream-bg-animate"
+            >
+              Animate background (slow drift)
+            </label>
+          </div>
+          <p id="settings-stream-bg-animate-hint" className="settings-modal-similar-notes-hint">
+            When off, the image stays centered and scaled to cover the viewport (no motion). Applies to
+            Stream and Canvas. Saved to your account.
+          </p>
+          <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
+            <input
+              id="settings-stream-bg-crt"
+              type="checkbox"
+              className="settings-modal-similar-notes-checkbox"
+              checked={streamBackgroundCrtEffect}
+              onChange={(e) => setStreamBackgroundCrtEffect(e.target.checked)}
+              aria-describedby="settings-stream-bg-crt-hint"
+            />
+            <label
+              className="settings-modal-similar-notes-checkbox-label"
+              htmlFor="settings-stream-bg-crt"
+            >
+              CRT scanlines (horizontal transparent lines)
+            </label>
+          </div>
+          <p id="settings-stream-bg-crt-hint" className="settings-modal-similar-notes-hint">
+            Adds alternating fully transparent horizontal stripes over the background image so the page
+            color shows through (CRT-style). Applies to Stream and Canvas. Saved to your account.
+          </p>
+
+          <h4 className="settings-modal-subsection-title">Default thread background</h4>
+          <p className="settings-modal-section-lead settings-modal-subsection-lead">
+            Upload an image to use behind threads that do not already use a head image (root list, or any
+            thread whose focused note has no image attachment). Same file can appear on Canvas if you enable
+            that below.
+          </p>
+          <div className="settings-modal-similar-notes-row settings-modal-root-bg-row">
+            <input
+              ref={rootBackgroundFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp,image/avif,image/bmp"
+              className="settings-modal-file-input-hidden"
+              aria-hidden
+              tabIndex={-1}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                setRootBgUploadBusy(true);
+                try {
+                  await uploadStreamRootBackgroundFile(file);
+                } catch (err) {
+                  console.error(err);
+                  window.alert(err?.message || 'Upload failed');
+                } finally {
+                  setRootBgUploadBusy(false);
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="settings-modal-btn"
+              disabled={rootBgUploadBusy}
+              onClick={() => rootBackgroundFileRef.current?.click()}
+            >
+              {streamRootBackgroundPresent ? 'Replace image…' : 'Upload image…'}
+            </button>
+            <button
+              type="button"
+              className="settings-modal-btn"
+              disabled={rootBgUploadBusy || !streamRootBackgroundPresent}
+              onClick={async () => {
+                if (!streamRootBackgroundPresent) return;
+                if (
+                  !window.confirm(
+                    'Remove the default background image from your account? Stream and Canvas will stop using it.'
+                  )
+                ) {
+                  return;
+                }
+                setRootBgUploadBusy(true);
+                try {
+                  await removeStreamRootBackgroundFile();
+                } catch (err) {
+                  console.error(err);
+                  window.alert(err?.message || 'Remove failed');
+                } finally {
+                  setRootBgUploadBusy(false);
+                }
+              }}
+            >
+              Remove
+            </button>
+          </div>
+          <div className="settings-modal-similar-notes-row">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-stream-root-bg-opacity">
+              Default background visibility
+            </label>
+            <input
+              id="settings-stream-root-bg-opacity"
+              type="range"
+              className="settings-modal-similar-notes-input"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(streamRootBackgroundOpacity * 100)}
+              disabled={!streamRootBackgroundPresent}
+              onChange={(e) => setStreamRootBackgroundOpacity(Number(e.target.value) / 100)}
+              aria-valuetext={`${Math.round(streamRootBackgroundOpacity * 100)} percent`}
+            />
+          </div>
+          <p className="settings-modal-similar-notes-hint">
+            Applies to the default image only. Saved to your account.
+          </p>
+          <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
+            <input
+              id="settings-canvas-use-root-bg"
+              type="checkbox"
+              className="settings-modal-similar-notes-checkbox"
+              checked={canvasUseStreamRootBackground}
+              onChange={(e) => setCanvasUseStreamRootBackground(e.target.checked)}
+              disabled={!streamRootBackgroundPresent}
+              aria-describedby="settings-canvas-use-root-bg-hint"
+            />
+            <label className="settings-modal-similar-notes-checkbox-label" htmlFor="settings-canvas-use-root-bg">
+              Also use default background on Canvas
+            </label>
+          </div>
+          <p id="settings-canvas-use-root-bg-hint" className="settings-modal-similar-notes-hint">
+            When enabled, the same image and visibility slider apply behind the canvas workspace (cards and
+            grid stay readable). Requires an uploaded default image.
+          </p>
         </section>
 
         <section className="settings-modal-section" aria-labelledby="settings-note-type-colors-heading">

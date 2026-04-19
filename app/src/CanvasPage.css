@@ -5,6 +5,12 @@
   min-height: 0;
   width: 100%;
   background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-page--root-bg {
+  background: var(--bg);
 }
 
 .canvas-page-main {
@@ -13,11 +19,24 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  z-index: 1;
+}
+
+.canvas-page-main--root-bg {
+  background: transparent;
+}
+
+.canvas-page--root-bg .canvas-viewport {
+  background-color: transparent;
+  background-image: radial-gradient(circle at 1px 1px, var(--border-subtle) 1px, transparent 0);
+  background-size: 24px 24px;
 }
 
 /* Width/max-width come from StreamPage.css (.canvas-page-compose-wrap shared with stream). */
 .canvas-page-compose-wrap {
   flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .canvas-page--empty {
@@ -40,6 +59,8 @@
   /* --bg-elevated is undefined in theme tokens; use solid card bg so panels are not transparent */
   background: var(--bg-card);
   flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .canvas-toolbar-left {

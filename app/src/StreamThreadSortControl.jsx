@@ -125,7 +125,7 @@ export default function StreamThreadSortControl({ sortMode, starredFirst, onChan
       <button
         ref={triggerRef}
         type="button"
-        className="stream-thread-sort__trigger"
+        className={`note-card-icon-btn${open ? ' note-card-icon-btn--active' : ''}`}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label="Sort replies in this thread"
@@ -136,7 +136,7 @@ export default function StreamThreadSortControl({ sortMode, starredFirst, onChan
           setOpen((v) => !v);
         }}
       >
-        <NavIconSort className="stream-thread-sort__icon" />
+        <NavIconSort className="note-card-icon-btn__svg" />
       </button>
       {typeof document !== 'undefined' && panel ? createPortal(panel, document.body) : null}
     </div>

@@ -373,6 +373,30 @@ export async function patchUserSettings(patch) {
   return data;
 }
 
+/** Upload or replace the account default Stream/Canvas background image (multipart field: file). */
+export async function uploadUserBackground(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const h = { ...headers() };
+  delete h['Content-Type'];
+  const r = await fetch(`${API}/user/background`, {
+    method: 'POST',
+    headers: h,
+    body: fd,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Failed to upload background');
+  return data;
+}
+
+export async function deleteUserBackground() {
+  const r = await fetch(`${API}/user/background`, { method: 'DELETE', headers: headers() });
+  if (!r.ok && r.status !== 204) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to remove background');
+  }
+}
+
 /** Subscribed calendar feeds: events touching local “today” [from, to) that are not finished yet (end > now), including multi-day and in-progress. */
 export async function fetchCalendarFeedEvents(fromIso, toIso) {
   const params = new URLSearchParams({ from: fromIso, to: toIso });

@@ -317,3 +317,37 @@
 .settings-modal-btn--primary:hover {
   filter: brightness(1.05);
 }
+
+.settings-modal-subsection-title {
+  margin: 1.1rem 0 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-modal-subsection-lead {
+  margin-top: 0.35rem;
+}
+
+.settings-modal-file-input-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.settings-modal-root-bg-row {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-modal-root-bg-row .settings-modal-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

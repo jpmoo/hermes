@@ -9,7 +9,7 @@ import React, {
   useState,
 } from 'react';
 import { useAuth } from './AuthContext';
-import { fetchUserSettings, patchUserSettings } from './api';
+import { deleteUserBackground, fetchUserSettings, patchUserSettings, uploadUserBackground } from './api';
 import {
   NOTE_TYPE_COLOR_KEYS,
   loadNoteTypeColorsFromStorage,
@@ -77,6 +77,15 @@ export function NoteTypeColorProvider({ children }) {
   const [defaultStartPage, setDefaultStartPage] = useState('stream');
   const [defaultStartPagePhone, setDefaultStartPagePhone] = useState('stream');
   const [markdownListAlternatingShades, setMarkdownListAlternatingShades] = useState(true);
+  const [streamThreadImageBgEnabled, setStreamThreadImageBgEnabled] = useState(false);
+  const [streamThreadImageBgOpacity, setStreamThreadImageBgOpacity] = useState(0.28);
+  const [streamBackgroundAnimate, setStreamBackgroundAnimate] = useState(true);
+  const [streamBackgroundCrtEffect, setStreamBackgroundCrtEffect] = useState(false);
+  const [streamRootBackgroundPresent, setStreamRootBackgroundPresent] = useState(false);
+  const [streamRootBackgroundOpacity, setStreamRootBackgroundOpacity] = useState(0.28);
+  const [canvasUseStreamRootBackground, setCanvasUseStreamRootBackground] = useState(false);
+  /** Bust HTTP cache for GET /api/user/background (new value after load, upload, or remove). */
+  const [userBackgroundFetchRevision, setUserBackgroundFetchRevision] = useState(0);
   const [theme, setTheme] = useState(() => readThemeFromLocalStorage());
   const [hoverInsight, setHoverInsightState] = useState(() => readHoverInsightLocalSeed());
   const [serverReady, setServerReady] = useState(false);
@@ -89,6 +98,8 @@ export function NoteTypeColorProvider({ children }) {
   const skipDefaultStartPageSave = useRef(false);
   const skipDefaultStartPagePhoneSave = useRef(false);
   const skipMarkdownListAlternatingShadesSave = useRef(false);
+  const skipStreamThreadImageBgSave = useRef(false);
+  const skipStreamRootBackgroundMetaSave = useRef(false);
   const skipThemeSave = useRef(false);
   const skipHoverInsightSave = useRef(false);
   const saveTimer = useRef(null);
@@ -100,6 +111,8 @@ export function NoteTypeColorProvider({ children }) {
   const defaultStartPageSaveTimer = useRef(null);
   const defaultStartPagePhoneSaveTimer = useRef(null);
   const markdownListAlternatingShadesSaveTimer = useRef(null);
+  const streamThreadImageBgSaveTimer = useRef(null);
+  const streamRootBackgroundMetaSaveTimer = useRef(null);
   const themeSaveTimer = useRef(null);
   const hoverInsightSaveTimer = useRef(null);
   const prevUserRef = useRef(null);
@@ -137,6 +150,24 @@ export function NoteTypeColorProvider({ children }) {
         setDefaultStartPage(normalizeDefaultStartPage(data.defaultStartPage));
         setDefaultStartPagePhone(normalizeDefaultStartPage(data.defaultStartPagePhone));
         setMarkdownListAlternatingShades(data.markdownListAlternatingShades !== false);
+        setStreamThreadImageBgEnabled(data.streamThreadImageBgEnabled === true);
+        {
+          const op = data.streamThreadImageBgOpacity;
+          setStreamThreadImageBgOpacity(
+            typeof op === 'number' && Number.isFinite(op) ? Math.min(1, Math.max(0, op)) : 0.28
+          );
+        }
+        setStreamBackgroundAnimate(data.streamBackgroundAnimate !== false);
+        setStreamBackgroundCrtEffect(data.streamBackgroundCrtEffect === true);
+        setStreamRootBackgroundPresent(data.streamRootBackgroundPresent === true);
+        {
+          const op = data.streamRootBackgroundOpacity;
+          setStreamRootBackgroundOpacity(
+            typeof op === 'number' && Number.isFinite(op) ? Math.min(1, Math.max(0, op)) : 0.28
+          );
+        }
+        setCanvasUseStreamRootBackground(data.canvasUseStreamRootBackground === true);
+        setUserBackgroundFetchRevision(data.streamRootBackgroundPresent === true ? Date.now() : 0);
 
         const themeFromServer = data.theme === 'dark' ? 'dark' : 'light';
         if (data.settingsThemeWasSet === true) {
@@ -178,6 +209,8 @@ export function NoteTypeColorProvider({ children }) {
           skipDefaultStartPageSave.current = true;
           skipDefaultStartPagePhoneSave.current = true;
           skipMarkdownListAlternatingShadesSave.current = true;
+          skipStreamThreadImageBgSave.current = true;
+          skipStreamRootBackgroundMetaSave.current = true;
           try {
             await patchUserSettings({ noteTypeColors: local });
           } catch (e) {
@@ -194,6 +227,8 @@ export function NoteTypeColorProvider({ children }) {
           skipDefaultStartPageSave.current = true;
           skipDefaultStartPagePhoneSave.current = true;
           skipMarkdownListAlternatingShadesSave.current = true;
+          skipStreamThreadImageBgSave.current = true;
+          skipStreamRootBackgroundMetaSave.current = true;
         }
       } catch (e) {
         console.error(e);
@@ -206,6 +241,8 @@ export function NoteTypeColorProvider({ children }) {
         skipDefaultStartPageSave.current = true;
         skipDefaultStartPagePhoneSave.current = true;
         skipMarkdownListAlternatingShadesSave.current = true;
+        skipStreamThreadImageBgSave.current = true;
+        skipStreamRootBackgroundMetaSave.current = true;
         skipThemeSave.current = true;
         skipHoverInsightSave.current = true;
       } finally {
@@ -234,6 +271,14 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPage('stream');
       setDefaultStartPagePhone('stream');
       setMarkdownListAlternatingShades(true);
+      setStreamThreadImageBgEnabled(false);
+      setStreamThreadImageBgOpacity(0.28);
+      setStreamBackgroundAnimate(true);
+      setStreamBackgroundCrtEffect(false);
+      setStreamRootBackgroundPresent(false);
+      setStreamRootBackgroundOpacity(0.28);
+      setCanvasUseStreamRootBackground(false);
+      setUserBackgroundFetchRevision(0);
       setTheme('light');
       setHoverInsightState(defaultHoverInsightForAccount());
       skipNoteTypeColorsSave.current = true;
@@ -245,6 +290,8 @@ export function NoteTypeColorProvider({ children }) {
       skipDefaultStartPageSave.current = true;
       skipDefaultStartPagePhoneSave.current = true;
       skipMarkdownListAlternatingShadesSave.current = true;
+      skipStreamThreadImageBgSave.current = true;
+      skipStreamRootBackgroundMetaSave.current = true;
       skipThemeSave.current = true;
       skipHoverInsightSave.current = true;
     }
@@ -432,6 +479,57 @@ export function NoteTypeColorProvider({ children }) {
 
   useEffect(() => {
     if (!user?.id || !serverReady) return;
+    if (skipStreamThreadImageBgSave.current) {
+      skipStreamThreadImageBgSave.current = false;
+      return;
+    }
+    if (streamThreadImageBgSaveTimer.current) clearTimeout(streamThreadImageBgSaveTimer.current);
+    streamThreadImageBgSaveTimer.current = setTimeout(() => {
+      streamThreadImageBgSaveTimer.current = null;
+      patchUserSettings({
+        streamThreadImageBgEnabled,
+        streamThreadImageBgOpacity,
+        streamBackgroundAnimate,
+        streamBackgroundCrtEffect,
+      }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (streamThreadImageBgSaveTimer.current) clearTimeout(streamThreadImageBgSaveTimer.current);
+    };
+  }, [
+    streamThreadImageBgEnabled,
+    streamThreadImageBgOpacity,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+    user?.id,
+    serverReady,
+  ]);
+
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
+    if (skipStreamRootBackgroundMetaSave.current) {
+      skipStreamRootBackgroundMetaSave.current = false;
+      return;
+    }
+    if (streamRootBackgroundMetaSaveTimer.current) {
+      clearTimeout(streamRootBackgroundMetaSaveTimer.current);
+    }
+    streamRootBackgroundMetaSaveTimer.current = setTimeout(() => {
+      streamRootBackgroundMetaSaveTimer.current = null;
+      patchUserSettings({
+        streamRootBackgroundOpacity,
+        canvasUseStreamRootBackground,
+      }).catch((e) => console.error(e));
+    }, 450);
+    return () => {
+      if (streamRootBackgroundMetaSaveTimer.current) {
+        clearTimeout(streamRootBackgroundMetaSaveTimer.current);
+      }
+    };
+  }, [streamRootBackgroundOpacity, canvasUseStreamRootBackground, user?.id, serverReady]);
+
+  useEffect(() => {
+    if (!user?.id || !serverReady) return;
     if (skipThemeSave.current) {
       skipThemeSave.current = false;
       return;
@@ -527,6 +625,88 @@ export function NoteTypeColorProvider({ children }) {
     setMarkdownListAlternatingShades(Boolean(on));
   }, []);
 
+  const setStreamThreadImageBgEnabledSetting = useCallback((on) => {
+    setStreamThreadImageBgEnabled(Boolean(on));
+  }, []);
+
+  const setStreamThreadImageBgOpacitySetting = useCallback((n) => {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return;
+    setStreamThreadImageBgOpacity(Math.min(1, Math.max(0, x)));
+  }, []);
+
+  const setStreamBackgroundAnimateSetting = useCallback((on) => {
+    setStreamBackgroundAnimate(Boolean(on));
+  }, []);
+
+  const setStreamBackgroundCrtEffectSetting = useCallback((on) => {
+    setStreamBackgroundCrtEffect(Boolean(on));
+  }, []);
+
+  const setStreamRootBackgroundOpacitySetting = useCallback((n) => {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return;
+    setStreamRootBackgroundOpacity(Math.min(1, Math.max(0, x)));
+  }, []);
+
+  const setCanvasUseStreamRootBackgroundSetting = useCallback((on) => {
+    setCanvasUseStreamRootBackground(Boolean(on));
+  }, []);
+
+  const uploadStreamRootBackgroundFile = useCallback(async (file) => {
+    await uploadUserBackground(file);
+    setStreamRootBackgroundPresent(true);
+    setUserBackgroundFetchRevision(Date.now());
+    skipStreamRootBackgroundMetaSave.current = true;
+    skipStreamThreadImageBgSave.current = true;
+    try {
+      await patchUserSettings({
+        streamThreadImageBgEnabled,
+        streamThreadImageBgOpacity,
+        streamBackgroundAnimate,
+        streamBackgroundCrtEffect,
+        streamRootBackgroundOpacity,
+        canvasUseStreamRootBackground,
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }, [
+    streamThreadImageBgEnabled,
+    streamThreadImageBgOpacity,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+    streamRootBackgroundOpacity,
+    canvasUseStreamRootBackground,
+  ]);
+
+  const removeStreamRootBackgroundFile = useCallback(async () => {
+    await deleteUserBackground();
+    setStreamRootBackgroundPresent(false);
+    setUserBackgroundFetchRevision(Date.now());
+    skipStreamRootBackgroundMetaSave.current = true;
+    skipStreamThreadImageBgSave.current = true;
+    try {
+      await patchUserSettings({
+        streamThreadImageBgEnabled,
+        streamThreadImageBgOpacity,
+        streamBackgroundAnimate,
+        streamBackgroundCrtEffect,
+        streamRootBackgroundOpacity,
+        canvasUseStreamRootBackground,
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }, [
+    streamThreadImageBgEnabled,
+    streamThreadImageBgOpacity,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+    streamRootBackgroundOpacity,
+    canvasUseStreamRootBackground,
+  ]);
+
   const setInboxThreadRootIdSetting = useCallback((id) => {
     if (typeof id !== 'string') {
       setInboxThreadRootId('');
@@ -599,6 +779,22 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPagePhone: setDefaultStartPagePhoneSetting,
       markdownListAlternatingShades,
       setMarkdownListAlternatingShades: setMarkdownListAlternatingShadesSetting,
+      streamThreadImageBgEnabled,
+      setStreamThreadImageBgEnabled: setStreamThreadImageBgEnabledSetting,
+      streamThreadImageBgOpacity,
+      setStreamThreadImageBgOpacity: setStreamThreadImageBgOpacitySetting,
+      streamBackgroundAnimate,
+      setStreamBackgroundAnimate: setStreamBackgroundAnimateSetting,
+      streamBackgroundCrtEffect,
+      setStreamBackgroundCrtEffect: setStreamBackgroundCrtEffectSetting,
+      streamRootBackgroundPresent,
+      streamRootBackgroundOpacity,
+      setStreamRootBackgroundOpacity: setStreamRootBackgroundOpacitySetting,
+      canvasUseStreamRootBackground,
+      setCanvasUseStreamRootBackground: setCanvasUseStreamRootBackgroundSetting,
+      userBackgroundFetchRevision,
+      uploadStreamRootBackgroundFile,
+      removeStreamRootBackgroundFile,
       theme,
       setTheme: setThemeSetting,
       hoverInsight,
@@ -633,6 +829,22 @@ export function NoteTypeColorProvider({ children }) {
       setDefaultStartPagePhoneSetting,
       markdownListAlternatingShades,
       setMarkdownListAlternatingShadesSetting,
+      streamThreadImageBgEnabled,
+      setStreamThreadImageBgEnabledSetting,
+      streamThreadImageBgOpacity,
+      setStreamThreadImageBgOpacitySetting,
+      streamBackgroundAnimate,
+      setStreamBackgroundAnimateSetting,
+      streamBackgroundCrtEffect,
+      setStreamBackgroundCrtEffectSetting,
+      streamRootBackgroundPresent,
+      streamRootBackgroundOpacity,
+      setStreamRootBackgroundOpacitySetting,
+      canvasUseStreamRootBackground,
+      setCanvasUseStreamRootBackgroundSetting,
+      userBackgroundFetchRevision,
+      uploadStreamRootBackgroundFile,
+      removeStreamRootBackgroundFile,
       theme,
       setThemeSetting,
       hoverInsight,

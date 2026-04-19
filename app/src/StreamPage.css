@@ -19,9 +19,25 @@
   /* No padding-top: it sat above the sticky nav row and scrolling notes showed through the gap. */
   padding-top: 0;
   background: var(--bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.stream-page-scroll-main {
+  flex: 1;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+  position: relative;
+  z-index: 1;
+}
+
+.stream-page-scroll-main--thread-bg {
+  background: transparent;
 }
 
 /* Quiet context above root / thread-root note lists */
@@ -94,11 +110,11 @@
 }
 
 /*
- * Thread list lives in .stream-page-scroll (inner overflow). Sticky top is relative to that
- * scroller, not the window — do not offset by layout header height or the first message sits in a
- * dead band / looks clipped.
+ * Thread list scrolls in .stream-page-scroll-main. Sticky top is relative to that scroller, not the
+ * window — do not offset by layout header height or the first message sits in a dead band / looks
+ * clipped.
  */
-.stream-page-scroll > .stream-page-nav-row {
+.stream-page-scroll-main > .stream-page-nav-row {
   top: 0;
 }
 
