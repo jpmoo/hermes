@@ -1,12 +1,9 @@
 .stream-page {
-  /* Fill layout-main and cap height so the inner column is the scrollport (was growing with content). */
+  /* Fill layout-main; thread nav is full-width like Canvas — column cap is on .stream-page-scroll-main + compose. */
   flex: 1;
   min-height: 0;
   overflow: hidden;
   width: 100%;
-  max-width: var(--hermes-stream-column-max);
-  margin-left: auto;
-  margin-right: auto;
   display: flex;
   flex-direction: column;
   padding: 0 0 1rem;
@@ -16,7 +13,6 @@
 .stream-page-scroll {
   flex: 1;
   min-height: 0;
-  /* No padding-top: it sat above the sticky nav row and scrolling notes showed through the gap. */
   padding-top: 0;
   background: var(--bg);
   overflow: hidden;
@@ -28,12 +24,18 @@
 .stream-page-scroll-main {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  max-width: var(--hermes-stream-column-max);
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg);
   position: relative;
   z-index: 1;
+  padding-top: 0.75rem;
   /* Reserve space for the absolutely positioned composer so the last notes stay scrollable above it. */
   padding-bottom: var(--stream-compose-reserve, 10rem);
   /* Hide scrollbar; scrolling still works (wheel, touch, trackpad, keyboard). */
@@ -94,37 +96,21 @@
   z-index: 2;
 }
 
-.stream-page-nav-row {
+.stream-page-scroll > .stream-page-nav-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 0.5rem 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
+  flex-shrink: 0;
   transition: opacity 0.2s ease;
-  /* Stay visible while scrolling (below sticky layout header) */
-  position: sticky;
-  top: var(--stream-nav-sticky-top, 3.5rem);
   z-index: 9;
   background: var(--bg);
-  /* Formerly offset by scroll padding-top; keep a little air below layout header */
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
+  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.5rem max(0.75rem, env(safe-area-inset-left, 0px));
   margin-top: 0;
-  margin-left: -0.25rem;
-  margin-right: -0.25rem;
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
-  box-shadow: 0 6px 8px -6px rgba(28, 27, 24, 0.12);
-}
-
-/*
- * Thread list scrolls in .stream-page-scroll-main. Sticky top is relative to that scroller, not the
- * window — do not offset by layout header height or the first message sits in a dead band / looks
- * clipped.
- */
-.stream-page-scroll-main > .stream-page-nav-row {
-  top: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  box-shadow: 0 6px 8px -6px rgba(28, 27, 24, 0.08);
 }
 
 .stream-page-nav-left {
@@ -419,13 +405,6 @@
   }
 }
 
-@media (max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px) {
-  .stream-page-nav-row {
-    /* Below single-row sticky header (see Layout.css --stream-nav-sticky-top-mobile) */
-    top: var(--stream-nav-sticky-top-mobile, 3.65rem);
-  }
-}
-
 /* Stream + canvas: same max width as note column; centered so textarea matches card width */
 .stream-page-compose-wrap,
 .canvas-page-compose-wrap {
@@ -678,10 +657,10 @@
   padding: 0;
 }
 
-/* scrollIntoView targets: room below sticky .stream-page-nav-row inside .stream-page-scroll */
+/* scrollIntoView: thread nav is outside the scrollport; small top margin is enough */
 .stream-page-scroll .stream-page-list > li[data-stream-note],
 .stream-page-scroll .stream-page-replies > li[data-stream-note] {
-  scroll-margin-top: 5.25rem;
+  scroll-margin-top: 0.75rem;
   scroll-margin-bottom: 1rem;
 }
 
@@ -747,8 +726,6 @@
 @media (max-width: 767px), screen and (max-height: 480px) and (orientation: landscape) and (max-width: 932px) {
   .stream-page {
     max-width: 100%;
-    padding-left: max(0.25rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.25rem, env(safe-area-inset-right, 0px));
   }
 
   .stream-page-scroll article.note-card {

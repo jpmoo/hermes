@@ -28,13 +28,9 @@ import {
   readHoverInsightLocalSeed,
   readThemeFromLocalStorage,
 } from './hoverInsightLocalSeed';
+import { normalizeHermesTheme, themeMetaColorScheme, themeMetaThemeColor } from './hermesThemes';
 
 const NoteTypeColorContext = createContext(null);
-
-const THEME_META = {
-  light: '#f4f3f0',
-  dark: '#15181c',
-};
 
 function clampInsightPct(n, fallback) {
   const x = Math.round(Number(n));
@@ -169,7 +165,7 @@ export function NoteTypeColorProvider({ children }) {
         setCanvasUseStreamRootBackground(data.canvasUseStreamRootBackground === true);
         setUserBackgroundFetchRevision(data.streamRootBackgroundPresent === true ? Date.now() : 0);
 
-        const themeFromServer = data.theme === 'dark' ? 'dark' : 'light';
+        const themeFromServer = normalizeHermesTheme(data.theme);
         if (data.settingsThemeWasSet === true) {
           setTheme(themeFromServer);
           skipThemeSave.current = true;
@@ -312,8 +308,8 @@ export function NoteTypeColorProvider({ children }) {
     } catch {
       /* ignore */
     }
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_META[theme]);
-    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeMetaThemeColor(theme));
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', themeMetaColorScheme(theme));
   }, [theme]);
 
   useLayoutEffect(() => {
@@ -573,7 +569,7 @@ export function NoteTypeColorProvider({ children }) {
   }, []);
 
   const setThemeSetting = useCallback((t) => {
-    setTheme(t === 'dark' ? 'dark' : 'light');
+    setTheme(normalizeHermesTheme(t));
   }, []);
 
   const patchHoverInsight = useCallback((partial) => {

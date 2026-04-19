@@ -88,6 +88,117 @@ html[data-theme='dark'] {
   --note-type-bg-event-hover: color-mix(in srgb, #46815f 30%, var(--bg-card-hover));
 }
 
+/* Warm paper — light UI chrome */
+html[data-theme='muted-orange'] {
+  --color-scheme: light;
+  --bg: #f3ebe3;
+  --bg-card: #fffcf8;
+  --bg-card-hover: #ede3d9;
+  --border: #d9c9b8;
+  --text: #221c16;
+  --text-muted: #6b5f54;
+  --accent: #a85a24;
+  --accent-dim: #8a4a1e;
+  --star: #c27836;
+  --on-accent: #fffaf5;
+  --status-warning-bg: rgba(130, 95, 25, 0.09);
+  --status-warning-border: rgba(110, 80, 20, 0.28);
+  --status-warning-text: #5c4200;
+  --status-danger-bg: rgba(160, 45, 45, 0.08);
+  --status-danger-border: rgba(140, 40, 40, 0.3);
+  --status-danger-text: #8f2424;
+  --status-danger-hover: #7a1f1f;
+  --status-danger-btn-bg: #a33636;
+  --status-danger-btn-hover: #8f2d2d;
+  --on-danger-btn: #fff;
+  --note-type-icon-note: color-mix(in srgb, var(--accent) 42%, var(--text-muted));
+  --note-type-icon-organization: var(--accent-dim);
+  --note-type-icon-person: color-mix(in srgb, #6fa9dc 52%, var(--text-muted));
+  --note-type-icon-event: color-mix(in srgb, #5f9b76 50%, var(--text-muted));
+  --note-type-bg-note: var(--bg-card);
+  --note-type-bg-note-hover: var(--bg-card-hover);
+  --note-type-bg-organization: color-mix(in srgb, #f0dcc0 30%, var(--bg-card));
+  --note-type-bg-organization-hover: color-mix(in srgb, #e8d2b4 25%, var(--bg-card-hover));
+  --note-type-bg-person: color-mix(in srgb, #dce8f4 26%, var(--bg-card));
+  --note-type-bg-person-hover: color-mix(in srgb, #d0e0ef 22%, var(--bg-card-hover));
+  --note-type-bg-event: color-mix(in srgb, #ddeee2 28%, var(--bg-card));
+  --note-type-bg-event-hover: color-mix(in srgb, #d0e8d8 24%, var(--bg-card-hover));
+}
+
+/* Sage-tinted surfaces — light UI chrome */
+html[data-theme='muted-green'] {
+  --color-scheme: light;
+  --bg: #e8f0e9;
+  --bg-card: #f9fcf9;
+  --bg-card-hover: #dfe8e0;
+  --border: #c4d4c6;
+  --text: #161c17;
+  --text-muted: #556056;
+  --accent: #2f6b44;
+  --accent-dim: #265738;
+  --star: #3d8a5a;
+  --on-accent: #f9fcf9;
+  --status-warning-bg: rgba(95, 110, 45, 0.1);
+  --status-warning-border: rgba(85, 95, 40, 0.28);
+  --status-warning-text: #4a4200;
+  --status-danger-bg: rgba(160, 45, 45, 0.08);
+  --status-danger-border: rgba(140, 40, 40, 0.3);
+  --status-danger-text: #8f2424;
+  --status-danger-hover: #7a1f1f;
+  --status-danger-btn-bg: #a33636;
+  --status-danger-btn-hover: #8f2d2d;
+  --on-danger-btn: #fff;
+  --note-type-icon-note: color-mix(in srgb, var(--accent) 42%, var(--text-muted));
+  --note-type-icon-organization: var(--accent-dim);
+  --note-type-icon-person: color-mix(in srgb, #4a8ab8 52%, var(--text-muted));
+  --note-type-icon-event: color-mix(in srgb, #4a9b6a 50%, var(--text-muted));
+  --note-type-bg-note: var(--bg-card);
+  --note-type-bg-note-hover: var(--bg-card-hover);
+  --note-type-bg-organization: color-mix(in srgb, #e2e8c8 32%, var(--bg-card));
+  --note-type-bg-organization-hover: color-mix(in srgb, #d8e0bc 27%, var(--bg-card-hover));
+  --note-type-bg-person: color-mix(in srgb, #d4e6f2 28%, var(--bg-card));
+  --note-type-bg-person-hover: color-mix(in srgb, #c8deec 24%, var(--bg-card-hover));
+  --note-type-bg-event: color-mix(in srgb, #cfe8d8 30%, var(--bg-card));
+  --note-type-bg-event-hover: color-mix(in srgb, #c2e0d0 26%, var(--bg-card-hover));
+}
+
+/* Cool gray-blue — light UI chrome */
+html[data-theme='muted-blue'] {
+  --color-scheme: light;
+  --bg: #e6eef6;
+  --bg-card: #f8fafc;
+  --bg-card-hover: #dce6f0;
+  --border: #c2cedb;
+  --text: #151a1f;
+  --text-muted: #525c66;
+  --accent: #3566a3;
+  --accent-dim: #2a5282;
+  --star: #4a7ec4;
+  --on-accent: #f8fafc;
+  --status-warning-bg: rgba(120, 95, 35, 0.09);
+  --status-warning-border: rgba(100, 80, 30, 0.26);
+  --status-warning-text: #5c4200;
+  --status-danger-bg: rgba(160, 45, 45, 0.08);
+  --status-danger-border: rgba(140, 40, 40, 0.3);
+  --status-danger-text: #8f2424;
+  --status-danger-hover: #7a1f1f;
+  --status-danger-btn-bg: #a33636;
+  --status-danger-btn-hover: #8f2d2d;
+  --on-danger-btn: #fff;
+  --note-type-icon-note: color-mix(in srgb, var(--accent) 42%, var(--text-muted));
+  --note-type-icon-organization: var(--accent-dim);
+  --note-type-icon-person: color-mix(in srgb, #5a9fd4 52%, var(--text-muted));
+  --note-type-icon-event: color-mix(in srgb, #5aab84 50%, var(--text-muted));
+  --note-type-bg-note: var(--bg-card);
+  --note-type-bg-note-hover: var(--bg-card-hover);
+  --note-type-bg-organization: color-mix(in srgb, #e8e4d4 28%, var(--bg-card));
+  --note-type-bg-organization-hover: color-mix(in srgb, #e0dbc8 24%, var(--bg-card-hover));
+  --note-type-bg-person: color-mix(in srgb, #d8e8f8 30%, var(--bg-card));
+  --note-type-bg-person-hover: color-mix(in srgb, #ccdff4 26%, var(--bg-card-hover));
+  --note-type-bg-event: color-mix(in srgb, #d6ebe4 28%, var(--bg-card));
+  --note-type-bg-event-hover: color-mix(in srgb, #cae4da 24%, var(--bg-card-hover));
+}
+
 .note-type-icon {
   flex-shrink: 0;
 }
@@ -212,6 +323,17 @@ html.hermes-viewport-bg-active .canvas-toolbar .canvas-icon-btn {
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--bg-card);
+}
+
+html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-icon-btn,
+html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-icon-btn.canvas-icon-btn--open {
+  background: var(--bg-card);
+}
+
+html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-icon-btn:hover {
   color: var(--accent);
   border-color: var(--accent-dim);
   background: var(--bg-card);

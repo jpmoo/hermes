@@ -9,6 +9,7 @@ import {
   normalizeCalendarLookoutDays,
 } from './calendarLookoutDays';
 import { getRoots } from './api';
+import { HERMES_THEME_LABELS, HERMES_THEME_ORDER } from './hermesThemes';
 import './SettingsModal.css';
 
 export default function SettingsModal({ onClose }) {
@@ -54,6 +55,8 @@ export default function SettingsModal({ onClose }) {
     setCanvasUseStreamRootBackground,
     uploadStreamRootBackgroundFile,
     removeStreamRootBackgroundFile,
+    theme,
+    setTheme,
   } = useNoteTypeColors();
   const rootBackgroundFileRef = useRef(null);
   const [rootBgUploadBusy, setRootBgUploadBusy] = useState(false);
@@ -213,6 +216,33 @@ export default function SettingsModal({ onClose }) {
         aria-labelledby="settings-modal-title"
       >
         <h2 id="settings-modal-title">Settings</h2>
+
+        <section className="settings-modal-section" aria-labelledby="settings-appearance-heading">
+          <h3 id="settings-appearance-heading" className="settings-modal-section-title">
+            Appearance
+          </h3>
+          <p className="settings-modal-section-lead">
+            Color theme for the whole app (header, cards, accents). Saved to your account and synced across
+            devices. You can also cycle themes from the palette icon in the header.
+          </p>
+          <div className="settings-modal-similar-notes-row">
+            <label className="settings-modal-similar-notes-label" htmlFor="settings-theme-select">
+              Theme
+            </label>
+            <select
+              id="settings-theme-select"
+              className="settings-modal-similar-notes-input"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+            >
+              {HERMES_THEME_ORDER.map((id) => (
+                <option key={id} value={id}>
+                  {HERMES_THEME_LABELS[id]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
 
         <section className="settings-modal-section" aria-labelledby="settings-start-page-heading">
           <h3 id="settings-start-page-heading" className="settings-modal-section-title">
@@ -460,7 +490,7 @@ export default function SettingsModal({ onClose }) {
           </h3>
           <p className="settings-modal-section-lead">
             These colors tint type icons and card backgrounds across Stream, Outline, Search, and hover panels.
-            They follow light and dark theme surfaces automatically. Choices are saved to your account so they
+            They follow the active theme (light, dark, or tinted) automatically. Choices are saved to your account so they
             apply on every device after you sign in.
           </p>
           <ul className="settings-modal-type-colors">

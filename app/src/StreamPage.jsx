@@ -168,6 +168,7 @@ function scrollStreamDrillUpRowBelowNav(streamEl, listEl, noteId) {
   if (!streamEl || !listEl || noteId == null) return false;
   const li = findStreamLiByNoteId(listEl, noteId);
   if (!li) return false;
+  /* Nav sits above `.stream-page-scroll-main` (not inside it), so no in-scroller chrome height. */
   const nav = streamEl.querySelector(':scope > .stream-page-nav-row');
   const navH = nav ? nav.getBoundingClientRect().height : 0;
   const pad = 8;
@@ -226,6 +227,7 @@ function readCssRemVarPx(varName, fallbackRem) {
  */
 function measureStreamFloatMoveTopPx(streamScrollEl) {
   const nav =
+    streamScrollEl?.parentElement?.querySelector?.(':scope > .stream-page-nav-row') ??
     streamScrollEl?.querySelector?.(':scope > .stream-page-nav-row') ??
     document.querySelector('.stream-page-scroll > .stream-page-nav-row');
   if (nav && typeof nav.getBoundingClientRect === 'function') {
@@ -1857,6 +1859,36 @@ export default function StreamPage() {
               crtEffect={streamBackgroundCrtEffect}
             />
           ) : null}
+          {threadRootId ? (
+            <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
+              <div className="stream-page-nav-left">
+                {focusId && !noteIdEq(focusId, actualRootId) ? (
+                  <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
+                    <NavIconUpOneLevel className="stream-page-nav-icon" />
+                  </button>
+                ) : null}
+                <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
+                  <NavIconRootLevel className="stream-page-nav-icon" />
+                </button>
+                {historyControl}
+                {!loadingThread && thread.length > 0 && tree.length > 0 && summaryVisibleIds.length > 0 ? (
+                  <button
+                    type="button"
+                    className="stream-page-nav-btn stream-page-nav-btn--icon"
+                    onClick={() => setSummaryModalOpen(true)}
+                    aria-label="AI thread summary"
+                    title="AI thread summary"
+                  >
+                    <NavIconBrain className="stream-page-nav-icon" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="stream-page-nav-row">
+              <div className="stream-page-nav-left">{historyControl}</div>
+            </div>
+          )}
           <div
             ref={streamScrollRef}
             className={`stream-page-scroll-main ${
@@ -1865,30 +1897,6 @@ export default function StreamPage() {
           >
           {threadRootId ? (
             <>
-              <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
-                <div className="stream-page-nav-left">
-                  {focusId && !noteIdEq(focusId, actualRootId) ? (
-                    <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
-                      <NavIconUpOneLevel className="stream-page-nav-icon" />
-                    </button>
-                  ) : null}
-                  <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
-                    <NavIconRootLevel className="stream-page-nav-icon" />
-                  </button>
-                  {historyControl}
-                  {!loadingThread && thread.length > 0 && tree.length > 0 && summaryVisibleIds.length > 0 ? (
-                    <button
-                      type="button"
-                      className="stream-page-nav-btn stream-page-nav-btn--icon"
-                      onClick={() => setSummaryModalOpen(true)}
-                      aria-label="AI thread summary"
-                      title="AI thread summary"
-                    >
-                      <NavIconBrain className="stream-page-nav-icon" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
               {loadingThread && thread.length === 0 ? (
                 <p className="stream-page-muted">Loading thread…</p>
               ) : thread.length === 0 ? (
@@ -1924,9 +1932,6 @@ export default function StreamPage() {
             </>
           ) : (
             <>
-              <div className="stream-page-nav-row">
-                <div className="stream-page-nav-left">{historyControl}</div>
-              </div>
               {loadError && (
                 <p className="stream-page-error" role="alert">
                   {loadError}

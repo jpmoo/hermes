@@ -77,6 +77,10 @@
   outline-offset: 2px;
 }
 
-.canvas-icon-btn.canvas-icon-btn--open {
-  outline: 1px solid var(--accent-dim);
+/* Open state: match other toolbar icon buttons (accent border, not extra outline ring) */
+.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn.canvas-icon-btn--open {
+  outline: none;
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--bg-card);
 }

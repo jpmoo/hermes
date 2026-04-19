@@ -140,6 +140,31 @@
   border-color: var(--accent-dim);
 }
 
+/* Sequence/lines menu lives in a nested component; pin same chrome as sibling toolbar icon buttons */
+.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn {
+  width: 2.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--bg-card);
+}
+
+.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn.canvas-icon-btn--off:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
 .canvas-toolbar-right {
   display: flex;
   flex-wrap: wrap;

@@ -2,6 +2,7 @@
  * Device-local defaults for Hover Insight (used to seed the account on first sync).
  * Kept separate from HoverInsightContext so NoteTypeColorContext can migrate them to the server.
  */
+import { normalizeHermesTheme } from './hermesThemes';
 import { ALL_NOTE_TYPES, NOTE_TYPE_FILTER_ORDER } from './noteTypeFilter';
 
 const RAGDOLL_CONTEXT_LS_KEY = 'hermes.ragdollContextOptions';
@@ -95,7 +96,7 @@ export function defaultHoverInsightForAccount() {
 export function readThemeFromLocalStorage() {
   try {
     const v = localStorage.getItem('hermes.theme');
-    return v === 'dark' ? 'dark' : 'light';
+    return normalizeHermesTheme(v);
   } catch {
     return 'light';
   }

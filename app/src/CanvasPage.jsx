@@ -1979,7 +1979,7 @@ export default function CanvasPage() {
                 onAutoFocusAlignChange={setDraftAutoFocusAlign}
                 onApply={applyCanvasSequence}
               >
-                <NavIconSequenceLines />
+                <NavIconSequenceLines className="stream-page-nav-icon" />
               </CanvasSequenceMenu>
               <div className="canvas-toolbar-zoom">
                 <button

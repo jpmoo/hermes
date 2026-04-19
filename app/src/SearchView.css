@@ -69,6 +69,43 @@
   border-top: 1px solid var(--border);
 }
 
+/* Note types + tags side by side (half width each); stack on narrow viewports */
+.search-view-types-tags-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1.25rem;
+  align-items: start;
+}
+
+.search-view-types-tags-row > .search-view-query-section {
+  min-width: 0;
+}
+
+.search-view-types-tags-row > .search-view-query-section + .search-view-query-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.search-view-types-tags-row + .search-view-query-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .search-view-types-tags-row {
+    grid-template-columns: 1fr;
+    gap: 1rem 0;
+  }
+
+  .search-view-types-tags-row > .search-view-query-section + .search-view-query-section {
+    margin-top: 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+}
+
 .search-view-section-label {
   margin: 0 0 0.5rem;
   font-size: 0.875rem;

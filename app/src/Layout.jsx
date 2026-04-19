@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearStreamNavMemory, getLastStreamSearch } from './streamNavMemory';
 import { useNoteTypeColors } from './NoteTypeColorContext';
+import { HERMES_THEME_LABELS, nextHermesTheme, normalizeHermesTheme } from './hermesThemes';
 import './Layout.css';
 import {
   LayoutNavIcon,
@@ -96,9 +97,9 @@ export default function Layout({
             <button
               type="button"
               className="layout-logout"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              onClick={() => setTheme(nextHermesTheme(theme))}
+              aria-label={`Switch to ${HERMES_THEME_LABELS[nextHermesTheme(normalizeHermesTheme(theme))]} theme`}
+              title={`Theme: ${HERMES_THEME_LABELS[normalizeHermesTheme(theme)]}. Next: ${HERMES_THEME_LABELS[nextHermesTheme(normalizeHermesTheme(theme))]}.`}
             >
               <NavIconTheme className="layout-toolbar-icon" />
             </button>

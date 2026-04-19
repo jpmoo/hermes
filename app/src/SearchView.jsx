@@ -163,41 +163,43 @@ function SearchViewInner() {
             for text (alone or together with tags).
           </p>
 
-          <div className="search-view-query-section">
-            <p className="search-view-section-label" id="search-section-types">
-              Note types
-            </p>
-            <NoteTypeFilterButtons mode="search" />
-          </div>
-
-          <div className="search-view-query-section">
-            <p className="search-view-section-label" id="search-section-tags">
-              Tags <span className="search-view-section-optional">(optional)</span>
-            </p>
-            <div className="search-view-tags-row">
-              {allTags.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`search-view-tag-chip ${selectedTagIds.includes(t.id) ? 'search-view-tag-chip--on' : ''}`}
-                  onClick={() => toggleTag(t)}
-                >
-                  {t.name}
-                </button>
-              ))}
+          <div className="search-view-types-tags-row">
+            <div className="search-view-query-section">
+              <p className="search-view-section-label" id="search-section-types">
+                Note types
+              </p>
+              <NoteTypeFilterButtons mode="search" />
             </div>
-            {hasTags && (
-              <div className="search-view-tags-mode" role="radiogroup" aria-label="Tag match mode">
-                <label>
-                  <input type="radio" checked={tagMode === 'and'} onChange={() => setTagMode('and')} />
-                  Match all tags (AND)
-                </label>
-                <label>
-                  <input type="radio" checked={tagMode === 'or'} onChange={() => setTagMode('or')} />
-                  Match any tag (OR)
-                </label>
+
+            <div className="search-view-query-section">
+              <p className="search-view-section-label" id="search-section-tags">
+                Tags <span className="search-view-section-optional">(optional)</span>
+              </p>
+              <div className="search-view-tags-row">
+                {allTags.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`search-view-tag-chip ${selectedTagIds.includes(t.id) ? 'search-view-tag-chip--on' : ''}`}
+                    onClick={() => toggleTag(t)}
+                  >
+                    {t.name}
+                  </button>
+                ))}
               </div>
-            )}
+              {hasTags && (
+                <div className="search-view-tags-mode" role="radiogroup" aria-label="Tag match mode">
+                  <label>
+                    <input type="radio" checked={tagMode === 'and'} onChange={() => setTagMode('and')} />
+                    Match all tags (AND)
+                  </label>
+                  <label>
+                    <input type="radio" checked={tagMode === 'or'} onChange={() => setTagMode('or')} />
+                    Match any tag (OR)
+                  </label>
+                </div>
+              )}
+            </div>
           </div>
 
           <form className="search-view-query-section search-view-form" onSubmit={handleSearch}>

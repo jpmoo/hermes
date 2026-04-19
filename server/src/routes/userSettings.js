@@ -105,17 +105,25 @@ function settingsJsonHasKey(raw, key) {
   return raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, key);
 }
 
+const HERMES_THEME_IDS = new Set([
+  'light',
+  'dark',
+  'muted-orange',
+  'muted-green',
+  'muted-blue',
+]);
+
 function sanitizeTheme(input) {
   if (input == null) return undefined;
-  if (input === 'light' || input === 'dark') return input;
+  if (typeof input === 'string' && HERMES_THEME_IDS.has(input)) return input;
   return undefined;
 }
 
-/** @returns {'light' | 'dark'} */
+/** @returns {string} Hermes theme id (defaults to light) */
 function themeFromStored(raw) {
   if (!raw || typeof raw !== 'object') return 'light';
   const t = sanitizeTheme(raw.theme);
-  return t === 'dark' ? 'dark' : 'light';
+  return t ?? 'light';
 }
 
 function streamThreadImageBgOpacityFromStored(raw) {
@@ -870,7 +878,10 @@ router.patch('/settings', requireAuth, async (req, res) => {
       } else {
         const t = sanitizeTheme(theme);
         if (t === undefined) {
-          return res.status(400).json({ error: 'theme must be light, dark, or null' });
+          return res.status(400).json({
+            error:
+              'theme must be light, dark, muted-orange, muted-green, muted-blue, or null',
+          });
         }
         cur.theme = t;
       }
