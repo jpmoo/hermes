@@ -255,11 +255,11 @@ function isCompactStreamViewport() {
   ).matches;
 }
 
-/** Mirrors `index.css` `--hermes-stream-column-max: min(50vw, calc(100vw - 2rem))` in px. */
+/** Mirrors `index.css` `--hermes-stream-column-max: min(60vw, calc(100vw - 2rem))` in px. */
 function streamColumnMaxWidthPx() {
-  if (typeof window === 'undefined' || !Number.isFinite(window.innerWidth)) return 720;
+  if (typeof window === 'undefined' || !Number.isFinite(window.innerWidth)) return 864;
   const vw = window.innerWidth;
-  return Math.max(0, Math.round(Math.min(vw * 0.5, vw - 32)));
+  return Math.max(0, Math.round(Math.min(vw * 0.6, vw - 32)));
 }
 
 function streamMoveFloatTargetWidthPx(naturalCardWidthPx) {

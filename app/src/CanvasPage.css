@@ -102,12 +102,42 @@
   background: var(--bg-hover);
 }
 
+/* Toolbar controls: match Stream thread nav icon buttons (stream-page-nav-btn--icon). */
+.canvas-toolbar .canvas-icon-btn {
+  width: 2.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.canvas-toolbar .canvas-icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--bg-card);
+}
+
+.canvas-toolbar .canvas-zoom-field {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
 .canvas-icon-btn--off {
   opacity: 0.55;
 }
 
 .canvas-icon-btn--off:hover {
   opacity: 0.75;
+}
+
+.canvas-toolbar .canvas-icon-btn--off:hover {
+  color: var(--accent);
+  border-color: var(--accent-dim);
 }
 
 .canvas-toolbar-right {

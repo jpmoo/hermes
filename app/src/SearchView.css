@@ -35,6 +35,12 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 2rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.search-view-results::-webkit-scrollbar {
+  display: none;
 }
 
 .search-view-query {
