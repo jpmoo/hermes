@@ -42,13 +42,13 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 7.5rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 2.75rem)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 7.5rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 2.75rem)),
     transparent 100%
   );
   mask-repeat: no-repeat;
@@ -117,19 +117,20 @@
  * Thread nav sits outside .stream-page-scroll-main so it is not clipped by overflow-x: hidden
  * (full-bleed 100vw + negative margin previously hid left-aligned controls).
  */
+/* Match .canvas-toolbar horizontal padding + thread controls match .canvas-toolbar-left / .canvas-toolbar .canvas-icon-btn */
 .stream-page-scroll > .stream-page-nav-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.5rem 0.75rem;
+  gap: 0.75rem;
   flex-shrink: 0;
   position: relative;
   z-index: 2;
   transition: opacity 0.2s ease;
   width: 100%;
-  margin: 0 0 0.65rem;
-  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.45rem max(0.75rem, env(safe-area-inset-left, 0px));
+  margin: 0 0 0.5rem;
+  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.5rem max(0.75rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   background: transparent;
   border: none;
@@ -140,7 +141,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 0.75rem;
+  gap: 0.35rem;
 }
 
 .stream-page-nav-row--exit {
@@ -148,15 +149,12 @@
   pointer-events: none;
 }
 
+/* Icon nav — same chrome as .canvas-toolbar .canvas-icon-btn (CanvasPage.css) */
 .stream-page-nav-btn {
   padding: 0.45rem 0.85rem;
-  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
-  border: none;
   border-radius: 8px;
-  color: var(--text-muted);
   font-size: 0.875rem;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
   box-shadow: none;
 }
 
@@ -168,11 +166,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .stream-page-nav-btn:hover {
   color: var(--accent);
-  background: color-mix(in srgb, var(--bg-card) 94%, var(--accent) 6%);
+  border-color: var(--accent-dim);
+  background: var(--bg-card);
 }
 
 .stream-page-nav-btn:focus-visible {
@@ -480,7 +483,7 @@
 
 /*
  * Composer overlays scroll/viewport — no theme-color wash; wallpaper / body bg shows through.
- * Inputs and buttons keep their own solid fills (see .stream-page-compose rules).
+ * Blur band sits just above the form (tight to the content box); list fade mask stays minimal.
  */
 .stream-page-scroll > .stream-page-compose-wrap,
 .canvas-page-main > .canvas-page-compose-wrap {
@@ -492,6 +495,29 @@
   padding-top: 1.25rem;
   padding-bottom: 0.5rem;
   background: transparent;
+}
+
+.stream-page-scroll > .stream-page-compose-wrap::before,
+.canvas-page-main > .canvas-page-compose-wrap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--hermes-compose-blur-band-height, 2.5rem);
+  pointer-events: none;
+  z-index: 0;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  /* Feather so blur peaks just above the compose row */
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 28%, #000 72%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 28%, #000 72%, transparent 100%);
+}
+
+.stream-page-scroll > .stream-page-compose-wrap .stream-page-compose,
+.canvas-page-main > .canvas-page-compose-wrap .stream-page-compose {
+  position: relative;
+  z-index: 1;
 }
 
 .stream-page-scroll > .stream-page-compose-wrap {

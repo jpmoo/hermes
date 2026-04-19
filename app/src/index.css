@@ -50,8 +50,10 @@ html {
   /* Stream note column + stream/canvas compose: 60% of viewport width (never wider than full width minus margin). */
   --hermes-stream-column-max: min(60vw, calc(100vw - 2rem));
   --hermes-compose-inset-x: 0.75rem;
-  /* Bottom fade for thread/canvas content above the compose strip (mask alpha, not theme fill). */
-  --hermes-compose-content-fade: 7.5rem;
+  /* Bottom fade for thread/canvas list (mask alpha) — keep tight so blur band above the form does the work. */
+  --hermes-compose-content-fade: 2.75rem;
+  /* Backdrop blur band at top of compose strip (above the form). */
+  --hermes-compose-blur-band-height: 2.5rem;
 }
 
 html[data-theme='dark'] {
@@ -270,7 +272,11 @@ html.hermes-viewport-bg-active .stream-page-nav-row {
 
 html.hermes-viewport-bg-active .stream-page-nav-btn {
   background: var(--bg-card);
-  border: none;
+  border: 1px solid var(--border);
+}
+
+html.hermes-viewport-bg-active .stream-page-nav-btn:hover {
+  border-color: var(--accent-dim);
 }
 
 /* Compose strip: transparent — thread/canvas wallpaper visible; controls keep card fills below */
