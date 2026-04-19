@@ -57,6 +57,8 @@ export default function NoteCard({
   drillOnSingleClick = false,
   /** Stream: hide delete (and trailing spacer) on the subtree head when drilled below thread root. */
   hideDelete = false,
+  /** Stream thread head: optional control (e.g. reply sort), bottom-right of card. */
+  streamThreadSortSlot = null,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
@@ -422,7 +424,7 @@ export default function NoteCard({
     const el = raw instanceof Element ? raw : raw?.parentElement;
     return Boolean(
       el?.closest(
-        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments'
+        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-stream-thread-sort, .stream-thread-sort'
       )
     );
   }, []);
@@ -488,6 +490,7 @@ export default function NoteCard({
   const cardClassNames = [
     cardClass,
     'note-card--has-type-icon',
+    streamThreadSortSlot ? 'note-card--has-stream-sort' : '',
     editing ? 'note-card--editing' : '',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
@@ -800,6 +803,9 @@ export default function NoteCard({
           </time>
         </div>
       </div>
+      {streamThreadSortSlot ? (
+        <div className="note-card-stream-thread-sort">{streamThreadSortSlot}</div>
+      ) : null}
       {descendantBadge != null ? (
         <span
           className="note-card-descendant-count"

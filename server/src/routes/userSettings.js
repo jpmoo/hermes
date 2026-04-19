@@ -216,6 +216,35 @@ function defaultStartPagePhoneFromStored(raw) {
 const NOTE_HISTORY_MAX = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const STREAM_THREAD_SORT_MODES = new Set([
+  'edit_asc',
+  'edit_desc',
+  'schedule_asc',
+  'schedule_desc',
+  'alpha_asc',
+  'alpha_desc',
+]);
+const MAX_STREAM_THREAD_SORT_KEYS = 160;
+
+function sanitizeStreamThreadSortMap(input) {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) return {};
+  const out = {};
+  let n = 0;
+  for (const [tid, v] of Object.entries(input)) {
+    if (n++ >= MAX_STREAM_THREAD_SORT_KEYS) break;
+    if (typeof tid !== 'string' || !UUID_RE.test(tid.trim())) continue;
+    const id = tid.trim().toLowerCase();
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    const sortMode =
+      typeof v.sortMode === 'string' && STREAM_THREAD_SORT_MODES.has(v.sortMode)
+        ? v.sortMode
+        : 'schedule_asc';
+    const starredFirst = v.starredFirst === false ? false : true;
+    out[id] = { sortMode, starredFirst };
+  }
+  return out;
+}
+
 function normalizeHex(v) {
   if (typeof v !== 'string') return null;
   const s = v.trim();
@@ -394,6 +423,7 @@ router.get('/settings', requireAuth, async (req, res) => {
     const markdownListAlternatingShades = raw.markdownListAlternatingShades !== false;
     const outTheme = themeFromStored(raw);
     const outHoverInsight = hoverInsightFromStored(raw);
+    const streamThreadSort = sanitizeStreamThreadSortMap(raw.streamThreadSort);
     res.json({
       noteTypeColors,
       similarNotesMinChars: similarStored === undefined ? null : similarStored,
@@ -415,6 +445,7 @@ router.get('/settings', requireAuth, async (req, res) => {
       /** True once the key exists in settings_json (client may migrate from localStorage when false). */
       settingsThemeWasSet: settingsJsonHasKey(raw, 'theme'),
       settingsHoverInsightWasSet: settingsJsonHasKey(raw, 'hoverInsight'),
+      streamThreadSort,
     });
   } catch (err) {
     console.error(err);
@@ -442,6 +473,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       markdownListAlternatingShades,
       theme,
       hoverInsight,
+      streamThreadSort,
     } = req.body ?? {};
     const r = await pool.query('SELECT settings_json FROM users WHERE id = $1', [req.userId]);
     const cur = r.rows[0]?.settings_json && typeof r.rows[0].settings_json === 'object'
@@ -674,6 +706,16 @@ router.patch('/settings', requireAuth, async (req, res) => {
       }
     }
 
+    if (streamThreadSort !== undefined) {
+      if (streamThreadSort === null) {
+        delete cur.streamThreadSort;
+      } else if (typeof streamThreadSort !== 'object' || Array.isArray(streamThreadSort)) {
+        return res.status(400).json({ error: 'streamThreadSort must be an object or null' });
+      } else {
+        cur.streamThreadSort = sanitizeStreamThreadSortMap(streamThreadSort);
+      }
+    }
+
     await pool.query('UPDATE users SET settings_json = $1::jsonb WHERE id = $2', [
       JSON.stringify(cur),
       req.userId,
@@ -694,6 +736,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outListAlt = cur.markdownListAlternatingShades !== false;
     const outTheme = themeFromStored(cur);
     const outHoverInsight = hoverInsightFromStored(cur);
+    const outStreamThreadSort = sanitizeStreamThreadSortMap(cur.streamThreadSort);
     res.json({
       noteTypeColors: outColors,
       similarNotesMinChars: outSimilar === undefined ? null : outSimilar,
@@ -714,6 +757,7 @@ router.patch('/settings', requireAuth, async (req, res) => {
       hoverInsight: outHoverInsight,
       settingsThemeWasSet: settingsJsonHasKey(cur, 'theme'),
       settingsHoverInsightWasSet: settingsJsonHasKey(cur, 'hoverInsight'),
+      streamThreadSort: outStreamThreadSort,
     });
   } catch (err) {
     console.error(err);

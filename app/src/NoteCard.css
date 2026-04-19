@@ -62,6 +62,19 @@
   padding-right: 2.1rem;
 }
 
+/* Stream thread sort control (bottom-right; shifts reply-count left when both show) */
+.note-card-stream-thread-sort {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.55rem;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.note-card--has-stream-sort .note-card-descendant-count {
+  right: 2.85rem;
+}
+
 /* Recursive reply count (Stream/Canvas); blank when zero — mirrors .note-card-type-icon inset (top/right) */
 .note-card-descendant-count {
   position: absolute;

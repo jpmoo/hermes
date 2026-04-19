@@ -31,7 +31,12 @@ import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync'
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
-import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
+import {
+  sortNoteTreeWithStreamPrefs,
+  normalizeStreamThreadSortPrefs,
+  sortStarredPinned,
+} from './noteThreadSort';
+import StreamThreadSortControl from './StreamThreadSortControl';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import {
   NavIconAttach,
@@ -396,6 +401,9 @@ function StreamList({
   exitToRoot = false,
   /** Hide delete on the NoteCard for this note id at list depth 0 (stream focus target). */
   streamFocusHideDeleteId = null,
+  /** Thread head only: sort control target id + slot (must match hide-delete head). */
+  streamHeadSortTargetId = null,
+  streamHeadSortSlot = null,
 }) {
   return (
     <>
@@ -435,6 +443,14 @@ function StreamList({
                 depth === 0 &&
                 noteIdEq(n.id, streamFocusHideDeleteId)
               }
+              streamThreadSortSlot={
+                streamHeadSortSlot &&
+                streamHeadSortTargetId != null &&
+                depth === 0 &&
+                noteIdEq(n.id, streamHeadSortTargetId)
+                  ? streamHeadSortSlot
+                  : null
+              }
               hasReplies={(n.children?.length ?? 0) > 0}
               hoverInsightEnabled
               drillOnSingleClick
@@ -459,6 +475,8 @@ function StreamList({
                   levelDropDelays={levelDropDelays}
                   exitToRoot={exitToRoot}
                   streamFocusHideDeleteId={streamFocusHideDeleteId}
+                  streamHeadSortTargetId={streamHeadSortTargetId}
+                  streamHeadSortSlot={streamHeadSortSlot}
                 />
               </ul>
             )}
@@ -546,10 +564,13 @@ export default function StreamPage() {
   const [floatOpen, setFloatOpen] = useState(null);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [noteHistory, setNoteHistory] = useState([]);
+  /** Per thread root: stream reply sort prefs (persisted in user settings). */
+  const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyBtnRef = useRef(null);
   const historyMenuRef = useRef(null);
   const historySaveTimer = useRef(null);
+  const streamSortSaveTimer = useRef(null);
   const historyInitRef = useRef(false);
   const lastVisitedNoteRef = useRef(null);
   const [replyStagger, setReplyStagger] = useState(false);
@@ -596,6 +617,7 @@ export default function StreamPage() {
   useEffect(() => {
     if (!user?.id) {
       setNoteHistory([]);
+      setStreamThreadSortByRoot({});
       historyInitRef.current = false;
       return;
     }
@@ -605,6 +627,11 @@ export default function StreamPage() {
         const s = await fetchUserSettings();
         if (cancelled) return;
         setNoteHistory(Array.isArray(s.noteHistory) ? s.noteHistory : []);
+        setStreamThreadSortByRoot(
+          s.streamThreadSort && typeof s.streamThreadSort === 'object' && !Array.isArray(s.streamThreadSort)
+            ? s.streamThreadSort
+            : {}
+        );
       } catch (e) {
         console.error(e);
         if (!cancelled) setNoteHistory([]);
@@ -731,13 +758,51 @@ export default function StreamPage() {
     setDrillPendingFocusId(null);
   }, [threadRootId]);
 
+  const threadSortPrefs = useMemo(() => {
+    if (!threadRootId) return normalizeStreamThreadSortPrefs(undefined);
+    const rid = threadRootId.trim().toLowerCase();
+    return normalizeStreamThreadSortPrefs(streamThreadSortByRoot[rid]);
+  }, [streamThreadSortByRoot, threadRootId]);
+
+  const onThreadSortChange = useCallback(
+    (next) => {
+      if (!threadRootId) return;
+      const rid = threadRootId.trim().toLowerCase();
+      setStreamThreadSortByRoot((prev) => {
+        const merged = { ...prev, [rid]: next };
+        if (streamSortSaveTimer.current) clearTimeout(streamSortSaveTimer.current);
+        streamSortSaveTimer.current = setTimeout(() => {
+          streamSortSaveTimer.current = null;
+          patchUserSettings({ streamThreadSort: merged }).catch((e) => console.error(e));
+        }, 400);
+        return merged;
+      });
+    },
+    [threadRootId]
+  );
+
+  const streamHeadSortSlot = useMemo(
+    () =>
+      threadRootId ? (
+        <StreamThreadSortControl
+          sortMode={threadSortPrefs.sortMode}
+          starredFirst={threadSortPrefs.starredFirst}
+          onChange={onThreadSortChange}
+        />
+      ) : null,
+    [threadRootId, threadSortPrefs.sortMode, threadSortPrefs.starredFirst, onThreadSortChange]
+  );
+
   const threadReady = Boolean(threadRootId && !loadingThread && thread.length > 0);
   const treeFull = useMemo(() => buildTree(thread), [thread]);
   const tree = useMemo(
-    () => sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes)),
-    [treeFull, visibleNoteTypes]
+    () =>
+      sortNoteTreeWithStreamPrefs(
+        filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes),
+        threadSortPrefs
+      ),
+    [treeFull, visibleNoteTypes, threadSortPrefs]
   );
-  const pinnedTree = useMemo(() => sortStarredPinned(tree), [tree]);
   const filteredRoots = useMemo(() => {
     const filtered = filterRootsByVisibleNoteTypes(roots, visibleNoteTypes);
     return sortStarredPinned(filtered.map((r) => ({ ...r, children: [] })));
@@ -748,19 +813,19 @@ export default function StreamPage() {
   const focusForDisplay = focusId ?? focusParam;
   const displayTree = useMemo(() => {
     const fn =
-      focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
+      focusForDisplay && actualRootId ? findNode(tree, focusForDisplay) : null;
     if (fn && !noteIdEq(focusForDisplay, actualRootId)) {
       return [{ ...fn, children: fn.children || [] }];
     }
-    return pinnedTree;
-  }, [pinnedTree, focusForDisplay, actualRootId]);
+    return tree;
+  }, [tree, focusForDisplay, actualRootId]);
   const summaryVisibleIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
   const summaryFocusNoteId =
     focusForDisplay && actualRootId && !noteIdEq(focusForDisplay, actualRootId)
       ? focusForDisplay
       : null;
   const focusedNode =
-    focusForDisplay && actualRootId ? findNode(pinnedTree, focusForDisplay) : null;
+    focusForDisplay && actualRootId ? findNode(tree, focusForDisplay) : null;
 
   /**
    * Stream head must never show delete (PERIOD). Merge every focus source + bar URL + single-head
@@ -786,7 +851,7 @@ export default function StreamPage() {
     if (!threadReady || !focusParam || !thread.length) return;
     const key = `${threadRootId}|${focusParam}`;
     if (focusFromUrlApplied.current === key) return;
-    if (!findNode(pinnedTree, focusParam)) return;
+    if (!findNode(tree, focusParam)) return;
     focusFromUrlApplied.current = key;
     let skipScroll = false;
     flushSync(() => {
@@ -799,7 +864,7 @@ export default function StreamPage() {
     if (!skipScroll) {
       setStreamScrollIntent({ kind: 'note', id: focusParam });
     }
-  }, [threadReady, threadRootId, focusParam, thread, pinnedTree]);
+  }, [threadReady, threadRootId, focusParam, thread, tree]);
 
   useEffect(() => {
     if (!focusId || !thread.length || !threadRootId) return;
@@ -815,7 +880,7 @@ export default function StreamPage() {
 
   /**
    * Drop focus when the note is gone or hidden by type filters. Use `treeFull` + flat `thread` so we
-   * don’t clear focus in the render after a reply before `pinnedTree` includes the new note (race).
+   * don’t clear focus in the render after a reply before `tree` includes the new note (race).
    */
   useEffect(() => {
     if (!threadRootId || !focusId || !tree.length) return;
@@ -829,12 +894,12 @@ export default function StreamPage() {
     }
     const inFullTree = findNode(treeFull, focusId);
     if (!inFullTree) return;
-    if (findNode(pinnedTree, focusId)) return;
+    if (findNode(tree, focusId)) return;
     focusFromUrlApplied.current = '';
     setFocusId(null);
     setDrillPendingFocusId(null);
     setSearchParams({ thread: threadRootId });
-  }, [threadRootId, focusId, pinnedTree, treeFull, thread, tree.length, setSearchParams]);
+  }, [threadRootId, focusId, tree, treeFull, thread, tree.length, setSearchParams]);
 
   useLayoutEffect(() => {
     if (!streamScrollIntent) return;
@@ -1237,7 +1302,7 @@ export default function StreamPage() {
         return;
       }
       const fullPath =
-        pathFromRootToId(displayTree, id) ?? pathFromRootToId(pinnedTree, id);
+        pathFromRootToId(displayTree, id) ?? pathFromRootToId(tree, id);
       if (!fullPath) {
         applyFocusImmediate(id);
         return;
@@ -1326,7 +1391,7 @@ export default function StreamPage() {
       thread,
       tree,
       displayTree,
-      pinnedTree,
+      tree,
       actualRootId,
       focusForDisplay,
       threadRootId,
@@ -1770,6 +1835,8 @@ export default function StreamPage() {
                       levelDropDelays={levelDropDelays}
                       exitToRoot={branchHeadExiting}
                       streamFocusHideDeleteId={streamHeadHideDeleteId}
+                      streamHeadSortTargetId={streamHeadHideDeleteId}
+                      streamHeadSortSlot={streamHeadSortSlot}
                     />
                   </ul>
                 </div>
