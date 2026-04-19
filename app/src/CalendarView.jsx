@@ -190,49 +190,56 @@ export default function CalendarView() {
           <p className="calendar-view-loading">Loading events…</p>
         ) : (
           <>
-            <div className="calendar-dow-row" aria-hidden>
-              {DOW.map((d) => (
-                <div key={d} className="calendar-dow-cell">
-                  {d}
-                </div>
-              ))}
-            </div>
-            {weekSegments.map(({ week, bars, nLanes }) => (
-              <div key={week[0].key} className="calendar-week">
-                <div className="calendar-week-days">
-                  {week.map((cell) => (
-                    <div
-                      key={cell.key}
-                      className={`calendar-day ${cell.inMonth ? '' : 'calendar-day--outside'}`}
-                    >
-                      <span className="calendar-day-num">{cell.date.getDate()}</span>
-                    </div>
-                  ))}
-                </div>
-                <div
-                  className="calendar-week-bars"
-                  style={{
-                    gridTemplateRows: nLanes > 0 ? `repeat(${nLanes}, 1.28rem)` : 'minmax(0.5rem, auto)',
-                  }}
-                >
-                  {bars.map((b) => (
-                    <button
-                      key={`${b.event.id}-${week[0].key}-${b.lane}-${b.colStart}`}
-                      type="button"
-                      className="calendar-event-bar"
-                      style={{
-                        gridColumn: `${b.colStart + 1} / span ${b.span}`,
-                        gridRow: b.lane + 1,
-                      }}
-                      title={`${eventBarLabel(b.event)} — ${formatEventRange(b.event)}\nOpen in Stream`}
-                      onClick={() => goToEventInStream(b.event)}
-                    >
-                      {eventBarLabel(b.event)}
-                    </button>
-                  ))}
-                </div>
+            <div className="calendar-view-month">
+              <div className="calendar-dow-row" aria-hidden>
+                {DOW.map((d) => (
+                  <div key={d} className="calendar-dow-cell">
+                    {d}
+                  </div>
+                ))}
               </div>
-            ))}
+              <div className="calendar-view-weeks">
+                {weekSegments.map(({ week, bars, nLanes }) => (
+                  <div key={week[0].key} className="calendar-week">
+                    <div className="calendar-week-days">
+                      {week.map((cell) => (
+                        <div
+                          key={cell.key}
+                          className={`calendar-day ${cell.inMonth ? '' : 'calendar-day--outside'}`}
+                        >
+                          <span className="calendar-day-num">{cell.date.getDate()}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div
+                      className="calendar-week-bars"
+                      style={{
+                        gridTemplateRows:
+                          nLanes > 0
+                            ? `repeat(${nLanes}, minmax(1.25rem, 1fr))`
+                            : 'minmax(1.25rem, 1fr)',
+                      }}
+                    >
+                      {bars.map((b) => (
+                        <button
+                          key={`${b.event.id}-${week[0].key}-${b.lane}-${b.colStart}`}
+                          type="button"
+                          className="calendar-event-bar"
+                          style={{
+                            gridColumn: `${b.colStart + 1} / span ${b.span}`,
+                            gridRow: b.lane + 1,
+                          }}
+                          title={`${eventBarLabel(b.event)} — ${formatEventRange(b.event)}\nOpen in Stream`}
+                          onClick={() => goToEventInStream(b.event)}
+                        >
+                          {eventBarLabel(b.event)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <p className="calendar-view-hint">Click an event to open it in Stream (focused in the thread).</p>
           </>
         )}

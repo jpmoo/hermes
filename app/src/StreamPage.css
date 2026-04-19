@@ -98,7 +98,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.5rem 0.75rem;
   margin-bottom: 1rem;
   transition: opacity 0.2s ease;
@@ -132,13 +132,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
-}
-
-.stream-page-nav-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-left: auto;
 }
 
 .stream-page-nav-row--exit {
@@ -457,15 +450,24 @@
 
 .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
 .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
-  /* Center expanded width while staying anchored to the bottom (absolute in stream scroll / canvas main). */
   --compose-exp-w: min(80vw, calc(100vw - 2rem));
   box-sizing: border-box;
   width: var(--compose-exp-w);
   max-width: var(--compose-exp-w);
-  left: 0;
-  right: 0;
-  margin-left: auto;
-  margin-right: auto;
+}
+
+/* Wider than the column: don’t clip; center the bar on the scroll/main region. */
+.stream-page-scroll:has(.stream-page-compose-field--expanded) {
+  overflow: visible;
+}
+
+.stream-page-scroll > .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
+.canvas-page-main > .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* Composer overlays the scroll/viewport so thread notes + canvas paint behind the strip. */
@@ -769,13 +771,16 @@
     box-sizing: border-box;
   }
 
-  .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
-  .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
+  .stream-page-scroll > .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
+  .canvas-page-main > .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
     --compose-exp-w: min(80vw, calc(100vw - 2rem));
     width: var(--compose-exp-w);
     max-width: var(--compose-exp-w);
-    margin-left: calc(50% - var(--compose-exp-w) / 2);
-    margin-right: calc(50% - var(--compose-exp-w) / 2);
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    margin-left: 0;
+    margin-right: 0;
   }
 
   /* Narrow viewports: cap float width like inset cards; keep `--fp-w` as the primary width driver. */

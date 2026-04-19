@@ -1876,9 +1876,7 @@ export default function StreamPage() {
                     <NavIconRootLevel className="stream-page-nav-icon" />
                   </button>
                   {historyControl}
-                </div>
-                {!loadingThread && thread.length > 0 && tree.length > 0 && summaryVisibleIds.length > 0 ? (
-                  <div className="stream-page-nav-right">
+                  {!loadingThread && thread.length > 0 && tree.length > 0 && summaryVisibleIds.length > 0 ? (
                     <button
                       type="button"
                       className="stream-page-nav-btn stream-page-nav-btn--icon"
@@ -1888,8 +1886,8 @@ export default function StreamPage() {
                     >
                       <NavIconBrain className="stream-page-nav-icon" />
                     </button>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
               {loadingThread && thread.length === 0 ? (
                 <p className="stream-page-muted">Loading thread…</p>
@@ -1927,7 +1925,7 @@ export default function StreamPage() {
           ) : (
             <>
               <div className="stream-page-nav-row">
-                {historyControl}
+                <div className="stream-page-nav-left">{historyControl}</div>
               </div>
               {loadError && (
                 <p className="stream-page-error" role="alert">

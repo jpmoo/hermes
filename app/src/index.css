@@ -145,12 +145,11 @@ html.hermes-viewport-bg-active .stream-page-scroll-main {
 }
 
 /*
- * Tinted strips composite with the portal image (z-index below #root). Thread/canvas *content* only
- * lines up behind chrome if the composer/nav sit over the scroll/viewport (see StreamPage/Canvas).
+ * App title bar stays opaque. Thread/canvas strips can show content behind; see StreamPage/Canvas.
  */
 html.hermes-viewport-bg-active .layout-header {
-  background: transparent;
-  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: var(--bg);
+  border-bottom-color: var(--border);
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-row {
@@ -170,15 +169,15 @@ html.hermes-viewport-bg-active .canvas-page-main > .canvas-page-compose-wrap {
 
 html.hermes-viewport-bg-active .stream-page-compose textarea,
 html.hermes-viewport-bg-active .stream-page-compose .mentions-textarea-wrap textarea {
-  background: color-mix(in srgb, var(--bg-card) 68%, transparent);
+  background: var(--bg-card);
 }
 
 html.hermes-viewport-bg-active .stream-page-compose .mentions-compose-type-btn {
-  background: color-mix(in srgb, var(--bg-card) 62%, transparent);
+  background: var(--bg-card);
 }
 
 html.hermes-viewport-bg-active .stream-page-compose .mentions-compose-type-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--bg-card-hover) 72%, transparent);
+  background: var(--bg-card-hover);
 }
 
 /* Opaque controls — semi-transparent fills would show the fixed background through the button face. */
@@ -202,9 +201,22 @@ html.hermes-viewport-bg-active .stream-page-compose-row button[type='submit']:di
   color: color-mix(in srgb, var(--bg) 65%, var(--text-muted));
 }
 
+/* Canvas: toolbar strip clear; controls stay solid (see CanvasPage.css defaults). */
 html.hermes-viewport-bg-active .canvas-toolbar {
-  background: color-mix(in srgb, var(--bg-card) 52%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--border) 45%, transparent);
+  background: transparent;
+  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+html.hermes-viewport-bg-active .canvas-toolbar .canvas-icon-btn {
+  background: var(--bg);
+}
+
+html.hermes-viewport-bg-active .canvas-toolbar .canvas-icon-btn:hover {
+  background: var(--bg-hover);
+}
+
+html.hermes-viewport-bg-active .canvas-toolbar .canvas-zoom-field {
+  background: var(--bg);
 }
 
 html.hermes-viewport-bg-active .canvas-page,

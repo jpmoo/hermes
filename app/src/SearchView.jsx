@@ -250,59 +250,61 @@ function SearchViewInner() {
           </form>
         </div>
 
-        {loading && <p className="search-view-loading">Searching…</p>}
+        <div className="search-view-results">
+          {loading && <p className="search-view-loading">Searching…</p>}
 
-        {!loading && results.length > 0 && filteredResults.length === 0 && (
-          <p className="search-view-empty">
-            No notes match the current note-type filters. Turn on more types in the query panel above.
-          </p>
-        )}
+          {!loading && results.length > 0 && filteredResults.length === 0 && (
+            <p className="search-view-empty">
+              No notes match the current note-type filters. Turn on more types in the query panel above.
+            </p>
+          )}
 
-        {!loading && filteredResults.length > 0 && (
-          <ul className="search-view-list">
-            {filteredResults.map((n) => (
-              <li key={n.id}>
-                {searchMode === 'semantic' && n.similarity != null && (
-                  <span className="search-view-sim">{Math.round(n.similarity * 100)}%</span>
-                )}
-                <NoteCard
-                  note={n}
-                  depth={0}
-                  hasReplies={(n.reply_count ?? 0) > 0}
-                  hoverInsightEnabled
-                  onOpenThread={() => {
-                    const root = n.root_id || n.id;
-                    const search =
-                      n.parent_id && n.root_id
-                        ? `?thread=${root}&focus=${n.id}`
-                        : `?thread=${root}`;
-                    navigate({ pathname: '/stream', search });
-                  }}
-                  onStarredChange={() => {
-                    const id = n.id;
-                    setResults((prev) =>
-                      prev.map((x) => (x.id === id ? { ...x, starred: !x.starred } : x))
-                    );
-                  }}
-                  onNoteUpdate={refreshAfterNoteChange}
-                  onNoteDelete={refreshAfterNoteChange}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+          {!loading && filteredResults.length > 0 && (
+            <ul className="search-view-list">
+              {filteredResults.map((n) => (
+                <li key={n.id}>
+                  {searchMode === 'semantic' && n.similarity != null && (
+                    <span className="search-view-sim">{Math.round(n.similarity * 100)}%</span>
+                  )}
+                  <NoteCard
+                    note={n}
+                    depth={0}
+                    hasReplies={(n.reply_count ?? 0) > 0}
+                    hoverInsightEnabled
+                    onOpenThread={() => {
+                      const root = n.root_id || n.id;
+                      const search =
+                        n.parent_id && n.root_id
+                          ? `?thread=${root}&focus=${n.id}`
+                          : `?thread=${root}`;
+                      navigate({ pathname: '/stream', search });
+                    }}
+                    onStarredChange={() => {
+                      const id = n.id;
+                      setResults((prev) =>
+                        prev.map((x) => (x.id === id ? { ...x, starred: !x.starred } : x))
+                      );
+                    }}
+                    onNoteUpdate={refreshAfterNoteChange}
+                    onNoteDelete={refreshAfterNoteChange}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
 
-        {!loading && !searchError && results.length === 0 && (hasTags || textSearchRequested) && (
-          <p className="search-view-empty">
-            {hasTags && hasQ
-              ? 'No notes match both the selected tags and your search.'
-              : hasTags
-                ? 'No notes match the selected tags.'
-                : searchMode === 'keyword'
-                  ? 'No notes contain that text.'
-                  : 'No results. Try Keyword search for exact words, or rephrase for semantic match.'}
-          </p>
-        )}
+          {!loading && !searchError && results.length === 0 && (hasTags || textSearchRequested) && (
+            <p className="search-view-empty">
+              {hasTags && hasQ
+                ? 'No notes match both the selected tags and your search.'
+                : hasTags
+                  ? 'No notes match the selected tags.'
+                  : searchMode === 'keyword'
+                    ? 'No notes contain that text.'
+                    : 'No results. Try Keyword search for exact words, or rephrase for semantic match.'}
+            </p>
+          )}
+        </div>
       </div>
     </HoverInsightProvider>
   );

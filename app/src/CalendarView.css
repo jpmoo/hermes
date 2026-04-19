@@ -1,10 +1,33 @@
 .calendar-view {
-  max-width: 960px;
-  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  width: 95%;
+  max-width: none;
+  margin-left: auto;
+  margin-right: auto;
   padding: 0 0 2rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-view-month {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-view-weeks {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .calendar-view-toolbar {
+  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -58,6 +81,7 @@
 }
 
 .calendar-view-error {
+  flex-shrink: 0;
   padding: 0.65rem 1rem;
   margin-bottom: 1rem;
   border-radius: 8px;
@@ -68,12 +92,14 @@
 }
 
 .calendar-view-loading {
+  flex: 1;
   color: var(--text-muted);
   text-align: center;
   padding: 2rem;
 }
 
 .calendar-dow-row {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
@@ -91,14 +117,18 @@
 }
 
 .calendar-week {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 10px;
-  margin-bottom: 0.5rem;
   overflow: hidden;
   background: var(--bg-card);
 }
 
 .calendar-week-days {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 0;
@@ -132,12 +162,14 @@
 }
 
 .calendar-week-bars {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
   padding: 4px 2px 6px;
-  min-height: 1.5rem;
   background: color-mix(in srgb, var(--bg) 40%, var(--bg-card));
+  align-content: stretch;
 }
 
 .calendar-event-bar {
@@ -168,6 +200,7 @@
 }
 
 .calendar-view-hint {
+  flex-shrink: 0;
   margin: 1rem 0 0;
   font-size: 0.8rem;
   color: var(--text-muted);
