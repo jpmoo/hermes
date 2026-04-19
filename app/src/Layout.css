@@ -15,8 +15,8 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: transparent;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
 /* Logo (left) | centered nav + filters | logout (right) — equal 1fr side columns keep the middle truly centered */

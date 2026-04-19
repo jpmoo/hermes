@@ -68,7 +68,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.5rem max(0px, env(safe-area-inset-left, 0px));
+  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.5rem max(0.75rem, env(safe-area-inset-left, 0px));
   border-bottom: none;
   background: transparent;
   pointer-events: none;
@@ -467,6 +467,26 @@
   background: var(--bg);
   background-image: radial-gradient(circle at 1px 1px, var(--border-subtle) 1px, transparent 0);
   background-size: 24px 24px;
+}
+
+/* Match stream: fade canvas content above reply/new so notes do not stay sharp through the compose band */
+.canvas-page-main:has(.canvas-page-compose-wrap) .canvas-viewport {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--hermes-compose-content-fade, 7.5rem)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--hermes-compose-content-fade, 7.5rem)),
+    transparent 100%
+  );
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
 }
 
 .canvas-viewport:active {

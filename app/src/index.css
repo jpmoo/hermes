@@ -50,6 +50,8 @@ html {
   /* Stream note column + stream/canvas compose: 60% of viewport width (never wider than full width minus margin). */
   --hermes-stream-column-max: min(60vw, calc(100vw - 2rem));
   --hermes-compose-inset-x: 0.75rem;
+  /* Bottom fade for thread/canvas content above the compose strip (mask alpha, not theme fill). */
+  --hermes-compose-content-fade: 7.5rem;
 }
 
 html[data-theme='dark'] {
@@ -255,10 +257,10 @@ html.hermes-viewport-bg-active .stream-page-scroll-main {
   background: transparent;
 }
 
-/* Title bar matches default Layout.css: transparent so full-viewport wallpaper shows through */
+/* App chrome stays opaque; thread/canvas tool strips are transparent in component CSS */
 html.hermes-viewport-bg-active .layout-header {
-  background: transparent;
-  border-bottom-color: color-mix(in srgb, var(--border) 35%, transparent);
+  background: var(--bg);
+  border-bottom-color: var(--border);
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-row {
