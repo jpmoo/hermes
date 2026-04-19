@@ -98,6 +98,11 @@ const LAYOUT_LEAD_CHILD_GAP = 40;
 const LAYOUT_START_X = 48;
 const LAYOUT_START_Y = 48;
 
+/** Horizontal space between focus card and reply column (vertical arrangement). 5× base column gap. */
+const LAYOUT_FOCUS_TO_COLUMN_GAP = LAYOUT_COL_GAP * 5;
+/** Vertical space between focus card and reply row (horizontal arrangement). 5× base lead/row gap. */
+const LAYOUT_FOCUS_TO_ROW_GAP = LAYOUT_LEAD_CHILD_GAP * 5;
+
 /**
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize existing card sizes
@@ -129,7 +134,7 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
       w = ex.w;
       h = ex.h;
     }
-    rects[String(n.id)] = { x: LAYOUT_START_X + leadW + LAYOUT_COL_GAP, y, w, h };
+    rects[String(n.id)] = { x: LAYOUT_START_X + leadW + LAYOUT_FOCUS_TO_COLUMN_GAP, y, w, h };
     y += h + LAYOUT_VERTICAL_GAP;
   });
   const totalH = children.length ? y - LAYOUT_START_Y - LAYOUT_VERTICAL_GAP : 0;
@@ -178,7 +183,7 @@ export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, ge
       w = ex.w;
       h = ex.h;
     }
-    rects[String(n.id)] = { x, y: LAYOUT_START_Y + leadH + LAYOUT_LEAD_CHILD_GAP, w, h };
+    rects[String(n.id)] = { x, y: LAYOUT_START_Y + leadH + LAYOUT_FOCUS_TO_ROW_GAP, w, h };
     maxChildH = Math.max(maxChildH, h);
     x += w + LAYOUT_ROW_GAP;
   });

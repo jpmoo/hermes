@@ -937,6 +937,7 @@ export default function CanvasPage() {
     }
   }, [layoutStorageKey, fk, canvasLayouts]);
 
+  /** Saves cards, pan/zoom, and line/layout prefs (arrangement, connector mode, anchors, focus align) for this thread/focus. */
   const persistCanvasLayoutNow = useCallback(async () => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
