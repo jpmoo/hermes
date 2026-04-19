@@ -168,9 +168,7 @@ function scrollStreamDrillUpRowBelowNav(streamEl, listEl, noteId) {
   if (!streamEl || !listEl || noteId == null) return false;
   const li = findStreamLiByNoteId(listEl, noteId);
   if (!li) return false;
-  const nav =
-    streamEl.parentElement?.querySelector?.(':scope > .stream-page-nav-row') ??
-    streamEl.querySelector?.(':scope > .stream-page-nav-row');
+  const nav = streamEl.querySelector?.(':scope > .stream-page-nav-row');
   const navH = nav ? nav.getBoundingClientRect().height : 0;
   const pad = 8;
   const s = streamEl.getBoundingClientRect();
@@ -228,9 +226,8 @@ function readCssRemVarPx(varName, fallbackRem) {
  */
 function measureStreamFloatMoveTopPx(streamScrollEl) {
   const nav =
-    streamScrollEl?.parentElement?.querySelector?.(':scope > .stream-page-nav-row') ??
     streamScrollEl?.querySelector?.(':scope > .stream-page-nav-row') ??
-    document.querySelector('.stream-page-scroll > .stream-page-nav-row');
+    document.querySelector('.stream-page-scroll-main > .stream-page-nav-row');
   if (nav && typeof nav.getBoundingClientRect === 'function') {
     const br = nav.getBoundingClientRect();
     if (br.height > 2) {
@@ -1860,6 +1857,12 @@ export default function StreamPage() {
               crtEffect={streamBackgroundCrtEffect}
             />
           ) : null}
+          <div
+            ref={streamScrollRef}
+            className={`stream-page-scroll-main ${
+              streamBackgroundFetchUrl ? 'stream-page-scroll-main--thread-bg' : ''
+            }`}
+          >
           {threadRootId ? (
             <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
               <div className="stream-page-nav-left">
@@ -1890,12 +1893,6 @@ export default function StreamPage() {
               <div className="stream-page-nav-left">{historyControl}</div>
             </div>
           )}
-          <div
-            ref={streamScrollRef}
-            className={`stream-page-scroll-main ${
-              streamBackgroundFetchUrl ? 'stream-page-scroll-main--thread-bg' : ''
-            }`}
-          >
           {threadRootId ? (
             <>
               {loadingThread && thread.length === 0 ? (

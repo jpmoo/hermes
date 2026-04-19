@@ -50,8 +50,8 @@ html {
   /* Stream note column + stream/canvas compose: 60% of viewport width (never wider than full width minus margin). */
   --hermes-stream-column-max: min(60vw, calc(100vw - 2rem));
   --hermes-compose-inset-x: 0.75rem;
-  /* Bottom mask fade on thread list / canvas viewport — taller band so the fade sits higher above the compose strip. */
-  --hermes-compose-content-fade: 6.75rem;
+  /* Bottom mask fade on thread list / canvas viewport — large band so content softens well above reply/new. */
+  --hermes-compose-content-fade: 12.5rem;
 }
 
 html[data-theme='dark'] {
@@ -267,13 +267,21 @@ html.hermes-viewport-bg-active .stream-page-nav-row {
   box-shadow: none;
 }
 
+/*
+ * Wallpaper sits behind #root; solid bg-card here was blocking it. Glass lets the stream show through
+ * the nav control faces while keeping icons readable.
+ */
 html.hermes-viewport-bg-active .stream-page-nav-btn {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-card) 38%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-btn:hover {
+  color: var(--accent);
   border-color: var(--accent-dim);
+  background: color-mix(in srgb, var(--bg-card) 52%, transparent);
 }
 
 /* Compose strip: transparent — thread/canvas wallpaper visible; controls keep card fills below */
@@ -322,26 +330,32 @@ html.hermes-viewport-bg-active .canvas-toolbar {
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-icon-btn {
-  background: var(--bg-card);
+  background: color-mix(in srgb, var(--bg-card) 38%, transparent);
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-icon-btn:hover {
   color: var(--accent);
   border-color: var(--accent-dim);
-  background: var(--bg-card);
+  background: color-mix(in srgb, var(--bg-card) 52%, transparent);
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-icon-btn,
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger,
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger.canvas-icon-btn--open {
-  background: var(--bg-card);
+  background: color-mix(in srgb, var(--bg-card) 38%, transparent);
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-icon-btn:hover,
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger:hover {
   color: var(--accent);
   border-color: var(--accent-dim);
-  background: var(--bg-card);
+  background: color-mix(in srgb, var(--bg-card) 52%, transparent);
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-zoom-field {

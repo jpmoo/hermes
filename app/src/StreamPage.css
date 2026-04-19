@@ -43,13 +43,13 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 6.75rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 12.5rem)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 6.75rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 12.5rem)),
     transparent 100%
   );
   mask-repeat: no-repeat;
@@ -115,19 +115,19 @@
 }
 
 /*
- * Thread nav sits outside .stream-page-scroll-main so it is not clipped by overflow-x: hidden
- * (full-bleed 100vw + negative margin previously hid left-aligned controls).
+ * First child inside scroll-main: sticky overlay like .canvas-toolbar — notes scroll underneath so they
+ * stay visible through the strip (between controls); buttons stay clickable.
  */
-/* Match .canvas-toolbar horizontal padding + thread controls match .canvas-toolbar-left / .canvas-toolbar .canvas-icon-btn */
-.stream-page-scroll > .stream-page-nav-row {
+.stream-page-scroll-main > .stream-page-nav-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 0.75rem;
   flex-shrink: 0;
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  top: 0;
+  z-index: 9;
   transition: opacity 0.2s ease;
   width: 100%;
   margin: 0 0 0.5rem;
@@ -136,6 +136,11 @@
   background: transparent;
   border: none;
   box-shadow: none;
+  pointer-events: none;
+}
+
+.stream-page-scroll-main > .stream-page-nav-row * {
+  pointer-events: auto;
 }
 
 .stream-page-nav-left {
