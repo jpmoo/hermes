@@ -51,7 +51,7 @@ html {
   --hermes-stream-column-max: min(60vw, calc(100vw - 2rem));
   --hermes-compose-inset-x: 0.75rem;
   /* Bottom mask fade on thread list / canvas viewport — large band so content softens well above reply/new. */
-  --hermes-compose-content-fade: 18rem;
+  --hermes-compose-content-fade: 26rem;
 }
 
 html[data-theme='dark'] {

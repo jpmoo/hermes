@@ -2,8 +2,7 @@
   /* Fill layout-main; thread nav is full-width like Canvas — column cap is on .stream-page-scroll-main + compose. */
   flex: 1;
   min-height: 0;
-  overflow-x: visible;
-  overflow-y: hidden;
+  overflow: hidden;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -17,8 +16,7 @@
   min-height: 0;
   padding-top: 0;
   background: transparent;
-  overflow-x: visible;
-  overflow-y: hidden;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -32,7 +30,7 @@
   margin-left: auto;
   margin-right: auto;
   box-sizing: border-box;
-  overflow-x: visible;
+  overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg);
@@ -45,13 +43,13 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 18rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 26rem)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 18rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 26rem)),
     transparent 100%
   );
   mask-repeat: no-repeat;
@@ -120,7 +118,10 @@
  * First child inside scroll-main: sticky overlay like .canvas-toolbar — notes scroll underneath so they
  * stay visible through the strip (between controls); buttons stay clickable.
  */
-/* Full-bleed strip: same horizontal inset as .canvas-toolbar (viewport edge + safe area), not column-inset. */
+/*
+ * Stay inside the scroll column — full-viewport 100vw + negative margin was clipped by .layout { overflow: hidden }.
+ * Same horizontal padding as .canvas-toolbar (edge + safe area) within the column width.
+ */
 .stream-page-scroll-main > .stream-page-nav-row {
   display: flex;
   flex-wrap: wrap;
@@ -132,12 +133,8 @@
   top: 0;
   z-index: 9;
   transition: opacity 0.2s ease;
-  width: 100vw;
-  max-width: none;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-  margin-bottom: 0.5rem;
-  margin-top: 0;
+  width: 100%;
+  margin: 0 0 0.5rem;
   padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.5rem max(0.75rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   background: transparent;
