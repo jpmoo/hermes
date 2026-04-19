@@ -255,18 +255,14 @@ html.hermes-viewport-bg-active .stream-page-scroll-main {
   background: transparent;
 }
 
-/*
- * App title bar stays opaque. Thread/canvas strips can show content behind; see StreamPage/Canvas.
- */
+/* Title bar matches default Layout.css: transparent so full-viewport wallpaper shows through */
 html.hermes-viewport-bg-active .layout-header {
-  background: var(--bg);
-  border-bottom-color: var(--border);
+  background: transparent;
+  border-bottom-color: color-mix(in srgb, var(--border) 35%, transparent);
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-row {
   background: transparent;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow: none;
 }
 
@@ -275,18 +271,10 @@ html.hermes-viewport-bg-active .stream-page-nav-btn {
   border: none;
 }
 
-/* Same fade as default theme: opaque over reply/new, soft edge above — wallpaper only in the fade band */
+/* Compose strip: transparent — thread/canvas wallpaper visible; controls keep card fills below */
 html.hermes-viewport-bg-active .stream-page-scroll > .stream-page-compose-wrap,
 html.hermes-viewport-bg-active .canvas-page-main > .canvas-page-compose-wrap {
-  background: linear-gradient(
-    to top,
-    var(--bg-card) 0%,
-    var(--bg-card) 34%,
-    color-mix(in srgb, var(--bg-card) 82%, transparent) 58%,
-    color-mix(in srgb, var(--bg-card) 38%, transparent) 78%,
-    color-mix(in srgb, var(--bg-card) 10%, transparent) 94%,
-    transparent 100%
-  );
+  background: transparent;
 }
 
 html.hermes-viewport-bg-active .stream-page-compose textarea,
@@ -323,12 +311,9 @@ html.hermes-viewport-bg-active .stream-page-compose-row button[type='submit']:di
   color: color-mix(in srgb, var(--bg) 65%, var(--text-muted));
 }
 
-/* Canvas: glass strip matches default; wallpaper shows through tint + blur */
 html.hermes-viewport-bg-active .canvas-toolbar {
-  background: color-mix(in srgb, var(--bg-card) 40%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: transparent;
+  border-bottom: none;
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar .canvas-icon-btn {

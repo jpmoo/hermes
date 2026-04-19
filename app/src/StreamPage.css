@@ -114,11 +114,9 @@
   margin-right: calc(50% - 50vw);
   margin-bottom: 0.65rem;
   margin-top: 0;
-  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.45rem max(0.75rem, env(safe-area-inset-left, 0px));
+  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.45rem max(0px, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
-  background: color-mix(in srgb, var(--bg) 52%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: transparent;
   border: none;
   box-shadow: none;
 }
@@ -466,8 +464,8 @@
 }
 
 /*
- * Composer overlays scroll/viewport. Bottom stays opaque so stream/canvas don’t show through the
- * reply/new region; upper part of the overlay fades out gradually (not an abrupt line).
+ * Composer overlays scroll/viewport — no theme-color wash; wallpaper / body bg shows through.
+ * Inputs and buttons keep their own solid fills (see .stream-page-compose rules).
  */
 .stream-page-scroll > .stream-page-compose-wrap,
 .canvas-page-main > .canvas-page-compose-wrap {
@@ -476,17 +474,9 @@
   right: 0;
   bottom: 0;
   margin-top: 0;
-  padding-top: 2rem;
+  padding-top: 1.25rem;
   padding-bottom: 0.5rem;
-  background: linear-gradient(
-    to top,
-    var(--bg) 0%,
-    var(--bg) 34%,
-    color-mix(in srgb, var(--bg) 82%, transparent) 58%,
-    color-mix(in srgb, var(--bg) 38%, transparent) 78%,
-    color-mix(in srgb, var(--bg) 10%, transparent) 94%,
-    transparent 100%
-  );
+  background: transparent;
 }
 
 .stream-page-scroll > .stream-page-compose-wrap {
