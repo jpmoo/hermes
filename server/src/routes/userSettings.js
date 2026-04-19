@@ -365,7 +365,7 @@ function sanitizeManualNewNoteAnchor(input) {
 }
 
 function sanitizeCanvasConnectorMode(input) {
-  if (input === 'thread_chain' || input === 'focus_to_children') return input;
+  if (input === 'thread_chain' || input === 'focus_to_children' || input === 'none') return input;
   return 'thread_chain';
 }
 

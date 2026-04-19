@@ -43,6 +43,8 @@ export const CANVAS_CONNECTOR_MODE = {
   THREAD_CHAIN: 'thread_chain',
   /** Hub: one line from focus note to each other card. */
   FOCUS_TO_CHILDREN: 'focus_to_children',
+  /** No connector lines; vertical/horizontal card modes place new notes near focus instead of a line-shaped stack. */
+  NONE: 'none',
 };
 
 /**
@@ -58,7 +60,9 @@ export function resolveCanvasBlockPrefs(block) {
   }
   const c = block?.connectorMode;
   const connectorMode =
-    c === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN || c === CANVAS_CONNECTOR_MODE.THREAD_CHAIN
+    c === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN ||
+    c === CANVAS_CONNECTOR_MODE.THREAD_CHAIN ||
+    c === CANVAS_CONNECTOR_MODE.NONE
       ? c
       : CANVAS_CONNECTOR_MODE.THREAD_CHAIN;
   const anchor = block?.manualNewNoteAnchor;

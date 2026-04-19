@@ -33,6 +33,10 @@ const LINE_OPTIONS = [
     value: CANVAS_CONNECTOR_MODE.THREAD_CHAIN,
     label: 'Show thread from focus through each note in sort order',
   },
+  {
+    value: CANVAS_CONNECTOR_MODE.NONE,
+    label: 'Do not show lines',
+  },
 ];
 
 /**
@@ -69,6 +73,15 @@ export default function CanvasSequenceMenu({
   onApply,
   children,
 }) {
+  const pickConnectorMode = (v) => {
+    onConnectorModeChange(v);
+    if (v === CANVAS_CONNECTOR_MODE.NONE) {
+      onShowLinesChange(false);
+    } else if (connectorMode === CANVAS_CONNECTOR_MODE.NONE) {
+      onShowLinesChange(true);
+    }
+  };
+
   const [panelPos, setPanelPos] = useState(null);
   const triggerRef = useRef(null);
   const panelRef = useRef(null);
@@ -177,8 +190,16 @@ export default function CanvasSequenceMenu({
           <label className="canvas-sequence-menu__check">
             <input
               type="checkbox"
-              checked={showLines}
-              onChange={(e) => onShowLinesChange(e.target.checked)}
+              disabled={connectorMode === CANVAS_CONNECTOR_MODE.NONE}
+              checked={connectorMode === CANVAS_CONNECTOR_MODE.NONE ? false : showLines}
+              onChange={(e) => {
+                const on = e.target.checked;
+                if (!on) {
+                  pickConnectorMode(CANVAS_CONNECTOR_MODE.NONE);
+                } else {
+                  onShowLinesChange(true);
+                }
+              }}
             />
             Show dashed connector lines
           </label>
@@ -190,7 +211,7 @@ export default function CanvasSequenceMenu({
                 name="canvas-connector"
                 value={o.value}
                 checked={connectorMode === o.value}
-                onChange={() => onConnectorModeChange(o.value)}
+                onChange={() => pickConnectorMode(o.value)}
               />
               {o.label}
             </label>

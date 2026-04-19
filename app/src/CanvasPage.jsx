@@ -818,6 +818,15 @@ export default function CanvasPage() {
             anchorRect = next[leadId] ?? prev[leadId];
           }
           next[id] = rectForNewNoteNearAnchor(anchorRect, existingRects, scale, tx, ty, vw, vh);
+        } else if (
+          (canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL ||
+            canvasArrangement === CANVAS_ARRANGEMENT.HORIZONTAL) &&
+          connectorMode === CANVAS_CONNECTOR_MODE.NONE
+        ) {
+          const lead = sequenceOrderedNotesRef.current[0];
+          const leadId = lead ? String(lead.id) : null;
+          const anchorRect = leadId ? next[leadId] ?? prev[leadId] : null;
+          next[id] = rectForNewNoteNearAnchor(anchorRect, existingRects, scale, tx, ty, vw, vh);
         } else {
           next[id] = rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects);
         }
@@ -829,6 +838,7 @@ export default function CanvasPage() {
     canvasNotes,
     canvasLeadId,
     canvasArrangement,
+    connectorMode,
     manualNewNoteAnchor,
     manualSequenceOrderedNotes,
     layoutRankById,
@@ -848,6 +858,9 @@ export default function CanvasPage() {
     ) {
       return;
     }
+    if (connectorMode === CANVAS_CONNECTOR_MODE.NONE) {
+      return;
+    }
     const ordered = sequenceOrderedNotesRef.current;
     if (!ordered.length) return;
     const getSize = (id) => {
@@ -860,15 +873,18 @@ export default function CanvasPage() {
         : computeCanvasHorizontalArrangementRects(ordered, getSize);
     setCardRects((prev) => ({ ...prev, ...computed }));
     scheduleSaveRef.current();
-  }, [canvasArrangement, sequenceLayoutKey]);
+  }, [canvasArrangement, connectorMode, sequenceLayoutKey]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
     const v = resolveCanvasView(block, isCanvasMobileViewport);
+    const p = resolveCanvasBlockPrefs(block || {});
     setScale(v.scale);
     setTx(v.tx);
     setTy(v.ty);
-    setShowSequenceLines(v.showSequenceLines);
+    setShowSequenceLines(
+      p.connectorMode === CANVAS_CONNECTOR_MODE.NONE ? false : v.showSequenceLines
+    );
   }, [layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
 
   useEffect(() => {
@@ -887,7 +903,9 @@ export default function CanvasPage() {
     setDraftArrangement(p.canvasArrangement);
     setDraftConnector(p.connectorMode);
     setDraftManualNewNoteAnchor(p.manualNewNoteAnchor);
-    setDraftShowLines(v.showSequenceLines);
+    setDraftShowLines(
+      p.connectorMode === CANVAS_CONNECTOR_MODE.NONE ? false : v.showSequenceLines
+    );
   }, [sequenceMenuOpen, layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
 
   useEffect(() => {
@@ -1722,7 +1740,7 @@ export default function CanvasPage() {
   }, []);
 
   const connectorPoints = useMemo(() => {
-    if (!showSequenceLines) return [];
+    if (!showSequenceLines || connectorMode === CANVAS_CONNECTOR_MODE.NONE) return [];
     const notes = sequenceNotesForCanvas;
     if (notes.length < 2) return [];
     if (connectorMode === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN) {
@@ -1909,7 +1927,9 @@ export default function CanvasPage() {
                 arrangement={draftArrangement}
                 connectorMode={draftConnector}
                 showLines={draftShowLines}
-                showLinesActive={showSequenceLines}
+                showLinesActive={
+                  showSequenceLines && connectorMode !== CANVAS_CONNECTOR_MODE.NONE
+                }
                 manualNewNoteAnchor={draftManualNewNoteAnchor}
                 onArrangementChange={setDraftArrangement}
                 onConnectorModeChange={setDraftConnector}
@@ -1998,7 +2018,7 @@ export default function CanvasPage() {
                   transformOrigin: '0 0',
                 }}
               >
-                {showSequenceLines ? (
+                {showSequenceLines && connectorMode !== CANVAS_CONNECTOR_MODE.NONE ? (
                   <svg className="canvas-connectors" aria-hidden>
                     <defs>
                       <marker
