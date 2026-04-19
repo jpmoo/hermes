@@ -18,6 +18,9 @@ import NoteRichText, { toggleTaskMarkerAtIndex } from './NoteRichText';
 import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
 import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
+import { useNoteTypeColors } from './NoteTypeColorContext';
+import StreamThreadImageBackground from './StreamThreadImageBackground';
+import { userBackgroundFileUrl } from './attachmentUtils';
 import './OutlineView.css';
 
 const OutlineExpandContext = createContext({
@@ -337,6 +340,15 @@ export default function OutlineView() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { visibleNoteTypes } = useNoteTypeFilter();
+  const {
+    streamRootBackgroundPresent,
+    streamRootBackgroundOpacity,
+    canvasUseStreamRootBackground,
+    userBackgroundFetchRevision,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+  } = useNoteTypeColors();
+  const showRootViewportBg = canvasUseStreamRootBackground && streamRootBackgroundPresent;
 
   useEffect(() => {
     rootThreadsRef.current = rootThreads;
@@ -645,7 +657,15 @@ export default function OutlineView() {
         { to: '/search', label: 'Search' },
       ]}
     >
-      <div className="outline-view">
+      <div className={`outline-view${showRootViewportBg ? ' outline-view--root-bg' : ''}`}>
+        {showRootViewportBg ? (
+          <StreamThreadImageBackground
+            fetchUrl={userBackgroundFileUrl(userBackgroundFetchRevision)}
+            imageOpacity={streamRootBackgroundOpacity}
+            animate={streamBackgroundAnimate}
+            crtEffect={streamBackgroundCrtEffect}
+          />
+        ) : null}
         {!loading && tree.length > 0 && (
           <div className="outline-view-toolbar">
             <div

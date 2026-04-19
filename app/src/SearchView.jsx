@@ -8,6 +8,9 @@ import NoteCard from './NoteCard';
 import NoteTypeFilterButtons from './NoteTypeFilterButtons';
 import { filterNotesByVisibleNoteTypes } from './noteTypeFilter';
 import { SearchNoteTypeFilterProvider, useSearchNoteTypeFilter } from './SearchNoteTypeFilterContext';
+import { useNoteTypeColors } from './NoteTypeColorContext';
+import StreamThreadImageBackground from './StreamThreadImageBackground';
+import { userBackgroundFileUrl } from './attachmentUtils';
 import './SearchView.css';
 
 function SearchViewInner() {
@@ -25,6 +28,15 @@ function SearchViewInner() {
 
   const navigate = useNavigate();
   const { visibleNoteTypes } = useSearchNoteTypeFilter();
+  const {
+    streamRootBackgroundPresent,
+    streamRootBackgroundOpacity,
+    canvasUseStreamRootBackground,
+    userBackgroundFetchRevision,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+  } = useNoteTypeColors();
+  const showRootViewportBg = canvasUseStreamRootBackground && streamRootBackgroundPresent;
 
   const filteredResults = useMemo(
     () => filterNotesByVisibleNoteTypes(results, visibleNoteTypes),
@@ -150,7 +162,15 @@ function SearchViewInner() {
         });
       }}
     >
-    <div className="search-view">
+    <div className={`search-view${showRootViewportBg ? ' search-view--root-bg' : ''}`}>
+        {showRootViewportBg ? (
+          <StreamThreadImageBackground
+            fetchUrl={userBackgroundFileUrl(userBackgroundFetchRevision)}
+            imageOpacity={streamRootBackgroundOpacity}
+            animate={streamBackgroundAnimate}
+            crtEffect={streamBackgroundCrtEffect}
+          />
+        ) : null}
         {searchError && (
           <p className="search-view-error" role="alert">
             {searchError}

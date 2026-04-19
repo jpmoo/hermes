@@ -358,6 +358,12 @@ html.hermes-viewport-bg-active .canvas-page--root-bg {
   background: transparent;
 }
 
+html.hermes-viewport-bg-active .outline-view--root-bg,
+html.hermes-viewport-bg-active .calendar-view--root-bg,
+html.hermes-viewport-bg-active .search-view--root-bg {
+  background: transparent;
+}
+
 /* Transparent so fixed full-viewport background (portal, z-index 0) shows through; body keeps --bg. */
 #root {
   position: relative;

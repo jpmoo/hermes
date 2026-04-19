@@ -14,6 +14,9 @@ import {
   segmentInWeek,
   weekOverlapsRange,
 } from './calendarUtils';
+import { useNoteTypeColors } from './NoteTypeColorContext';
+import StreamThreadImageBackground from './StreamThreadImageBackground';
+import { userBackgroundFileUrl } from './attachmentUtils';
 import './CalendarView.css';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -29,6 +32,15 @@ function todayYmd() {
 export default function CalendarView() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const {
+    streamRootBackgroundPresent,
+    streamRootBackgroundOpacity,
+    canvasUseStreamRootBackground,
+    userBackgroundFetchRevision,
+    streamBackgroundAnimate,
+    streamBackgroundCrtEffect,
+  } = useNoteTypeColors();
+  const showRootViewportBg = canvasUseStreamRootBackground && streamRootBackgroundPresent;
   const [cursor, setCursor] = useState(() => {
     const n = new Date();
     return { y: n.getFullYear(), m: n.getMonth() };
@@ -168,7 +180,15 @@ export default function CalendarView() {
 
   return (
     <Layout title="Calendar" noteTypeFilterEnabled={false} onLogout={logout} viewLinks={viewLinks}>
-      <div className="calendar-view">
+      <div className={`calendar-view${showRootViewportBg ? ' calendar-view--root-bg' : ''}`}>
+        {showRootViewportBg ? (
+          <StreamThreadImageBackground
+            fetchUrl={userBackgroundFileUrl(userBackgroundFetchRevision)}
+            imageOpacity={streamRootBackgroundOpacity}
+            animate={streamBackgroundAnimate}
+            crtEffect={streamBackgroundCrtEffect}
+          />
+        ) : null}
         <div className="calendar-view-toolbar">
           <h1 className="calendar-view-title">{monthTitle}</h1>
           <div className="calendar-view-nav">
