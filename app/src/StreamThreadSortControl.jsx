@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavIconSort } from './icons/NavIcons';
 import { STREAM_THREAD_SORT_MODES } from './noteThreadSort';
 import './StreamThreadSortControl.css';
@@ -18,12 +19,48 @@ function normalizeMode(v) {
 
 export default function StreamThreadSortControl({ sortMode, starredFirst, onChange }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
+  const [panelPos, setPanelPos] = useState(null);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+
+  const updatePanelPos = useCallback(() => {
+    if (!open) return;
+    const el = triggerRef.current;
+    if (!el || typeof window === 'undefined') return;
+    const r = el.getBoundingClientRect();
+    setPanelPos({
+      top: r.bottom + 6,
+      right: window.innerWidth - r.right,
+    });
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelPos(null);
+      return;
+    }
+    updatePanelPos();
+    const el = triggerRef.current;
+    const ro =
+      el && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => updatePanelPos())
+        : null;
+    if (el && ro) ro.observe(el);
+    window.addEventListener('resize', updatePanelPos);
+    window.addEventListener('scroll', updatePanelPos, true);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', updatePanelPos);
+      window.removeEventListener('scroll', updatePanelPos, true);
+    };
+  }, [open, updatePanelPos]);
 
   useEffect(() => {
     if (!open) return undefined;
     const onDoc = (e) => {
-      if (rootRef.current?.contains(e.target)) return;
+      const t = e.target;
+      if (triggerRef.current?.contains(t)) return;
+      if (panelRef.current?.contains(t)) return;
       setOpen(false);
     };
     const onKey = (e) => {
@@ -39,9 +76,50 @@ export default function StreamThreadSortControl({ sortMode, starredFirst, onChan
 
   const mode = normalizeMode(sortMode);
 
+  const panel =
+    open && panelPos ? (
+      <div
+        ref={panelRef}
+        className="stream-thread-sort__panel stream-thread-sort__panel--portal"
+        style={{ top: panelPos.top, right: panelPos.right }}
+        role="dialog"
+        aria-label="Thread reply order"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <label className="stream-thread-sort__label" htmlFor="stream-thread-sort-select">
+          Order replies by
+        </label>
+        <select
+          id="stream-thread-sort-select"
+          className="stream-thread-sort__select"
+          value={mode}
+          onChange={(e) => {
+            const next = normalizeMode(e.target.value);
+            onChange({ sortMode: next, starredFirst });
+          }}
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <label className="stream-thread-sort__check">
+          <input
+            type="checkbox"
+            checked={starredFirst}
+            onChange={(e) => onChange({ sortMode: mode, starredFirst: e.target.checked })}
+          />
+          Starred notes first (same order within each group)
+        </label>
+      </div>
+    ) : null;
+
   return (
-    <div className="stream-thread-sort" ref={rootRef}>
+    <div className="stream-thread-sort">
       <button
+        ref={triggerRef}
         type="button"
         className="stream-thread-sort__trigger"
         aria-expanded={open}
@@ -56,42 +134,7 @@ export default function StreamThreadSortControl({ sortMode, starredFirst, onChan
       >
         <NavIconSort className="stream-thread-sort__icon" />
       </button>
-      {open ? (
-        <div
-          className="stream-thread-sort__panel"
-          role="dialog"
-          aria-label="Thread reply order"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <label className="stream-thread-sort__label" htmlFor="stream-thread-sort-select">
-            Order replies by
-          </label>
-          <select
-            id="stream-thread-sort-select"
-            className="stream-thread-sort__select"
-            value={mode}
-            onChange={(e) => {
-              const next = normalizeMode(e.target.value);
-              onChange({ sortMode: next, starredFirst });
-            }}
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <label className="stream-thread-sort__check">
-            <input
-              type="checkbox"
-              checked={starredFirst}
-              onChange={(e) => onChange({ sortMode: mode, starredFirst: e.target.checked })}
-            />
-            Starred notes first (same order within each group)
-          </label>
-        </div>
-      ) : null}
+      {typeof document !== 'undefined' && panel ? createPortal(panel, document.body) : null}
     </div>
   );
 }
