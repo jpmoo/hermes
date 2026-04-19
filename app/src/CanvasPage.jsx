@@ -301,6 +301,20 @@ function connectorBetweenRects(a, b) {
   return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
 }
 
+/** Hub mode + horizontal layout: bottom of focus to top of each child. */
+function connectorFocusToChildHorizontal(a, b) {
+  const p1 = sideMidpoint(a, 'bottom');
+  const p2 = sideMidpoint(b, 'top');
+  return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+}
+
+/** Hub mode + vertical layout: right of focus to left of each child. */
+function connectorFocusToChildVertical(a, b) {
+  const p1 = sideMidpoint(a, 'right');
+  const p2 = sideMidpoint(b, 'left');
+  return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+}
+
 function notePreview(content, max = 72) {
   if (!content || typeof content !== 'string') return '—';
   const line = content.split('\n')[0].trim().replace(/^#+\s*/, '');
@@ -1753,7 +1767,13 @@ export default function CanvasPage() {
       for (let i = 1; i < notes.length; i++) {
         const b = cardRects[String(notes[i].id)];
         if (!b) continue;
-        pts.push(connectorBetweenRects(a, b));
+        if (canvasArrangement === CANVAS_ARRANGEMENT.HORIZONTAL) {
+          pts.push(connectorFocusToChildHorizontal(a, b));
+        } else if (canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL) {
+          pts.push(connectorFocusToChildVertical(a, b));
+        } else {
+          pts.push(connectorBetweenRects(a, b));
+        }
       }
       return pts;
     }
@@ -1765,7 +1785,7 @@ export default function CanvasPage() {
       pts.push(connectorBetweenRects(a, b));
     }
     return pts;
-  }, [connectorMode, sequenceNotesForCanvas, cardRects]);
+  }, [canvasArrangement, connectorMode, sequenceNotesForCanvas, cardRects]);
 
   pointerMoveInnerRef.current = (e) => {
     if (!viewportRef.current) return;
