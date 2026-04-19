@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from
 import { createPortal } from 'react-dom';
 import {
   CANVAS_ARRANGEMENT,
+  CANVAS_AUTO_FOCUS_ALIGN,
   CANVAS_CONNECTOR_MODE,
   CANVAS_MANUAL_NEW_NOTE_ANCHOR,
 } from './canvasLayoutApi';
@@ -22,6 +23,18 @@ const MANUAL_NEW_NOTE_OPTIONS = [
     value: CANVAS_MANUAL_NEW_NOTE_ANCHOR.LAST,
     label: 'Place new notes near last note in sort order',
   },
+];
+
+const VERTICAL_FOCUS_OPTIONS = [
+  { value: CANVAS_AUTO_FOCUS_ALIGN.START, label: 'Top' },
+  { value: CANVAS_AUTO_FOCUS_ALIGN.CENTER, label: 'Center' },
+  { value: CANVAS_AUTO_FOCUS_ALIGN.END, label: 'Bottom' },
+];
+
+const HORIZONTAL_FOCUS_OPTIONS = [
+  { value: CANVAS_AUTO_FOCUS_ALIGN.START, label: 'Left' },
+  { value: CANVAS_AUTO_FOCUS_ALIGN.CENTER, label: 'Center' },
+  { value: CANVAS_AUTO_FOCUS_ALIGN.END, label: 'Right' },
 ];
 
 const LINE_OPTIONS = [
@@ -48,11 +61,11 @@ const LINE_OPTIONS = [
  *   connectorMode: string,
  *   onArrangementChange: (v: string) => void,
  *   onConnectorModeChange: (v: string) => void,
- *   showLines: boolean,
- *   onShowLinesChange: (v: boolean) => void,
- *   showLinesActive: boolean,
+ *   linesActive: boolean,
  *   manualNewNoteAnchor: string,
  *   onManualNewNoteAnchorChange: (v: string) => void,
+ *   autoFocusAlign: string,
+ *   onAutoFocusAlignChange: (v: string) => void,
  *   onApply: () => void,
  *   children: React.ReactNode,
  * }} props
@@ -63,25 +76,16 @@ export default function CanvasSequenceMenu({
   onClose,
   arrangement,
   connectorMode,
-  showLines,
-  showLinesActive = true,
+  linesActive = true,
   manualNewNoteAnchor,
   onArrangementChange,
   onConnectorModeChange,
-  onShowLinesChange,
   onManualNewNoteAnchorChange,
+  autoFocusAlign,
+  onAutoFocusAlignChange,
   onApply,
   children,
 }) {
-  const pickConnectorMode = (v) => {
-    onConnectorModeChange(v);
-    if (v === CANVAS_CONNECTOR_MODE.NONE) {
-      onShowLinesChange(false);
-    } else if (connectorMode === CANVAS_CONNECTOR_MODE.NONE) {
-      onShowLinesChange(true);
-    }
-  };
-
   const [panelPos, setPanelPos] = useState(null);
   const triggerRef = useRef(null);
   const panelRef = useRef(null);
@@ -137,6 +141,13 @@ export default function CanvasSequenceMenu({
     };
   }, [open, onClose]);
 
+  const focusOptions =
+    arrangement === CANVAS_ARRANGEMENT.VERTICAL
+      ? VERTICAL_FOCUS_OPTIONS
+      : arrangement === CANVAS_ARRANGEMENT.HORIZONTAL
+        ? HORIZONTAL_FOCUS_OPTIONS
+        : null;
+
   const panel =
     open && panelPos ? (
       <div
@@ -185,24 +196,27 @@ export default function CanvasSequenceMenu({
               ))}
             </>
           )}
+          {focusOptions && (
+            <>
+              <div className="canvas-sequence-menu__section-title canvas-sequence-menu__section-title--sub">
+                Focus note position
+              </div>
+              {focusOptions.map((o) => (
+                <label key={o.value} className="canvas-sequence-menu__radio">
+                  <input
+                    type="radio"
+                    name="canvas-auto-focus-align"
+                    value={o.value}
+                    checked={autoFocusAlign === o.value}
+                    onChange={() => onAutoFocusAlignChange(o.value)}
+                  />
+                  {o.label}
+                </label>
+              ))}
+            </>
+          )}
         </div>
         <div className="canvas-sequence-menu__section">
-          <label className="canvas-sequence-menu__check">
-            <input
-              type="checkbox"
-              disabled={connectorMode === CANVAS_CONNECTOR_MODE.NONE}
-              checked={connectorMode === CANVAS_CONNECTOR_MODE.NONE ? false : showLines}
-              onChange={(e) => {
-                const on = e.target.checked;
-                if (!on) {
-                  pickConnectorMode(CANVAS_CONNECTOR_MODE.NONE);
-                } else {
-                  onShowLinesChange(true);
-                }
-              }}
-            />
-            Show dashed connector lines
-          </label>
           <div className="canvas-sequence-menu__section-title">Line display</div>
           {LINE_OPTIONS.map((o) => (
             <label key={o.value} className="canvas-sequence-menu__radio">
@@ -211,7 +225,7 @@ export default function CanvasSequenceMenu({
                 name="canvas-connector"
                 value={o.value}
                 checked={connectorMode === o.value}
-                onChange={() => pickConnectorMode(o.value)}
+                onChange={() => onConnectorModeChange(o.value)}
               />
               {o.label}
             </label>
@@ -229,7 +243,7 @@ export default function CanvasSequenceMenu({
         ref={triggerRef}
         type="button"
         className={`canvas-icon-btn${open ? ' canvas-icon-btn--open' : ''}${
-          showLinesActive ? '' : ' canvas-icon-btn--off'
+          linesActive ? '' : ' canvas-icon-btn--off'
         }`}
         aria-expanded={open}
         aria-haspopup="dialog"

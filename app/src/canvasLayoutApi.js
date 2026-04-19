@@ -37,6 +37,15 @@ export const CANVAS_MANUAL_NEW_NOTE_ANCHOR = {
   LAST: 'last',
 };
 
+/** Where the focus (lead) note sits relative to the auto column or row. */
+export const CANVAS_AUTO_FOCUS_ALIGN = {
+  /** Vertical: top; horizontal: left */
+  START: 'start',
+  CENTER: 'center',
+  /** Vertical: bottom; horizontal: right */
+  END: 'end',
+};
+
 /** How dashed connectors are drawn between cards. */
 export const CANVAS_CONNECTOR_MODE = {
   /** Consecutive pairs in stream sort order (focus → … → last). */
@@ -70,7 +79,14 @@ export function resolveCanvasBlockPrefs(block) {
     anchor === CANVAS_MANUAL_NEW_NOTE_ANCHOR.LAST
       ? CANVAS_MANUAL_NEW_NOTE_ANCHOR.LAST
       : CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS;
-  return { canvasArrangement, connectorMode, manualNewNoteAnchor };
+  const fa = block?.autoFocusAlign;
+  const autoFocusAlign =
+    fa === CANVAS_AUTO_FOCUS_ALIGN.START ||
+    fa === CANVAS_AUTO_FOCUS_ALIGN.CENTER ||
+    fa === CANVAS_AUTO_FOCUS_ALIGN.END
+      ? fa
+      : CANVAS_AUTO_FOCUS_ALIGN.CENTER;
+  return { canvasArrangement, connectorMode, manualNewNoteAnchor, autoFocusAlign };
 }
 
 const LAYOUT_DEFAULT_W = 340;
@@ -85,10 +101,15 @@ const LAYOUT_START_Y = 48;
 /**
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize existing card sizes
+ * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
  * @returns {Record<string, { x: number, y: number, w: number, h: number }>}
  */
-export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getSize) {
+export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getSize, focusAlign) {
   if (!sequenceOrderedNotes?.length) return {};
+  const align =
+    focusAlign === CANVAS_AUTO_FOCUS_ALIGN.START || focusAlign === CANVAS_AUTO_FOCUS_ALIGN.END
+      ? focusAlign
+      : CANVAS_AUTO_FOCUS_ALIGN.CENTER;
   const lead = sequenceOrderedNotes[0];
   const children = sequenceOrderedNotes.slice(1);
   let leadW = LAYOUT_DEFAULT_W;
@@ -112,7 +133,16 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
     y += h + LAYOUT_VERTICAL_GAP;
   });
   const totalH = children.length ? y - LAYOUT_START_Y - LAYOUT_VERTICAL_GAP : 0;
-  const leadY = children.length ? LAYOUT_START_Y + totalH / 2 - leadH / 2 : LAYOUT_START_Y;
+  let leadY = LAYOUT_START_Y;
+  if (children.length) {
+    if (align === CANVAS_AUTO_FOCUS_ALIGN.START) {
+      leadY = LAYOUT_START_Y;
+    } else if (align === CANVAS_AUTO_FOCUS_ALIGN.END) {
+      leadY = LAYOUT_START_Y + totalH - leadH;
+    } else {
+      leadY = LAYOUT_START_Y + totalH / 2 - leadH / 2;
+    }
+  }
   rects[String(lead.id)] = { x: LAYOUT_START_X, y: leadY, w: leadW, h: leadH };
   return rects;
 }
@@ -120,9 +150,14 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
 /**
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize
+ * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
  */
-export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, getSize) {
+export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, getSize, focusAlign) {
   if (!sequenceOrderedNotes?.length) return {};
+  const align =
+    focusAlign === CANVAS_AUTO_FOCUS_ALIGN.START || focusAlign === CANVAS_AUTO_FOCUS_ALIGN.END
+      ? focusAlign
+      : CANVAS_AUTO_FOCUS_ALIGN.CENTER;
   const lead = sequenceOrderedNotes[0];
   const children = sequenceOrderedNotes.slice(1);
   let leadW = LAYOUT_DEFAULT_W;
@@ -148,7 +183,16 @@ export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, ge
     x += w + LAYOUT_ROW_GAP;
   });
   const rowWidth = children.length ? x - LAYOUT_START_X - LAYOUT_ROW_GAP : 0;
-  const leadX = children.length ? LAYOUT_START_X + rowWidth / 2 - leadW / 2 : LAYOUT_START_X;
+  let leadX = LAYOUT_START_X;
+  if (children.length) {
+    if (align === CANVAS_AUTO_FOCUS_ALIGN.START) {
+      leadX = LAYOUT_START_X;
+    } else if (align === CANVAS_AUTO_FOCUS_ALIGN.END) {
+      leadX = LAYOUT_START_X + rowWidth - leadW;
+    } else {
+      leadX = LAYOUT_START_X + rowWidth / 2 - leadW / 2;
+    }
+  }
   rects[String(lead.id)] = { x: leadX, y: LAYOUT_START_Y, w: leadW, h: leadH };
   return rects;
 }

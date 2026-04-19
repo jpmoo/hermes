@@ -43,6 +43,7 @@ import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync'
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
   CANVAS_ARRANGEMENT,
+  CANVAS_AUTO_FOCUS_ALIGN,
   CANVAS_CONNECTOR_MODE,
   CANVAS_MANUAL_NEW_NOTE_ANCHOR,
   canvasFocusKey,
@@ -395,19 +396,19 @@ export default function CanvasPage() {
   const [noteHistory, setNoteHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const [showSequenceLines, setShowSequenceLines] = useState(true);
   /** Per thread root — same storage as Stream sort prefs. */
   const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
   const [sequenceMenuOpen, setSequenceMenuOpen] = useState(false);
   const [draftArrangement, setDraftArrangement] = useState(CANVAS_ARRANGEMENT.MANUAL);
   const [draftConnector, setDraftConnector] = useState(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
-  const [draftShowLines, setDraftShowLines] = useState(true);
   const [draftManualNewNoteAnchor, setDraftManualNewNoteAnchor] = useState(
     CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS
   );
+  const [draftAutoFocusAlign, setDraftAutoFocusAlign] = useState(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
   const [canvasArrangement, setCanvasArrangement] = useState(CANVAS_ARRANGEMENT.MANUAL);
   const [connectorMode, setConnectorMode] = useState(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
   const [manualNewNoteAnchor, setManualNewNoteAnchor] = useState(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
+  const [autoFocusAlign, setAutoFocusAlign] = useState(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
   const [starredDockExpanded, setStarredDockExpanded] = useState(false);
   /** Fixed px position; null = use CSS default placement */
   const [starredDockPos, setStarredDockPos] = useState(null);
@@ -433,16 +434,18 @@ export default function CanvasPage() {
 
   const cardRectsRef = useRef(cardRects);
   const canvasLayoutsRef = useRef(canvasLayouts);
-  const showSequenceLinesRef = useRef(showSequenceLines);
   const canvasArrangementRef = useRef(CANVAS_ARRANGEMENT.MANUAL);
   const connectorModeRef = useRef(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
   const manualNewNoteAnchorRef = useRef(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
+  const autoFocusAlignRef = useRef(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
-  showSequenceLinesRef.current = showSequenceLines;
   canvasArrangementRef.current = canvasArrangement;
   connectorModeRef.current = connectorMode;
   manualNewNoteAnchorRef.current = manualNewNoteAnchor;
+  autoFocusAlignRef.current = autoFocusAlign;
+
+  const linesVisible = connectorMode !== CANVAS_CONNECTOR_MODE.NONE;
 
   const viewportRef = useRef(null);
   const viewportPointersRef = useRef(new Map());
@@ -867,24 +870,21 @@ export default function CanvasPage() {
       const r = cardRectsRef.current[id];
       return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
     };
+    const align = autoFocusAlignRef.current;
     const computed =
       canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL
-        ? computeCanvasVerticalArrangementRects(ordered, getSize)
-        : computeCanvasHorizontalArrangementRects(ordered, getSize);
+        ? computeCanvasVerticalArrangementRects(ordered, getSize, align)
+        : computeCanvasHorizontalArrangementRects(ordered, getSize, align);
     setCardRects((prev) => ({ ...prev, ...computed }));
     scheduleSaveRef.current();
-  }, [canvasArrangement, connectorMode, sequenceLayoutKey]);
+  }, [canvasArrangement, connectorMode, autoFocusAlign, sequenceLayoutKey]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
     const v = resolveCanvasView(block, isCanvasMobileViewport);
-    const p = resolveCanvasBlockPrefs(block || {});
     setScale(v.scale);
     setTx(v.tx);
     setTy(v.ty);
-    setShowSequenceLines(
-      p.connectorMode === CANVAS_CONNECTOR_MODE.NONE ? false : v.showSequenceLines
-    );
   }, [layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
 
   useEffect(() => {
@@ -893,20 +893,18 @@ export default function CanvasPage() {
     setCanvasArrangement(p.canvasArrangement);
     setConnectorMode(p.connectorMode);
     setManualNewNoteAnchor(p.manualNewNoteAnchor);
+    setAutoFocusAlign(p.autoFocusAlign);
   }, [layoutStorageKey, fk, canvasLayouts]);
 
   useEffect(() => {
     if (!sequenceMenuOpen) return;
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
     const p = resolveCanvasBlockPrefs(block || {});
-    const v = resolveCanvasView(block, isCanvasMobileViewport);
     setDraftArrangement(p.canvasArrangement);
     setDraftConnector(p.connectorMode);
     setDraftManualNewNoteAnchor(p.manualNewNoteAnchor);
-    setDraftShowLines(
-      p.connectorMode === CANVAS_CONNECTOR_MODE.NONE ? false : v.showSequenceLines
-    );
-  }, [sequenceMenuOpen, layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
+    setDraftAutoFocusAlign(p.autoFocusAlign);
+  }, [sequenceMenuOpen, layoutStorageKey, fk, canvasLayouts]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -939,7 +937,7 @@ export default function CanvasPage() {
       scale: scaleRef.current,
       tx: txRef.current,
       ty: tyRef.current,
-      showSequenceLines: showSequenceLinesRef.current,
+      showSequenceLines: connectorModeRef.current !== CANVAS_CONNECTOR_MODE.NONE,
     };
     const mobile = isCanvasMobileViewportRef.current;
     const partial = { cards };
@@ -959,6 +957,7 @@ export default function CanvasPage() {
     partial.canvasArrangement = canvasArrangementRef.current;
     partial.connectorMode = connectorModeRef.current;
     partial.manualNewNoteAnchor = manualNewNoteAnchorRef.current;
+    partial.autoFocusAlign = autoFocusAlignRef.current;
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
       await patchUserSettings({ canvasLayouts: patchLayouts });
@@ -1375,24 +1374,24 @@ export default function CanvasPage() {
     };
     let nextCards = { ...cardRectsRef.current };
     if (draftArrangement === CANVAS_ARRANGEMENT.VERTICAL) {
-      const computed = computeCanvasVerticalArrangementRects(ordered, getSize);
+      const computed = computeCanvasVerticalArrangementRects(ordered, getSize, draftAutoFocusAlign);
       nextCards = { ...nextCards, ...computed };
     } else if (draftArrangement === CANVAS_ARRANGEMENT.HORIZONTAL) {
-      const computed = computeCanvasHorizontalArrangementRects(ordered, getSize);
+      const computed = computeCanvasHorizontalArrangementRects(ordered, getSize, draftAutoFocusAlign);
       nextCards = { ...nextCards, ...computed };
     }
 
     cardRectsRef.current = nextCards;
     canvasArrangementRef.current = draftArrangement;
     connectorModeRef.current = draftConnector;
-    showSequenceLinesRef.current = draftShowLines;
     manualNewNoteAnchorRef.current = draftManualNewNoteAnchor;
+    autoFocusAlignRef.current = draftAutoFocusAlign;
 
     setCardRects(nextCards);
     setCanvasArrangement(draftArrangement);
     setConnectorMode(draftConnector);
     setManualNewNoteAnchor(draftManualNewNoteAnchor);
-    setShowSequenceLines(draftShowLines);
+    setAutoFocusAlign(draftAutoFocusAlign);
     setSequenceMenuOpen(false);
     pendingFitAllRef.current = true;
 
@@ -1402,11 +1401,12 @@ export default function CanvasPage() {
     }
     const curRaw = canvasLayoutsRef.current[tid]?.[focusKey];
     const curBlock = curRaw && typeof curRaw === 'object' ? curRaw : {};
+    const linesOn = draftConnector !== CANVAS_CONNECTOR_MODE.NONE;
     const pos = {
       scale: scaleRef.current,
       tx: txRef.current,
       ty: tyRef.current,
-      showSequenceLines: draftShowLines,
+      showSequenceLines: linesOn,
     };
     const mobile = isCanvasMobileViewportRef.current;
     const partial = {
@@ -1414,13 +1414,14 @@ export default function CanvasPage() {
       canvasArrangement: draftArrangement,
       connectorMode: draftConnector,
       manualNewNoteAnchor: draftManualNewNoteAnchor,
+      autoFocusAlign: draftAutoFocusAlign,
     };
     if (mobile) {
       partial.viewMobile = pos;
-      partial.view = { ...(curBlock.view || {}), showSequenceLines: draftShowLines };
+      partial.view = { ...(curBlock.view || {}), showSequenceLines: linesOn };
     } else {
       partial.view = pos;
-      partial.viewMobile = { ...(curBlock.viewMobile || {}), showSequenceLines: draftShowLines };
+      partial.viewMobile = { ...(curBlock.viewMobile || {}), showSequenceLines: linesOn };
     }
     if (starredDockPosRef.current != null) {
       partial.starredDock = {
@@ -1435,7 +1436,7 @@ export default function CanvasPage() {
     } catch (e) {
       console.error(e);
     }
-  }, [draftArrangement, draftConnector, draftManualNewNoteAnchor, draftShowLines]);
+  }, [draftArrangement, draftConnector, draftManualNewNoteAnchor, draftAutoFocusAlign]);
 
   const resetCanvasLayout = useCallback(async () => {
     if (
@@ -1458,6 +1459,7 @@ export default function CanvasPage() {
       canvasArrangement: CANVAS_ARRANGEMENT.MANUAL,
       connectorMode: CANVAS_CONNECTOR_MODE.THREAD_CHAIN,
       manualNewNoteAnchor: CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS,
+      autoFocusAlign: CANVAS_AUTO_FOCUS_ALIGN.CENTER,
     };
     const patchLayouts = replaceCanvasLayoutFocusBlock(
       canvasLayoutsRef.current,
@@ -1470,14 +1472,14 @@ export default function CanvasPage() {
       pendingFitAllRef.current = true;
       fitAppliedForEmptyRef.current = false;
       setCanvasLayouts(patchLayouts);
-      setShowSequenceLines(true);
-      showSequenceLinesRef.current = true;
       setCanvasArrangement(CANVAS_ARRANGEMENT.MANUAL);
       setConnectorMode(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
       setManualNewNoteAnchor(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
+      setAutoFocusAlign(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
       canvasArrangementRef.current = CANVAS_ARRANGEMENT.MANUAL;
       connectorModeRef.current = CANVAS_CONNECTOR_MODE.THREAD_CHAIN;
       manualNewNoteAnchorRef.current = CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS;
+      autoFocusAlignRef.current = CANVAS_AUTO_FOCUS_ALIGN.CENTER;
       setStarredDockPos(null);
     } catch (e) {
       console.error(e);
@@ -1740,7 +1742,7 @@ export default function CanvasPage() {
   }, []);
 
   const connectorPoints = useMemo(() => {
-    if (!showSequenceLines || connectorMode === CANVAS_CONNECTOR_MODE.NONE) return [];
+    if (connectorMode === CANVAS_CONNECTOR_MODE.NONE) return [];
     const notes = sequenceNotesForCanvas;
     if (notes.length < 2) return [];
     if (connectorMode === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN) {
@@ -1763,7 +1765,7 @@ export default function CanvasPage() {
       pts.push(connectorBetweenRects(a, b));
     }
     return pts;
-  }, [showSequenceLines, connectorMode, sequenceNotesForCanvas, cardRects]);
+  }, [connectorMode, sequenceNotesForCanvas, cardRects]);
 
   pointerMoveInnerRef.current = (e) => {
     if (!viewportRef.current) return;
@@ -1926,15 +1928,13 @@ export default function CanvasPage() {
                 onClose={() => setSequenceMenuOpen(false)}
                 arrangement={draftArrangement}
                 connectorMode={draftConnector}
-                showLines={draftShowLines}
-                showLinesActive={
-                  showSequenceLines && connectorMode !== CANVAS_CONNECTOR_MODE.NONE
-                }
+                linesActive={linesVisible}
                 manualNewNoteAnchor={draftManualNewNoteAnchor}
+                autoFocusAlign={draftAutoFocusAlign}
                 onArrangementChange={setDraftArrangement}
                 onConnectorModeChange={setDraftConnector}
-                onShowLinesChange={setDraftShowLines}
                 onManualNewNoteAnchorChange={setDraftManualNewNoteAnchor}
+                onAutoFocusAlignChange={setDraftAutoFocusAlign}
                 onApply={applyCanvasSequence}
               >
                 <NavIconSequenceLines />
@@ -2018,7 +2018,7 @@ export default function CanvasPage() {
                   transformOrigin: '0 0',
                 }}
               >
-                {showSequenceLines && connectorMode !== CANVAS_CONNECTOR_MODE.NONE ? (
+                {linesVisible ? (
                   <svg className="canvas-connectors" aria-hidden>
                     <defs>
                       <marker

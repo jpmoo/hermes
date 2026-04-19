@@ -364,6 +364,11 @@ function sanitizeManualNewNoteAnchor(input) {
   return 'focus';
 }
 
+function sanitizeAutoFocusAlign(input) {
+  if (input === 'start' || input === 'center' || input === 'end') return input;
+  return 'center';
+}
+
 function sanitizeCanvasConnectorMode(input) {
   if (input === 'thread_chain' || input === 'focus_to_children' || input === 'none') return input;
   return 'thread_chain';
@@ -419,7 +424,16 @@ function sanitizeCanvasLayouts(input) {
       const canvasArrangement = sanitizeCanvasArrangement(block.canvasArrangement);
       const connectorMode = sanitizeCanvasConnectorMode(block.connectorMode);
       const manualNewNoteAnchor = sanitizeManualNewNoteAnchor(block.manualNewNoteAnchor);
-      const blockOut = { view, viewMobile, cards, canvasArrangement, connectorMode, manualNewNoteAnchor };
+      const autoFocusAlign = sanitizeAutoFocusAlign(block.autoFocusAlign);
+      const blockOut = {
+        view,
+        viewMobile,
+        cards,
+        canvasArrangement,
+        connectorMode,
+        manualNewNoteAnchor,
+        autoFocusAlign,
+      };
       if (starredDock) blockOut.starredDock = starredDock;
       out[tid][fk] = blockOut;
     }
