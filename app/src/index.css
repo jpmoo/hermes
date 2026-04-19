@@ -185,8 +185,25 @@ html.hermes-viewport-bg-active .stream-page-compose .mentions-compose-type-btn:h
   background: color-mix(in srgb, var(--bg-card-hover) 72%, transparent);
 }
 
+/* Opaque controls — semi-transparent fills would show the fixed background through the button face. */
 html.hermes-viewport-bg-active .stream-page-attach-btn {
-  background: color-mix(in srgb, var(--bg-card) 62%, transparent);
+  background: var(--bg-card);
+}
+
+html.hermes-viewport-bg-active .stream-page-compose-row button[type='submit'] {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/*
+ * Default disabled submit uses opacity: 0.5 on the whole control, which lets the wallpaper show through.
+ * Keep the face opaque; mute with color-mix instead.
+ */
+html.hermes-viewport-bg-active .stream-page-compose-row button[type='submit']:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--accent) 52%, var(--bg-card));
+  color: color-mix(in srgb, var(--bg) 65%, var(--text-muted));
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar {
