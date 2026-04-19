@@ -34,6 +34,7 @@ import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './n
 import {
   sortNoteTreeWithStreamPrefs,
   normalizeStreamThreadSortPrefs,
+  resolveStreamThreadSortPrefsForHead,
   sortStarredPinned,
 } from './noteThreadSort';
 import StreamThreadSortControl from './StreamThreadSortControl';
@@ -758,11 +759,25 @@ export default function StreamPage() {
     setDrillPendingFocusId(null);
   }, [threadRootId]);
 
+  const treeFull = useMemo(() => buildTree(thread), [thread]);
+  const focusForSortHead = focusId ?? focusParam;
+  const headNodeForStreamSort = useMemo(() => {
+    if (!threadRootId || !treeFull.length) return null;
+    const targetId =
+      focusForSortHead && !noteIdEq(focusForSortHead, threadRootId)
+        ? focusForSortHead
+        : treeFull[0]?.id;
+    if (targetId == null) return null;
+    return findNode(treeFull, targetId);
+  }, [treeFull, threadRootId, focusForSortHead]);
+
   const threadSortPrefs = useMemo(() => {
     if (!threadRootId) return normalizeStreamThreadSortPrefs(undefined);
     const rid = threadRootId.trim().toLowerCase();
-    return normalizeStreamThreadSortPrefs(streamThreadSortByRoot[rid]);
-  }, [streamThreadSortByRoot, threadRootId]);
+    const stored = streamThreadSortByRoot[rid];
+    const headHasDirectReplies = Boolean(headNodeForStreamSort?.children?.length);
+    return resolveStreamThreadSortPrefsForHead(stored, headHasDirectReplies);
+  }, [streamThreadSortByRoot, threadRootId, headNodeForStreamSort]);
 
   const onThreadSortChange = useCallback(
     (next) => {
@@ -794,7 +809,6 @@ export default function StreamPage() {
   );
 
   const threadReady = Boolean(threadRootId && !loadingThread && thread.length > 0);
-  const treeFull = useMemo(() => buildTree(thread), [thread]);
   const tree = useMemo(
     () =>
       sortNoteTreeWithStreamPrefs(

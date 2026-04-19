@@ -130,6 +130,18 @@ export function normalizeStreamThreadSortPrefs(raw) {
 }
 
 /**
+ * Stream thread root prefs: when the focused head has no direct replies yet and nothing is stored
+ * for this root, use {@link DEFAULT_STREAM_THREAD_SORT} (datetime / start time order + starred on).
+ */
+export function resolveStreamThreadSortPrefsForHead(storedRaw, headHasDirectReplies) {
+  const missing = storedRaw === undefined || storedRaw === null;
+  if (!headHasDirectReplies && missing) {
+    return { ...DEFAULT_STREAM_THREAD_SORT };
+  }
+  return normalizeStreamThreadSortPrefs(storedRaw);
+}
+
+/**
  * Sort each sibling level using stream prefs (immutable).
  * @param {any[]|null|undefined} nodes
  * @param {Partial<StreamThreadSortPrefs>|null|undefined} prefs
