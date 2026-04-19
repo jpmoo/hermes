@@ -150,6 +150,21 @@ html.hermes-viewport-bg-active .stream-page-nav-row {
   -webkit-backdrop-filter: blur(10px);
 }
 
+/*
+ * Default composer chrome uses linear-gradient(..., var(--bg) 85%, transparent): the solid band is
+ * 85% of the *element* height. Expanded composer (~50vh textarea) turns that into a huge opaque
+ * block and hides the viewport background in the lower third — use a short fixed fade instead.
+ */
+html.hermes-viewport-bg-active .stream-page > .stream-page-compose-wrap {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--bg) 82%, transparent) 0%,
+    transparent min(5.5rem, 22vh)
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 html.hermes-viewport-bg-active .canvas-page,
 html.hermes-viewport-bg-active .canvas-page--root-bg {
   background: transparent;
