@@ -7,7 +7,14 @@ import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal'
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
-import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
+import {
+  sortNoteTreeByThreadOrder,
+  sortNoteTreeWithStreamPrefs,
+  normalizeStreamThreadSortPrefs,
+  noteThreadSortKeyMs,
+  resolveStreamThreadSortPrefsForHead,
+  sortNotesByStreamOrderNoStarBias,
+} from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import {
   getThread,
@@ -35,12 +42,19 @@ import {
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
+  CANVAS_ARRANGEMENT,
+  CANVAS_CONNECTOR_MODE,
+  CANVAS_MANUAL_NEW_NOTE_ANCHOR,
   canvasFocusKey,
   canvasLayoutThreadKey,
+  computeCanvasHorizontalArrangementRects,
+  computeCanvasVerticalArrangementRects,
   mergeCanvasLayoutPatch,
   replaceCanvasLayoutFocusBlock,
+  resolveCanvasBlockPrefs,
   resolveCanvasView,
 } from './canvasLayoutApi';
+import CanvasSequenceMenu from './CanvasSequenceMenu';
 import { useMediaQuery } from './useMediaQuery';
 import {
   NavIconAttach,
@@ -111,18 +125,6 @@ const DEFAULT_CARD_GAP_Y = 36;
 const DEFAULT_CARD_START_X = 48;
 const DEFAULT_CARD_START_Y = 48;
 
-/** Sort key: event start (when set), else note creation time. */
-function noteTimelineMs(n) {
-  if (n.note_type === 'event' && n.event_start_at) {
-    const ev = Date.parse(n.event_start_at);
-    if (Number.isFinite(ev)) return ev;
-  }
-  const raw = n.created_at || n.updated_at;
-  if (!raw) return 0;
-  const ms = Date.parse(raw);
-  return Number.isFinite(ms) ? ms : 0;
-}
-
 /** Thread root, focused note (subtree), or first stream root — always first in sequence / default stack. */
 function canvasLeadNoteId(displayTree, focusId, threadRootId) {
   const flat = flattenCanvasNotes(displayTree);
@@ -134,30 +136,6 @@ function canvasLeadNoteId(displayTree, focusId, threadRootId) {
     return String(threadRootId);
   }
   return String(flat[0].id);
-}
-
-/** Lead note first; others by timeline. */
-function orderNotesLeadThenTimeline(notes, leadId) {
-  if (notes.length === 0) return [];
-  const ids = new Set(notes.map((n) => String(n.id)));
-  const effectiveLead = leadId && ids.has(String(leadId)) ? String(leadId) : null;
-  const rest = effectiveLead
-    ? notes.filter((n) => String(n.id) !== effectiveLead)
-    : [...notes];
-  rest.sort((a, b) => {
-    const d = noteTimelineMs(a) - noteTimelineMs(b);
-    return d !== 0 ? d : String(a.id).localeCompare(String(b.id));
-  });
-  if (!effectiveLead) return rest;
-  const lead = notes.find((n) => String(n.id) === effectiveLead);
-  return lead ? [lead, ...rest] : rest;
-}
-
-function layoutRankByLeadThenTimeline(notes, leadId) {
-  const ordered = orderNotesLeadThenTimeline(notes, leadId);
-  const m = new Map();
-  ordered.forEach((n, rank) => m.set(String(n.id), rank));
-  return m;
 }
 
 /** Vertical timeline: older notes higher, newer lower. */
@@ -258,6 +236,31 @@ function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects) 
   return defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh);
 }
 
+/** Place a new card adjacent to an anchor (manual layout). */
+function rectForNewNoteNearAnchor(anchorRect, existingRects, scale, tx, ty, vw, vh) {
+  const w = DEFAULT_CARD_W;
+  const h = DEFAULT_CARD_H;
+  const gap = NEW_CARD_GAP;
+  const others = existingRects.filter(
+    (r) => r && typeof r.x === 'number' && typeof r.w === 'number' && typeof r.h === 'number'
+  );
+  if (!anchorRect || typeof anchorRect.x !== 'number') {
+    return defaultRectForNewNoteInViewport(scale, tx, ty, vw, vh);
+  }
+  const candidates = [
+    { x: anchorRect.x + anchorRect.w + gap, y: anchorRect.y, w, h },
+    { x: anchorRect.x, y: anchorRect.y + anchorRect.h + gap, w, h },
+    { x: anchorRect.x + anchorRect.w + gap, y: anchorRect.y + anchorRect.h + gap, w, h },
+    { x: anchorRect.x - w - gap, y: anchorRect.y, w, h },
+    { x: anchorRect.x, y: anchorRect.y - h - gap, w, h },
+    { x: anchorRect.x + anchorRect.w + gap, y: anchorRect.y - h - gap, w, h },
+  ];
+  for (const c of candidates) {
+    if (!rectOverlapsAny(c, others, gap)) return c;
+  }
+  return rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, 0, others);
+}
+
 /** Midpoint of a rectangle side (top | right | bottom | left). */
 function sideMidpoint(rect, side) {
   const { x, y, w, h } = rect;
@@ -323,6 +326,8 @@ function isCanvasDragInteractiveTarget(target) {
         '.note-card-tag-dropdown',
         '[data-insight-ui]',
         'label',
+        '.canvas-sequence-menu',
+        '.canvas-sequence-menu__panel',
       ].join(', ')
     )
   );
@@ -391,6 +396,18 @@ export default function CanvasPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [showSequenceLines, setShowSequenceLines] = useState(true);
+  /** Per thread root — same storage as Stream sort prefs. */
+  const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
+  const [sequenceMenuOpen, setSequenceMenuOpen] = useState(false);
+  const [draftArrangement, setDraftArrangement] = useState(CANVAS_ARRANGEMENT.MANUAL);
+  const [draftConnector, setDraftConnector] = useState(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
+  const [draftShowLines, setDraftShowLines] = useState(true);
+  const [draftManualNewNoteAnchor, setDraftManualNewNoteAnchor] = useState(
+    CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS
+  );
+  const [canvasArrangement, setCanvasArrangement] = useState(CANVAS_ARRANGEMENT.MANUAL);
+  const [connectorMode, setConnectorMode] = useState(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
+  const [manualNewNoteAnchor, setManualNewNoteAnchor] = useState(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
   const [starredDockExpanded, setStarredDockExpanded] = useState(false);
   /** Fixed px position; null = use CSS default placement */
   const [starredDockPos, setStarredDockPos] = useState(null);
@@ -417,9 +434,15 @@ export default function CanvasPage() {
   const cardRectsRef = useRef(cardRects);
   const canvasLayoutsRef = useRef(canvasLayouts);
   const showSequenceLinesRef = useRef(showSequenceLines);
+  const canvasArrangementRef = useRef(CANVAS_ARRANGEMENT.MANUAL);
+  const connectorModeRef = useRef(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
+  const manualNewNoteAnchorRef = useRef(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
   showSequenceLinesRef.current = showSequenceLines;
+  canvasArrangementRef.current = canvasArrangement;
+  connectorModeRef.current = connectorMode;
+  manualNewNoteAnchorRef.current = manualNewNoteAnchor;
 
   const viewportRef = useRef(null);
   const viewportPointersRef = useRef(new Map());
@@ -490,6 +513,11 @@ export default function CanvasPage() {
         if (cancelled) return;
         const rawLayouts = s?.canvasLayouts ?? s?.campusLayouts;
         if (rawLayouts && typeof rawLayouts === 'object') setCanvasLayouts(rawLayouts);
+        setStreamThreadSortByRoot(
+          s.streamThreadSort && typeof s.streamThreadSort === 'object' && !Array.isArray(s.streamThreadSort)
+            ? s.streamThreadSort
+            : {}
+        );
         setNoteHistory(Array.isArray(s.noteHistory) ? s.noteHistory : []);
       } catch (e) {
         console.error(e);
@@ -523,38 +551,101 @@ export default function CanvasPage() {
     return buildTree(thread);
   }, [thread, threadRootId, visibleNoteTypes]);
 
+  const focusForSortHead = focusId ?? focusParam;
+  const headNodeForStreamSort = useMemo(() => {
+    if (!threadRootId || !treeFull.length) return null;
+    const targetId =
+      focusForSortHead && !noteIdEq(focusForSortHead, threadRootId)
+        ? focusForSortHead
+        : treeFull[0]?.id;
+    if (targetId == null) return null;
+    return findNode(treeFull, targetId);
+  }, [treeFull, threadRootId, focusForSortHead]);
+
+  const threadSortPrefs = useMemo(() => {
+    if (!threadRootId) return normalizeStreamThreadSortPrefs(undefined);
+    const rid = threadRootId.trim().toLowerCase();
+    const stored = streamThreadSortByRoot[rid];
+    return resolveStreamThreadSortPrefsForHead(stored, Boolean(headNodeForStreamSort?.children?.length));
+  }, [streamThreadSortByRoot, threadRootId, headNodeForStreamSort]);
+
   const tree = useMemo(() => {
     if (!threadRootId) return treeFull;
-    return sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes));
-  }, [threadRootId, treeFull, visibleNoteTypes]);
-
-  const pinnedTree = useMemo(() => sortStarredPinned(tree), [tree]);
+    return sortNoteTreeWithStreamPrefs(
+      filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes),
+      threadSortPrefs
+    );
+  }, [threadRootId, treeFull, visibleNoteTypes, threadSortPrefs]);
   const actualRootId = threadRootId;
   const layoutStorageKey = useMemo(() => canvasLayoutThreadKey(threadRootId), [threadRootId]);
 
   const displayTree = useMemo(() => {
-    const fn = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
+    const fn = focusId && actualRootId ? findNode(tree, focusId) : null;
     if (fn && !noteIdEq(focusId, actualRootId)) {
       return [{ ...fn, children: fn.children || [] }];
     }
-    return pinnedTree;
-  }, [pinnedTree, focusId, actualRootId]);
+    return tree;
+  }, [tree, focusId, actualRootId]);
 
   const canvasNotes = useMemo(() => flattenCanvasNotes(displayTree), [displayTree]);
   const canvasLeadId = useMemo(
     () => canvasLeadNoteId(displayTree, focusId, threadRootId),
     [displayTree, focusId, threadRootId]
   );
-  const layoutRankById = useMemo(
-    () => layoutRankByLeadThenTimeline(canvasNotes, canvasLeadId),
-    [canvasNotes, canvasLeadId]
-  );
-  const sequenceOrderedNotes = useMemo(
-    () => orderNotesLeadThenTimeline(canvasNotes, canvasLeadId),
-    [canvasNotes, canvasLeadId]
-  );
+  const sequenceOrderedNotes = useMemo(() => {
+    const notes = canvasNotes;
+    if (notes.length === 0) return [];
+    const lid = canvasLeadId ? String(canvasLeadId) : null;
+    if (!lid) return notes;
+    const lead = notes.find((n) => String(n.id) === lid);
+    if (!lead) return notes;
+    const rest = notes.filter((n) => String(n.id) !== lid);
+    return [lead, ...rest];
+  }, [canvasNotes, canvasLeadId]);
+
+  /** Stream sort including starred grouping — used for auto layouts and connector order there. */
+  const manualSequenceOrderedNotes = useMemo(() => {
+    const notes = canvasNotes;
+    if (notes.length === 0) return [];
+    const lid = canvasLeadId ? String(canvasLeadId) : null;
+    if (!lid) {
+      return sortNotesByStreamOrderNoStarBias(notes, threadSortPrefs);
+    }
+    const lead = notes.find((n) => String(n.id) === lid);
+    if (!lead) return sortNotesByStreamOrderNoStarBias(notes, threadSortPrefs);
+    const rest = notes.filter((n) => String(n.id) !== lid);
+    const sortedRest = sortNotesByStreamOrderNoStarBias(rest, threadSortPrefs);
+    return [lead, ...sortedRest];
+  }, [canvasNotes, canvasLeadId, threadSortPrefs]);
+
+  const sequenceNotesForCanvas = useMemo(() => {
+    if (
+      canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL ||
+      canvasArrangement === CANVAS_ARRANGEMENT.HORIZONTAL
+    ) {
+      return sequenceOrderedNotes;
+    }
+    return manualSequenceOrderedNotes;
+  }, [canvasArrangement, sequenceOrderedNotes, manualSequenceOrderedNotes]);
+
+  const layoutRankById = useMemo(() => {
+    const m = new Map();
+    sequenceNotesForCanvas.forEach((n, rank) => m.set(String(n.id), rank));
+    return m;
+  }, [sequenceNotesForCanvas]);
+
+  const sequenceLayoutKey = useMemo(() => {
+    const sortSig = `${threadSortPrefs.sortMode}:${threadSortPrefs.starredFirst ? 1 : 0}`;
+    const noteSig = sequenceOrderedNotes
+      .map((n) => `${n.id}:${n.starred ? 1 : 0}:${noteThreadSortKeyMs(n)}`)
+      .join('|');
+    return `${sortSig}|${noteSig}`;
+  }, [sequenceOrderedNotes, threadSortPrefs]);
+
+  const sequenceOrderedNotesRef = useRef(sequenceOrderedNotes);
+  sequenceOrderedNotesRef.current = sequenceOrderedNotes;
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
-  const focusedNode = focusId && actualRootId ? findNode(pinnedTree, focusId) : null;
+  const focusedNode = focusId && actualRootId ? findNode(tree, focusId) : null;
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
   const focusSnippet = focusedNode?.content?.slice(0, 50) || '';
 
@@ -645,10 +736,10 @@ export default function CanvasPage() {
     if (!thread.length) return;
     const key = `${threadRootId}|${focusParam || ''}`;
     if (focusFromUrl.current === key) return;
-    if (focusParam && !findNode(pinnedTree, focusParam)) return;
+    if (focusParam && !findNode(tree, focusParam)) return;
     focusFromUrl.current = key;
     setFocusId(focusParam || null);
-  }, [threadRootId, focusParam, thread, pinnedTree]);
+  }, [threadRootId, focusParam, thread, tree]);
 
   useEffect(() => {
     if (!canvasNotes.length) {
@@ -672,7 +763,7 @@ export default function CanvasPage() {
         saved = {};
       }
       const savedIsEmpty = Object.keys(saved).length === 0;
-      const rankById = layoutRankByLeadThenTimeline(canvasNotes, canvasLeadId);
+      const rankById = layoutRankById;
 
       canvasNotes.forEach((n) => {
         const id = String(n.id);
@@ -709,12 +800,67 @@ export default function CanvasPage() {
           .filter(([oid]) => oid !== id)
           .map(([, r]) => r);
         const rank = rankById.get(id) ?? 0;
-        next[id] = rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects);
+        if (canvasArrangement === CANVAS_ARRANGEMENT.MANUAL) {
+          let anchorRect = null;
+          if (manualNewNoteAnchor === CANVAS_MANUAL_NEW_NOTE_ANCHOR.LAST) {
+            for (let i = manualSequenceOrderedNotes.length - 1; i >= 0; i -= 1) {
+              const oid = String(manualSequenceOrderedNotes[i].id);
+              if (oid === id) continue;
+              const r = next[oid] ?? prev[oid];
+              if (r) {
+                anchorRect = r;
+                break;
+              }
+            }
+          }
+          if (!anchorRect && manualSequenceOrderedNotes[0]) {
+            const leadId = String(manualSequenceOrderedNotes[0].id);
+            anchorRect = next[leadId] ?? prev[leadId];
+          }
+          next[id] = rectForNewNoteNearAnchor(anchorRect, existingRects, scale, tx, ty, vw, vh);
+        } else {
+          next[id] = rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects);
+        }
       });
 
       return next;
     });
-  }, [canvasNotes, canvasLeadId, layoutStorageKey, fk, savedCardsLayoutSig, scale, tx, ty]);
+  }, [
+    canvasNotes,
+    canvasLeadId,
+    canvasArrangement,
+    manualNewNoteAnchor,
+    manualSequenceOrderedNotes,
+    layoutRankById,
+    layoutStorageKey,
+    fk,
+    savedCardsLayoutSig,
+    scale,
+    tx,
+    ty,
+  ]);
+
+  /** Auto layouts: reposition all cards when stream order, stars, or sort prefs change. */
+  useEffect(() => {
+    if (
+      canvasArrangement !== CANVAS_ARRANGEMENT.VERTICAL &&
+      canvasArrangement !== CANVAS_ARRANGEMENT.HORIZONTAL
+    ) {
+      return;
+    }
+    const ordered = sequenceOrderedNotesRef.current;
+    if (!ordered.length) return;
+    const getSize = (id) => {
+      const r = cardRectsRef.current[id];
+      return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
+    };
+    const computed =
+      canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL
+        ? computeCanvasVerticalArrangementRects(ordered, getSize)
+        : computeCanvasHorizontalArrangementRects(ordered, getSize);
+    setCardRects((prev) => ({ ...prev, ...computed }));
+    scheduleSaveRef.current();
+  }, [canvasArrangement, sequenceLayoutKey]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -724,6 +870,25 @@ export default function CanvasPage() {
     setTy(v.ty);
     setShowSequenceLines(v.showSequenceLines);
   }, [layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
+
+  useEffect(() => {
+    const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
+    const p = resolveCanvasBlockPrefs(block || {});
+    setCanvasArrangement(p.canvasArrangement);
+    setConnectorMode(p.connectorMode);
+    setManualNewNoteAnchor(p.manualNewNoteAnchor);
+  }, [layoutStorageKey, fk, canvasLayouts]);
+
+  useEffect(() => {
+    if (!sequenceMenuOpen) return;
+    const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
+    const p = resolveCanvasBlockPrefs(block || {});
+    const v = resolveCanvasView(block, isCanvasMobileViewport);
+    setDraftArrangement(p.canvasArrangement);
+    setDraftConnector(p.connectorMode);
+    setDraftManualNewNoteAnchor(p.manualNewNoteAnchor);
+    setDraftShowLines(v.showSequenceLines);
+  }, [sequenceMenuOpen, layoutStorageKey, fk, canvasLayouts, isCanvasMobileViewport]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -773,6 +938,9 @@ export default function CanvasPage() {
         right: starredDockPosRef.current.right,
       };
     }
+    partial.canvasArrangement = canvasArrangementRef.current;
+    partial.connectorMode = connectorModeRef.current;
+    partial.manualNewNoteAnchor = manualNewNoteAnchorRef.current;
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
       await patchUserSettings({ canvasLayouts: patchLayouts });
@@ -1172,28 +1340,75 @@ export default function CanvasPage() {
     [setSearchParams]
   );
 
-  const toggleSequenceLines = useCallback(async () => {
-    const tid = layoutStorageKey;
-    const focusKey = fk;
-    const prev = showSequenceLinesRef.current;
-    const next = !prev;
-    setShowSequenceLines(next);
-    showSequenceLinesRef.current = next;
-    const curBlock = canvasLayoutsRef.current[tid]?.[focusKey];
-    const cur = curBlock && typeof curBlock === 'object' ? curBlock : {};
+  const applyCanvasSequence = useCallback(async () => {
+    if (
+      !window.confirm(
+        'This may change where notes appear on the canvas depending on your choices. Continue?'
+      )
+    ) {
+      return;
+    }
+    const tid = layoutStorageKeyRef.current;
+    const focusKey = fkRef.current;
+    const ordered = sequenceOrderedNotesRef.current;
+    const getSize = (id) => {
+      const r = cardRectsRef.current[id];
+      return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
+    };
+    let nextCards = { ...cardRectsRef.current };
+    if (draftArrangement === CANVAS_ARRANGEMENT.VERTICAL) {
+      const computed = computeCanvasVerticalArrangementRects(ordered, getSize);
+      nextCards = { ...nextCards, ...computed };
+    } else if (draftArrangement === CANVAS_ARRANGEMENT.HORIZONTAL) {
+      const computed = computeCanvasHorizontalArrangementRects(ordered, getSize);
+      nextCards = { ...nextCards, ...computed };
+    }
+
+    cardRectsRef.current = nextCards;
+    canvasArrangementRef.current = draftArrangement;
+    connectorModeRef.current = draftConnector;
+    showSequenceLinesRef.current = draftShowLines;
+    manualNewNoteAnchorRef.current = draftManualNewNoteAnchor;
+
+    setCardRects(nextCards);
+    setCanvasArrangement(draftArrangement);
+    setConnectorMode(draftConnector);
+    setManualNewNoteAnchor(draftManualNewNoteAnchor);
+    setShowSequenceLines(draftShowLines);
+    setSequenceMenuOpen(false);
+    pendingFitAllRef.current = true;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const curRaw = canvasLayoutsRef.current[tid]?.[focusKey];
+    const curBlock = curRaw && typeof curRaw === 'object' ? curRaw : {};
     const pos = {
       scale: scaleRef.current,
       tx: txRef.current,
       ty: tyRef.current,
-      showSequenceLines: next,
+      showSequenceLines: draftShowLines,
     };
-    const partial = { cards: { ...cardRectsRef.current } };
-    if (isCanvasMobileViewport) {
+    const mobile = isCanvasMobileViewportRef.current;
+    const partial = {
+      cards: nextCards,
+      canvasArrangement: draftArrangement,
+      connectorMode: draftConnector,
+      manualNewNoteAnchor: draftManualNewNoteAnchor,
+    };
+    if (mobile) {
       partial.viewMobile = pos;
-      partial.view = { ...(cur.view || {}), showSequenceLines: next };
+      partial.view = { ...(curBlock.view || {}), showSequenceLines: draftShowLines };
     } else {
       partial.view = pos;
-      partial.viewMobile = { ...(cur.viewMobile || {}), showSequenceLines: next };
+      partial.viewMobile = { ...(curBlock.viewMobile || {}), showSequenceLines: draftShowLines };
+    }
+    if (starredDockPosRef.current != null) {
+      partial.starredDock = {
+        top: starredDockPosRef.current.top,
+        right: starredDockPosRef.current.right,
+      };
     }
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
@@ -1201,10 +1416,8 @@ export default function CanvasPage() {
       setCanvasLayouts(patchLayouts);
     } catch (e) {
       console.error(e);
-      setShowSequenceLines(prev);
-      showSequenceLinesRef.current = prev;
     }
-  }, [layoutStorageKey, fk, isCanvasMobileViewport]);
+  }, [draftArrangement, draftConnector, draftManualNewNoteAnchor, draftShowLines]);
 
   const resetCanvasLayout = useCallback(async () => {
     if (
@@ -1224,6 +1437,9 @@ export default function CanvasPage() {
       view: { scale: 1, tx: 0, ty: 0, showSequenceLines: true },
       viewMobile: { scale: 1, tx: 0, ty: 0, showSequenceLines: true },
       cards: {},
+      canvasArrangement: CANVAS_ARRANGEMENT.MANUAL,
+      connectorMode: CANVAS_CONNECTOR_MODE.THREAD_CHAIN,
+      manualNewNoteAnchor: CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS,
     };
     const patchLayouts = replaceCanvasLayoutFocusBlock(
       canvasLayoutsRef.current,
@@ -1238,6 +1454,12 @@ export default function CanvasPage() {
       setCanvasLayouts(patchLayouts);
       setShowSequenceLines(true);
       showSequenceLinesRef.current = true;
+      setCanvasArrangement(CANVAS_ARRANGEMENT.MANUAL);
+      setConnectorMode(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
+      setManualNewNoteAnchor(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
+      canvasArrangementRef.current = CANVAS_ARRANGEMENT.MANUAL;
+      connectorModeRef.current = CANVAS_CONNECTOR_MODE.THREAD_CHAIN;
+      manualNewNoteAnchorRef.current = CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS;
       setStarredDockPos(null);
     } catch (e) {
       console.error(e);
@@ -1500,15 +1722,30 @@ export default function CanvasPage() {
   }, []);
 
   const connectorPoints = useMemo(() => {
+    if (!showSequenceLines) return [];
+    const notes = sequenceNotesForCanvas;
+    if (notes.length < 2) return [];
+    if (connectorMode === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN) {
+      const lead = notes[0];
+      const a = cardRects[String(lead.id)];
+      if (!a) return [];
+      const pts = [];
+      for (let i = 1; i < notes.length; i++) {
+        const b = cardRects[String(notes[i].id)];
+        if (!b) continue;
+        pts.push(connectorBetweenRects(a, b));
+      }
+      return pts;
+    }
     const pts = [];
-    for (let i = 0; i < sequenceOrderedNotes.length - 1; i++) {
-      const a = cardRects[String(sequenceOrderedNotes[i].id)];
-      const b = cardRects[String(sequenceOrderedNotes[i + 1].id)];
+    for (let i = 0; i < notes.length - 1; i++) {
+      const a = cardRects[String(notes[i].id)];
+      const b = cardRects[String(notes[i + 1].id)];
       if (!a || !b) continue;
       pts.push(connectorBetweenRects(a, b));
     }
     return pts;
-  }, [sequenceOrderedNotes, cardRects]);
+  }, [showSequenceLines, connectorMode, sequenceNotesForCanvas, cardRects]);
 
   pointerMoveInnerRef.current = (e) => {
     if (!viewportRef.current) return;
@@ -1665,16 +1902,23 @@ export default function CanvasPage() {
               ) : null}
             </div>
             <div className="canvas-toolbar-right">
-              <button
-                type="button"
-                className={`canvas-icon-btn${showSequenceLines ? '' : ' canvas-icon-btn--off'}`}
-                onClick={toggleSequenceLines}
-                aria-label={showSequenceLines ? 'Hide sequence lines' : 'Show sequence lines'}
-                aria-pressed={showSequenceLines}
-                title={showSequenceLines ? 'Hide sequence lines' : 'Show sequence lines'}
+              <CanvasSequenceMenu
+                open={sequenceMenuOpen}
+                onOpenToggle={() => setSequenceMenuOpen((o) => !o)}
+                onClose={() => setSequenceMenuOpen(false)}
+                arrangement={draftArrangement}
+                connectorMode={draftConnector}
+                showLines={draftShowLines}
+                showLinesActive={showSequenceLines}
+                manualNewNoteAnchor={draftManualNewNoteAnchor}
+                onArrangementChange={setDraftArrangement}
+                onConnectorModeChange={setDraftConnector}
+                onShowLinesChange={setDraftShowLines}
+                onManualNewNoteAnchorChange={setDraftManualNewNoteAnchor}
+                onApply={applyCanvasSequence}
               >
                 <NavIconSequenceLines />
-              </button>
+              </CanvasSequenceMenu>
               <div className="canvas-toolbar-zoom">
                 <button
                   type="button"
@@ -1788,7 +2032,7 @@ export default function CanvasPage() {
                     ))}
                   </svg>
                 ) : null}
-                {sequenceOrderedNotes.map((n) => {
+                {sequenceNotesForCanvas.map((n) => {
                   const id = String(n.id);
                   const r =
                     cardRects[id] || defaultRectForRank(layoutRankById.get(id) ?? 0);

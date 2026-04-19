@@ -114,6 +114,16 @@ function compareStreamPrefs(a, b, prefs) {
   return compareDatetimePrimary(a, b, false);
 }
 
+/**
+ * Flat list: same stream sort mode as prefs, but starred-first grouping is disabled (for manual canvas layout).
+ * @param {any[]} notes
+ * @param {Partial<StreamThreadSortPrefs>|null|undefined} prefs
+ */
+export function sortNotesByStreamOrderNoStarBias(notes, prefs) {
+  const p = { ...normalizeStreamThreadSortPrefs(prefs), starredFirst: false };
+  return [...notes].sort((a, b) => compareStreamPrefs(a, b, p));
+}
+
 function isStarred(n) {
   return Boolean(n?.starred);
 }

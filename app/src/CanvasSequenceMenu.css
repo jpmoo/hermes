@@ -1,0 +1,99 @@
+.canvas-sequence-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.canvas-sequence-menu__panel {
+  min-width: min(22rem, calc(100vw - 2rem));
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.65rem 0.75rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.canvas-sequence-menu__panel--portal {
+  position: fixed;
+  left: auto;
+  bottom: auto;
+  margin: 0;
+  z-index: 500;
+}
+
+.canvas-sequence-menu__section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.canvas-sequence-menu__section-title--sub {
+  margin-top: 0.5rem;
+}
+
+.canvas-sequence-menu__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0.35rem;
+}
+
+.canvas-sequence-menu__check input {
+  margin-top: 0.12rem;
+  flex-shrink: 0;
+}
+
+.canvas-sequence-menu__radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0.35rem;
+}
+
+.canvas-sequence-menu__radio:last-child {
+  margin-bottom: 0;
+}
+
+.canvas-sequence-menu__radio input {
+  margin-top: 0.12rem;
+  flex-shrink: 0;
+}
+
+.canvas-sequence-menu__apply {
+  margin-top: 0.25rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--accent-dim);
+  color: var(--text);
+  cursor: pointer;
+  align-self: flex-end;
+}
+
+.canvas-sequence-menu__apply:hover {
+  filter: brightness(1.06);
+}
+
+.canvas-sequence-menu__apply:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.canvas-icon-btn.canvas-icon-btn--open {
+  outline: 1px solid var(--accent-dim);
+}

@@ -352,6 +352,23 @@ function sanitizeCanvasViewSlice(input) {
   return view;
 }
 
+function sanitizeCanvasArrangement(input) {
+  if (input === 'keep' || input === 'manual' || input === 'vertical' || input === 'horizontal') {
+    return input;
+  }
+  return 'manual';
+}
+
+function sanitizeManualNewNoteAnchor(input) {
+  if (input === 'last') return 'last';
+  return 'focus';
+}
+
+function sanitizeCanvasConnectorMode(input) {
+  if (input === 'thread_chain' || input === 'focus_to_children') return input;
+  return 'thread_chain';
+}
+
 /** Canvas layouts in settings_json: per-thread, per-focus view(s) + card rects. Legacy key `campusLayouts` is read once and migrated to `canvasLayouts`. */
 function sanitizeCanvasLayouts(input) {
   if (input == null || typeof input !== 'object' || Array.isArray(input)) return {};
@@ -399,7 +416,10 @@ function sanitizeCanvasLayouts(input) {
           cards[nid] = { x, y, w, h };
         }
       }
-      const blockOut = { view, viewMobile, cards };
+      const canvasArrangement = sanitizeCanvasArrangement(block.canvasArrangement);
+      const connectorMode = sanitizeCanvasConnectorMode(block.connectorMode);
+      const manualNewNoteAnchor = sanitizeManualNewNoteAnchor(block.manualNewNoteAnchor);
+      const blockOut = { view, viewMobile, cards, canvasArrangement, connectorMode, manualNewNoteAnchor };
       if (starredDock) blockOut.starredDock = starredDock;
       out[tid][fk] = blockOut;
     }

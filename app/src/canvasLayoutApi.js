@@ -22,6 +22,133 @@ export function canvasLayoutThreadKey(threadRootId) {
   return threadRootId ? String(threadRootId) : CANVAS_LAYOUT_STREAM_ROOT;
 }
 
+/** How auto-layout stacks cards relative to the focus note. */
+export const CANVAS_ARRANGEMENT = {
+  /** @deprecated use MANUAL; still accepted from stored settings */
+  KEEP: 'keep',
+  MANUAL: 'manual',
+  VERTICAL: 'vertical',
+  HORIZONTAL: 'horizontal',
+};
+
+/** Where new cards are placed in manual layout (stream sort order ignores starring). */
+export const CANVAS_MANUAL_NEW_NOTE_ANCHOR = {
+  FOCUS: 'focus',
+  LAST: 'last',
+};
+
+/** How dashed connectors are drawn between cards. */
+export const CANVAS_CONNECTOR_MODE = {
+  /** Consecutive pairs in stream sort order (focus → … → last). */
+  THREAD_CHAIN: 'thread_chain',
+  /** Hub: one line from focus note to each other card. */
+  FOCUS_TO_CHILDREN: 'focus_to_children',
+};
+
+/**
+ * Arrangement + connector prefs stored on each canvas layout focus block (alongside view/cards).
+ */
+export function resolveCanvasBlockPrefs(block) {
+  const a = block?.canvasArrangement;
+  let canvasArrangement = CANVAS_ARRANGEMENT.MANUAL;
+  if (a === CANVAS_ARRANGEMENT.VERTICAL) canvasArrangement = CANVAS_ARRANGEMENT.VERTICAL;
+  else if (a === CANVAS_ARRANGEMENT.HORIZONTAL) canvasArrangement = CANVAS_ARRANGEMENT.HORIZONTAL;
+  else if (a === CANVAS_ARRANGEMENT.KEEP || a === CANVAS_ARRANGEMENT.MANUAL) {
+    canvasArrangement = CANVAS_ARRANGEMENT.MANUAL;
+  }
+  const c = block?.connectorMode;
+  const connectorMode =
+    c === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN || c === CANVAS_CONNECTOR_MODE.THREAD_CHAIN
+      ? c
+      : CANVAS_CONNECTOR_MODE.THREAD_CHAIN;
+  const anchor = block?.manualNewNoteAnchor;
+  const manualNewNoteAnchor =
+    anchor === CANVAS_MANUAL_NEW_NOTE_ANCHOR.LAST
+      ? CANVAS_MANUAL_NEW_NOTE_ANCHOR.LAST
+      : CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS;
+  return { canvasArrangement, connectorMode, manualNewNoteAnchor };
+}
+
+const LAYOUT_DEFAULT_W = 340;
+const LAYOUT_DEFAULT_H = 220;
+const LAYOUT_COL_GAP = 48;
+const LAYOUT_ROW_GAP = 28;
+const LAYOUT_VERTICAL_GAP = 36;
+const LAYOUT_LEAD_CHILD_GAP = 40;
+const LAYOUT_START_X = 48;
+const LAYOUT_START_Y = 48;
+
+/**
+ * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
+ * @param {(id: string) => { w: number, h: number } | null} getSize existing card sizes
+ * @returns {Record<string, { x: number, y: number, w: number, h: number }>}
+ */
+export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getSize) {
+  if (!sequenceOrderedNotes?.length) return {};
+  const lead = sequenceOrderedNotes[0];
+  const children = sequenceOrderedNotes.slice(1);
+  let leadW = LAYOUT_DEFAULT_W;
+  let leadH = LAYOUT_DEFAULT_H;
+  const ls = getSize(String(lead.id));
+  if (ls && Number.isFinite(ls.w) && Number.isFinite(ls.h)) {
+    leadW = ls.w;
+    leadH = ls.h;
+  }
+  const rects = {};
+  let y = LAYOUT_START_Y;
+  children.forEach((n) => {
+    let w = LAYOUT_DEFAULT_W;
+    let h = LAYOUT_DEFAULT_H;
+    const ex = getSize(String(n.id));
+    if (ex && Number.isFinite(ex.w) && Number.isFinite(ex.h)) {
+      w = ex.w;
+      h = ex.h;
+    }
+    rects[String(n.id)] = { x: LAYOUT_START_X + leadW + LAYOUT_COL_GAP, y, w, h };
+    y += h + LAYOUT_VERTICAL_GAP;
+  });
+  const totalH = children.length ? y - LAYOUT_START_Y - LAYOUT_VERTICAL_GAP : 0;
+  const leadY = children.length ? LAYOUT_START_Y + totalH / 2 - leadH / 2 : LAYOUT_START_Y;
+  rects[String(lead.id)] = { x: LAYOUT_START_X, y: leadY, w: leadW, h: leadH };
+  return rects;
+}
+
+/**
+ * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
+ * @param {(id: string) => { w: number, h: number } | null} getSize
+ */
+export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, getSize) {
+  if (!sequenceOrderedNotes?.length) return {};
+  const lead = sequenceOrderedNotes[0];
+  const children = sequenceOrderedNotes.slice(1);
+  let leadW = LAYOUT_DEFAULT_W;
+  let leadH = LAYOUT_DEFAULT_H;
+  const ls = getSize(String(lead.id));
+  if (ls && Number.isFinite(ls.w) && Number.isFinite(ls.h)) {
+    leadW = ls.w;
+    leadH = ls.h;
+  }
+  const rects = {};
+  let x = LAYOUT_START_X;
+  let maxChildH = 0;
+  children.forEach((n) => {
+    let w = LAYOUT_DEFAULT_W;
+    let h = LAYOUT_DEFAULT_H;
+    const ex = getSize(String(n.id));
+    if (ex && Number.isFinite(ex.w) && Number.isFinite(ex.h)) {
+      w = ex.w;
+      h = ex.h;
+    }
+    rects[String(n.id)] = { x, y: LAYOUT_START_Y + leadH + LAYOUT_LEAD_CHILD_GAP, w, h };
+    maxChildH = Math.max(maxChildH, h);
+    x += w + LAYOUT_ROW_GAP;
+  });
+  const rowWidth = children.length ? x - LAYOUT_START_X - LAYOUT_ROW_GAP : 0;
+  const leadX = children.length ? LAYOUT_START_X + rowWidth / 2 - leadW / 2 : LAYOUT_START_X;
+  rects[String(lead.id)] = { x: leadX, y: LAYOUT_START_Y, w: leadW, h: leadH };
+  return rects;
+}
+
 /**
  * Resolve pan/zoom (+ sequence lines) for the current viewport.
  * Uses `view` for wide, `viewMobile` for narrow; if the active bucket has no saved zoom/pan, falls back to the other.
