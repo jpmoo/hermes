@@ -15,6 +15,7 @@ import { WebSocketServer } from 'ws';
 import { existsSync } from 'fs';
 import { mountMcpHttp } from './mcpHttp.js';
 import { httpRequestLog } from './middleware/httpRequestLog.js';
+import { ensureUserBackgroundBlobsTable } from './db/ensureUserBackgroundBlobs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -84,6 +85,15 @@ export function broadcast(data) {
   wss.clients.forEach((c) => { if (c.readyState === 1) c.send(msg); });
 }
 
-server.listen(PORT, () => {
-  console.log(`Hermes server listening on http://localhost:${PORT}`);
-});
+async function start() {
+  try {
+    await ensureUserBackgroundBlobsTable();
+  } catch (e) {
+    console.error('ensureUserBackgroundBlobsTable failed:', e?.message || e);
+  }
+  server.listen(PORT, () => {
+    console.log(`Hermes server listening on http://localhost:${PORT}`);
+  });
+}
+
+start();
