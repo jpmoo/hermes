@@ -1,20 +1,24 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavIconSort } from './icons/NavIcons';
-import { STREAM_THREAD_SORT_MODES } from './noteThreadSort';
+import { migrateLegacySortMode } from './noteThreadSort';
 import './StreamThreadSortControl.css';
 
 const SORT_OPTIONS = [
-  { value: 'edit_asc', label: 'Last edit (oldest first)' },
-  { value: 'edit_desc', label: 'Last edit (newest first)' },
-  { value: 'schedule_asc', label: 'Schedule / event date (earliest first)' },
-  { value: 'schedule_desc', label: 'Schedule / event date (latest first)' },
-  { value: 'alpha_asc', label: 'Alphabetical by first word (A → Z)' },
-  { value: 'alpha_desc', label: 'Alphabetical by first word (Z → A)' },
+  {
+    value: 'datetime_asc',
+    label: 'Last edit / start date and time (earliest to latest)',
+  },
+  {
+    value: 'datetime_desc',
+    label: 'Last edit / start date and time (latest to earliest)',
+  },
+  { value: 'alpha_asc', label: 'Alphabetical (A – Z)' },
+  { value: 'alpha_desc', label: 'Alphabetical (Z – A)' },
 ];
 
 function normalizeMode(v) {
-  return typeof v === 'string' && STREAM_THREAD_SORT_MODES.includes(v) ? v : 'schedule_asc';
+  return migrateLegacySortMode(v);
 }
 
 export default function StreamThreadSortControl({ sortMode, starredFirst, onChange }) {
@@ -111,7 +115,7 @@ export default function StreamThreadSortControl({ sortMode, starredFirst, onChan
             checked={starredFirst}
             onChange={(e) => onChange({ sortMode: mode, starredFirst: e.target.checked })}
           />
-          Starred notes first (same order within each group)
+          Starred notes at the top (same order as above within each group)
         </label>
       </div>
     ) : null;

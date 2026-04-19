@@ -1,27 +1,37 @@
 /**
  * Thread display order helpers.
- * Default stream behavior: schedule-style key (events by start; others by updated_at), oldest first;
- * starred siblings first, sorted within each group.
+ * Stream: datetime (event start or last edit, tie-break last edit) or full-note word order;
+ * optional starred-first groups.
  */
 
-/** @typedef {'edit_asc' | 'edit_desc' | 'schedule_asc' | 'schedule_desc' | 'alpha_asc' | 'alpha_desc'} StreamThreadSortMode */
+/** @typedef {'datetime_asc' | 'datetime_desc' | 'alpha_asc' | 'alpha_desc'} StreamThreadSortMode */
 
 /** @typedef {{ sortMode: StreamThreadSortMode, starredFirst: boolean }} StreamThreadSortPrefs */
 
-export const STREAM_THREAD_SORT_MODES = [
-  'edit_asc',
-  'edit_desc',
-  'schedule_asc',
-  'schedule_desc',
-  'alpha_asc',
-  'alpha_desc',
-];
+export const STREAM_THREAD_SORT_MODES = ['datetime_asc', 'datetime_desc', 'alpha_asc', 'alpha_desc'];
 
-/** Matches legacy Stream ordering before user prefs. */
+/** Matches prior default stream ordering (earliest primary time first; starred groups on). */
 export const DEFAULT_STREAM_THREAD_SORT = /** @type {StreamThreadSortPrefs} */ ({
-  sortMode: 'schedule_asc',
+  sortMode: 'datetime_asc',
   starredFirst: true,
 });
+
+/** Map prefs saved under older mode names. */
+export function migrateLegacySortMode(mode) {
+  if (typeof mode !== 'string') return DEFAULT_STREAM_THREAD_SORT.sortMode;
+  if (STREAM_THREAD_SORT_MODES.includes(mode)) return mode;
+  if (mode === 'edit_asc' || mode === 'schedule_asc') return 'datetime_asc';
+  if (mode === 'edit_desc' || mode === 'schedule_desc') return 'datetime_desc';
+  if (mode === 'alpha_asc') return 'alpha_asc';
+  if (mode === 'alpha_desc') return 'alpha_desc';
+  return DEFAULT_STREAM_THREAD_SORT.sortMode;
+}
+
+function coerceStarredFirst(raw) {
+  if (raw === false || raw === 'false') return false;
+  if (raw === true || raw === 'true') return true;
+  return DEFAULT_STREAM_THREAD_SORT.starredFirst;
+}
 
 export function noteThreadSortKeyMs(n) {
   if (n?.note_type === 'event' && n.event_start_at) {
@@ -34,7 +44,7 @@ export function noteThreadSortKeyMs(n) {
   return Number.isNaN(t) ? 0 : t;
 }
 
-/** Last edit time only (for sort-by-edit). */
+/** Last edit time only. */
 export function lastEditKeyMs(n) {
   const u = n?.updated_at ?? n?.created_at;
   if (!u) return 0;
@@ -42,35 +52,70 @@ export function lastEditKeyMs(n) {
   return Number.isNaN(t) ? 0 : t;
 }
 
-/** First “word” on the first line (after optional markdown # heading markers). */
-export function firstWordSortKey(n) {
-  const line = (n?.content || '').split('\n')[0] || '';
-  const cleaned = line.replace(/^\s*#+\s*/, '').trim();
-  const m = cleaned.match(/[^\s]+/u);
-  return m ? m[0] : '';
+/** Whitespace tokens from full note body (leading # on first line stripped). */
+export function contentWordsForSort(n) {
+  const raw = (n?.content || '').trim();
+  if (!raw) return [];
+  const lines = raw.split('\n');
+  if (lines[0]) {
+    lines[0] = lines[0].replace(/^\s*#+\s*/, '');
+  }
+  const s = lines.join('\n').trim();
+  if (!s) return [];
+  return s.split(/\s+/u).filter(Boolean);
 }
 
-function compareNotes(a, b) {
-  const d = noteThreadSortKeyMs(a) - noteThreadSortKeyMs(b);
-  if (d !== 0) return d;
+/**
+ * Primary: event start (if set) else last edit. Tie-break: last edit. Asc = earliest first.
+ * @returns {number} negative if a before b in asc order
+ */
+function compareDatetimePrimary(a, b, desc) {
+  const pa = noteThreadSortKeyMs(a);
+  const pb = noteThreadSortKeyMs(b);
+  if (pa !== pb) {
+    const d = pa - pb;
+    return desc ? -d : d;
+  }
+  const la = lastEditKeyMs(a);
+  const lb = lastEditKeyMs(b);
+  if (la !== lb) {
+    const d = la - lb;
+    return desc ? -d : d;
+  }
+  return String(a.id).localeCompare(String(b.id));
+}
+
+/**
+ * Word-by-word through full note; if shared prefix, longer text sorts after shorter (asc).
+ * @returns {number} negative if a before b in asc order
+ */
+function compareAlphabeticalFull(a, b, desc) {
+  const wa = contentWordsForSort(a);
+  const wb = contentWordsForSort(b);
+  const len = Math.min(wa.length, wb.length);
+  for (let i = 0; i < len; i++) {
+    const c = wa[i].localeCompare(wb[i], undefined, { sensitivity: 'base' });
+    if (c !== 0) return desc ? -c : c;
+  }
+  const lenDiff = wa.length - wb.length;
+  if (lenDiff !== 0) return desc ? -lenDiff : lenDiff;
   return String(a.id).localeCompare(String(b.id));
 }
 
 function compareStreamPrefs(a, b, prefs) {
   const mode = prefs.sortMode;
   const desc = mode.endsWith('_desc');
-  const kind = mode.replace(/_asc$|_desc$/, '');
-
-  let cmp = 0;
-  if (kind === 'edit') {
-    cmp = lastEditKeyMs(a) - lastEditKeyMs(b);
-  } else if (kind === 'schedule') {
-    cmp = noteThreadSortKeyMs(a) - noteThreadSortKeyMs(b);
-  } else if (kind === 'alpha') {
-    cmp = firstWordSortKey(a).localeCompare(firstWordSortKey(b), undefined, { sensitivity: 'base' });
+  if (mode.startsWith('datetime_')) {
+    return compareDatetimePrimary(a, b, desc);
   }
-  if (cmp !== 0) return desc ? -cmp : cmp;
-  return String(a.id).localeCompare(String(b.id));
+  if (mode.startsWith('alpha_')) {
+    return compareAlphabeticalFull(a, b, desc);
+  }
+  return compareDatetimePrimary(a, b, false);
+}
+
+function isStarred(n) {
+  return Boolean(n?.starred);
 }
 
 /**
@@ -79,12 +124,8 @@ function compareStreamPrefs(a, b, prefs) {
  */
 export function normalizeStreamThreadSortPrefs(raw) {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_STREAM_THREAD_SORT };
-  const sortMode =
-    typeof raw.sortMode === 'string' && STREAM_THREAD_SORT_MODES.includes(raw.sortMode)
-      ? raw.sortMode
-      : DEFAULT_STREAM_THREAD_SORT.sortMode;
-  const starredFirst =
-    typeof raw.starredFirst === 'boolean' ? raw.starredFirst : DEFAULT_STREAM_THREAD_SORT.starredFirst;
+  const sortMode = migrateLegacySortMode(raw.sortMode);
+  const starredFirst = coerceStarredFirst(raw.starredFirst);
   return { sortMode, starredFirst };
 }
 
@@ -115,12 +156,18 @@ function sortSiblingsStream(nodes, prefs) {
   const starred = [];
   const rest = [];
   for (const n of nodes) {
-    if (n.starred) starred.push(n);
+    if (isStarred(n)) starred.push(n);
     else rest.push(n);
   }
   starred.sort((a, b) => compareStreamPrefs(a, b, prefs));
   rest.sort((a, b) => compareStreamPrefs(a, b, prefs));
   return [...starred, ...rest];
+}
+
+function compareNotes(a, b) {
+  const d = noteThreadSortKeyMs(a) - noteThreadSortKeyMs(b);
+  if (d !== 0) return d;
+  return String(a.id).localeCompare(String(b.id));
 }
 
 /** Recursively sort each node's children (immutable). — legacy outline/canvas */

@@ -217,13 +217,21 @@ const NOTE_HISTORY_MAX = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const STREAM_THREAD_SORT_MODES = new Set([
-  'edit_asc',
-  'edit_desc',
-  'schedule_asc',
-  'schedule_desc',
+  'datetime_asc',
+  'datetime_desc',
   'alpha_asc',
   'alpha_desc',
 ]);
+
+function migrateStreamSortMode(mode) {
+  if (typeof mode !== 'string') return 'datetime_asc';
+  if (STREAM_THREAD_SORT_MODES.has(mode)) return mode;
+  if (mode === 'edit_asc' || mode === 'schedule_asc') return 'datetime_asc';
+  if (mode === 'edit_desc' || mode === 'schedule_desc') return 'datetime_desc';
+  if (mode === 'alpha_asc') return 'alpha_asc';
+  if (mode === 'alpha_desc') return 'alpha_desc';
+  return 'datetime_asc';
+}
 const MAX_STREAM_THREAD_SORT_KEYS = 160;
 
 function sanitizeStreamThreadSortMap(input) {
@@ -235,10 +243,7 @@ function sanitizeStreamThreadSortMap(input) {
     if (typeof tid !== 'string' || !UUID_RE.test(tid.trim())) continue;
     const id = tid.trim().toLowerCase();
     if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
-    const sortMode =
-      typeof v.sortMode === 'string' && STREAM_THREAD_SORT_MODES.has(v.sortMode)
-        ? v.sortMode
-        : 'schedule_asc';
+    const sortMode = migrateStreamSortMode(v.sortMode);
     const starredFirst = v.starredFirst === false ? false : true;
     out[id] = { sortMode, starredFirst };
   }
