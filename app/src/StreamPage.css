@@ -10,11 +10,12 @@
   box-sizing: border-box;
 }
 
+/* Transparent so thread/wallpaper shows in the nav row gaps (notes column stays opaque on .stream-page-scroll-main). */
 .stream-page-scroll {
   flex: 1;
   min-height: 0;
   padding-top: 0;
-  background: var(--bg);
+  background: transparent;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -42,13 +43,13 @@
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 2.75rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 6.75rem)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 calc(100% - var(--hermes-compose-content-fade, 2.75rem)),
+    #000 calc(100% - var(--hermes-compose-content-fade, 6.75rem)),
     transparent 100%
   );
   mask-repeat: no-repeat;
@@ -483,7 +484,7 @@
 
 /*
  * Composer overlays scroll/viewport — no theme-color wash; wallpaper / body bg shows through.
- * Blur band sits just above the form (tight to the content box); list fade mask stays minimal.
+ * List fade is mask on .stream-page-scroll-main / .canvas-viewport only (--hermes-compose-content-fade).
  */
 .stream-page-scroll > .stream-page-compose-wrap,
 .canvas-page-main > .canvas-page-compose-wrap {
@@ -495,29 +496,6 @@
   padding-top: 1.25rem;
   padding-bottom: 0.5rem;
   background: transparent;
-}
-
-.stream-page-scroll > .stream-page-compose-wrap::before,
-.canvas-page-main > .canvas-page-compose-wrap::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: var(--hermes-compose-blur-band-height, 2.5rem);
-  pointer-events: none;
-  z-index: 0;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  /* Feather so blur peaks just above the compose row */
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 28%, #000 72%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 28%, #000 72%, transparent 100%);
-}
-
-.stream-page-scroll > .stream-page-compose-wrap .stream-page-compose,
-.canvas-page-main > .canvas-page-compose-wrap .stream-page-compose {
-  position: relative;
-  z-index: 1;
 }
 
 .stream-page-scroll > .stream-page-compose-wrap {
