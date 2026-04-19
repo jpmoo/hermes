@@ -98,10 +98,10 @@ const LAYOUT_LEAD_CHILD_GAP = 40;
 const LAYOUT_START_X = 48;
 const LAYOUT_START_Y = 48;
 
-/** Horizontal space between focus card and reply column (vertical arrangement). 5× base column gap. */
-const LAYOUT_FOCUS_TO_COLUMN_GAP = LAYOUT_COL_GAP * 5;
-/** Vertical space between focus card and reply row (horizontal arrangement). 5× base lead/row gap. */
-const LAYOUT_FOCUS_TO_ROW_GAP = LAYOUT_LEAD_CHILD_GAP * 5;
+/** Horizontal space between focus card and reply column (vertical arrangement). 5× base column gap, +50%. */
+const LAYOUT_FOCUS_TO_COLUMN_GAP = LAYOUT_COL_GAP * 5 * 1.5;
+/** Vertical space between focus card and reply row (horizontal arrangement). 5× base lead/row gap, +50%. */
+const LAYOUT_FOCUS_TO_ROW_GAP = LAYOUT_LEAD_CHILD_GAP * 5 * 1.5;
 
 /**
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
