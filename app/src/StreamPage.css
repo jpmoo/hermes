@@ -35,7 +35,7 @@
   background: var(--bg);
   position: relative;
   z-index: 1;
-  padding-top: 0.75rem;
+  padding-top: 0;
   /* Reserve space for the absolutely positioned composer so the last notes stay scrollable above it. */
   padding-bottom: var(--stream-compose-reserve, 10rem);
   /* Hide scrollbar; scrolling still works (wheel, touch, trackpad, keyboard). */
@@ -96,21 +96,31 @@
   z-index: 2;
 }
 
-.stream-page-scroll > .stream-page-nav-row {
+/* Sticky strip inside scrollport: notes scroll behind; full-bleed within centered column */
+.stream-page-scroll-main > .stream-page-nav-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 0.5rem 0.75rem;
-  margin-bottom: 0;
+  position: sticky;
+  top: 0;
+  z-index: 9;
   flex-shrink: 0;
   transition: opacity 0.2s ease;
-  z-index: 9;
-  background: var(--bg);
-  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.5rem max(0.75rem, env(safe-area-inset-left, 0px));
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  margin-bottom: 0.65rem;
   margin-top: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-  box-shadow: 0 6px 8px -6px rgba(28, 27, 24, 0.08);
+  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.45rem max(0.75rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--bg) 52%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: none;
+  box-shadow: none;
 }
 
 .stream-page-nav-left {
@@ -127,13 +137,14 @@
 
 .stream-page-nav-btn {
   padding: 0.45rem 0.85rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  border: none;
   border-radius: 8px;
   color: var(--text-muted);
   font-size: 0.875rem;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s;
+  box-shadow: none;
 }
 
 .stream-page-nav-btn--icon {
@@ -148,7 +159,12 @@
 
 .stream-page-nav-btn:hover {
   color: var(--accent);
-  border-color: var(--accent-dim);
+  background: color-mix(in srgb, var(--bg-card) 94%, var(--accent) 6%);
+}
+
+.stream-page-nav-btn:focus-visible {
+  outline: 2px solid var(--accent-dim);
+  outline-offset: 2px;
 }
 
 .stream-page-nav-icon {
@@ -449,26 +465,45 @@
   margin-right: 0;
 }
 
-/* Composer overlays the scroll/viewport so thread notes + canvas paint behind the strip. */
-.stream-page-scroll > .stream-page-compose-wrap {
+/*
+ * Composer overlays scroll/viewport. Bottom stays opaque so stream/canvas don’t show through the
+ * reply/new region; upper part of the overlay fades out gradually (not an abrupt line).
+ */
+.stream-page-scroll > .stream-page-compose-wrap,
+.canvas-page-main > .canvas-page-compose-wrap {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  /* Above .stream-page-replies (z-index:5) and insight-selected cards (z-index:2) so notes don’t paint over the reply box while scrolling */
-  z-index: 8;
   margin-top: 0;
-  padding-top: 1rem;
+  padding-top: 2rem;
   padding-bottom: 0.5rem;
-  background: linear-gradient(to top, var(--bg) 85%, transparent);
+  background: linear-gradient(
+    to top,
+    var(--bg) 0%,
+    var(--bg) 34%,
+    color-mix(in srgb, var(--bg) 82%, transparent) 58%,
+    color-mix(in srgb, var(--bg) 38%, transparent) 78%,
+    color-mix(in srgb, var(--bg) 10%, transparent) 94%,
+    transparent 100%
+  );
 }
 
-.stream-page-scroll > .stream-page-compose-wrap:has(.stream-page-compose-field--expanded) {
+.stream-page-scroll > .stream-page-compose-wrap {
+  /* Above .stream-page-replies (z-index:5) and insight-selected cards (z-index:2) */
+  z-index: 8;
+}
+
+.canvas-page-main > .canvas-page-compose-wrap {
+  z-index: 3;
+}
+
+.stream-page-scroll > .stream-page-compose-wrap:has(.stream-page-compose-field--expanded),
+.canvas-page-main > .canvas-page-compose-wrap:has(.stream-page-compose-field--expanded) {
   z-index: 12;
 }
 
 .canvas-page-compose-wrap {
-  padding-top: 0.75rem;
   padding-bottom: 0.5rem;
 }
 
@@ -657,10 +692,10 @@
   padding: 0;
 }
 
-/* scrollIntoView: thread nav is outside the scrollport; small top margin is enough */
+/* scrollIntoView: room below sticky thread nav */
 .stream-page-scroll .stream-page-list > li[data-stream-note],
 .stream-page-scroll .stream-page-replies > li[data-stream-note] {
-  scroll-margin-top: 0.75rem;
+  scroll-margin-top: 4.5rem;
   scroll-margin-bottom: 1rem;
 }
 

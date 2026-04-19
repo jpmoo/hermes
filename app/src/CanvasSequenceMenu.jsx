@@ -242,7 +242,7 @@ export default function CanvasSequenceMenu({
       <button
         ref={triggerRef}
         type="button"
-        className={`canvas-icon-btn${open ? ' canvas-icon-btn--open' : ''}${
+        className={`canvas-icon-btn canvas-sequence-menu__trigger${open ? ' canvas-icon-btn--open' : ''}${
           linesActive ? '' : ' canvas-icon-btn--off'
         }`}
         aria-expanded={open}

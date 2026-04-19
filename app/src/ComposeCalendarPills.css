@@ -15,16 +15,27 @@
   overflow-y: hidden;
   padding-bottom: 2px;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Fade content at left/right while scrolling (mask follows the visible viewport) */
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 0.85rem,
+    #000 calc(100% - 0.85rem),
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 0.85rem,
+    #000 calc(100% - 0.85rem),
+    transparent
+  );
 }
 
 .compose-calendar-pills-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.compose-calendar-pills-scroll::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  display: none;
 }
 
 .compose-calendar-pill {

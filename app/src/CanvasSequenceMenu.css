@@ -78,7 +78,7 @@
 }
 
 /* Open state: match other toolbar icon buttons (accent border, not extra outline ring) */
-.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn.canvas-icon-btn--open {
+.canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger.canvas-icon-btn--open {
   outline: none;
   color: var(--accent);
   border-color: var(--accent-dim);

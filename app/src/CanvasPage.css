@@ -22,6 +22,12 @@
   z-index: 1;
 }
 
+/* Loading / empty messages (no viewport): keep text below floating toolbar */
+.canvas-page-main > .canvas-muted {
+  padding: 1rem;
+  padding-top: calc(3.35rem + 0.75rem);
+}
+
 .canvas-page-main--root-bg {
   background: transparent;
 }
@@ -39,14 +45,7 @@
   z-index: 2;
 }
 
-/* Overlay composer on the viewport so pan/zoom content shows through tinted chrome (matches Stream). */
-.canvas-page-main > .canvas-page-compose-wrap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
-}
+/* Compose overlay position + gradient: StreamPage.css (.stream-page-scroll > …, .canvas-page-main > …) */
 
 .canvas-page--empty {
   padding: 1.5rem;
@@ -57,19 +56,28 @@
   padding: 1rem;
 }
 
+/* Float over full canvas area so pan/zoom content shows through the strip (controls stay solid). */
 .canvas-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border-subtle);
-  /* --bg-elevated is undefined in theme tokens; use solid card bg so panels are not transparent */
-  background: var(--bg-card);
-  flex-shrink: 0;
-  position: relative;
-  z-index: 2;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 48%, transparent);
+  background: color-mix(in srgb, var(--bg) 52%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.canvas-toolbar * {
+  pointer-events: auto;
 }
 
 .canvas-toolbar-left {
@@ -140,8 +148,15 @@
   border-color: var(--accent-dim);
 }
 
+/* Lines/layout: global .canvas-icon-btn--off uses opacity:0.55 — reset so it matches other toolbar icons */
+.canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger.canvas-icon-btn--off {
+  opacity: 1;
+  color: var(--text-muted);
+}
+
 /* Sequence/lines menu lives in a nested component; pin same chrome as sibling toolbar icon buttons */
-.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn {
+.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn,
+.canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger {
   width: 2.35rem;
   min-width: 2.35rem;
   height: 2.35rem;
@@ -154,15 +169,18 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn:hover {
+.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn:hover,
+.canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger:hover {
   color: var(--accent);
   border-color: var(--accent-dim);
   background: var(--bg-card);
 }
 
-.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn.canvas-icon-btn--off:hover {
+.canvas-toolbar .canvas-sequence-menu .canvas-icon-btn.canvas-icon-btn--off:hover,
+.canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger.canvas-icon-btn--off:hover {
   color: var(--accent);
   border-color: var(--accent-dim);
+  opacity: 1; /* beat .canvas-icon-btn--off:hover { opacity: 0.75 } */
 }
 
 .canvas-toolbar-right {
