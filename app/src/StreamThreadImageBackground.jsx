@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getToken } from './api';
 import { noteFileUrl } from './attachmentUtils';
 import './StreamThreadImageBackground.css';
@@ -9,7 +10,7 @@ function resolveImageFetchUrl(attachmentId, fetchUrl) {
   return null;
 }
 
-const DRIFT_SPEED = 17;
+const DRIFT_SPEED = 6;
 /** Pan box is this fraction of the viewport; extra margin = (PAN_FRAC - 1) / 2 per side. */
 const PAN_FRAC = 1.22;
 
@@ -24,6 +25,8 @@ export default function StreamThreadImageBackground({
   imageOpacity,
   animate = true,
   crtEffect = false,
+  /** Cover the full browser viewport (not only the Stream column). */
+  fullViewport = true,
 }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const wrapRef = useRef(null);
@@ -137,13 +140,14 @@ export default function StreamThreadImageBackground({
 
   const rootClass = [
     'stream-thread-image-bg',
+    fullViewport && 'stream-thread-image-bg--viewport',
     !animate && 'stream-thread-image-bg--static',
     crtEffect && 'stream-thread-image-bg--crt',
   ]
     .filter(Boolean)
     .join(' ');
 
-  return (
+  const layer = (
     <div
       className={rootClass}
       ref={wrapRef}
@@ -157,4 +161,9 @@ export default function StreamThreadImageBackground({
       </div>
     </div>
   );
+
+  if (fullViewport && typeof document !== 'undefined') {
+    return createPortal(layer, document.body);
+  }
+  return layer;
 }
