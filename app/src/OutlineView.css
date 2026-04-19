@@ -34,17 +34,19 @@
 }
 
 .outline-view-tool-btn {
-  padding: 0.4rem 0.75rem;
+  padding: 0.45rem 0.85rem;
   font-size: 0.875rem;
-  background: none;
-  border: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-muted);
   cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .outline-view-tool-btn:hover {
   color: var(--accent);
+  border-color: var(--accent-dim);
 }
 
 .outline-drop-root {
