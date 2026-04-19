@@ -144,24 +144,19 @@ html.hermes-viewport-bg-active .stream-page-scroll-main {
   background: transparent;
 }
 
+/* No backdrop-filter here — it blurs the fixed background image into frosted blocks; use tint only. */
 html.hermes-viewport-bg-active .layout-header {
-  background: color-mix(in srgb, var(--bg) 42%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 52%, transparent);
   border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-row {
-  background: color-mix(in srgb, var(--bg) 38%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--bg) 48%, transparent);
   box-shadow: 0 6px 12px -8px rgba(28, 27, 24, 0.08);
 }
 
 html.hermes-viewport-bg-active .stream-page-nav-btn {
-  background: color-mix(in srgb, var(--bg-card) 48%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--bg-card) 62%, transparent);
 }
 
 /*
@@ -172,40 +167,30 @@ html.hermes-viewport-bg-active .stream-page-nav-btn {
 html.hermes-viewport-bg-active .stream-page > .stream-page-compose-wrap {
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--bg) 36%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 44%, transparent) 0%,
     transparent min(5.5rem, 22vh)
   );
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 html.hermes-viewport-bg-active .stream-page-compose textarea,
 html.hermes-viewport-bg-active .stream-page-compose .mentions-textarea-wrap textarea {
-  background: color-mix(in srgb, var(--bg-card) 52%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--bg-card) 68%, transparent);
 }
 
 html.hermes-viewport-bg-active .stream-page-compose .mentions-compose-type-btn {
-  background: color-mix(in srgb, var(--bg-card) 48%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--bg-card) 62%, transparent);
 }
 
 html.hermes-viewport-bg-active .stream-page-compose .mentions-compose-type-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--bg-card-hover) 58%, transparent);
+  background: color-mix(in srgb, var(--bg-card-hover) 72%, transparent);
 }
 
 html.hermes-viewport-bg-active .stream-page-attach-btn {
-  background: color-mix(in srgb, var(--bg-card) 48%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--bg-card) 62%, transparent);
 }
 
 html.hermes-viewport-bg-active .canvas-toolbar {
-  background: color-mix(in srgb, var(--bg-card) 42%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg-card) 52%, transparent);
   border-bottom-color: color-mix(in srgb, var(--border) 45%, transparent);
 }
 
