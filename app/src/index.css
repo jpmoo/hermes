@@ -269,7 +269,7 @@ html.hermes-viewport-bg-active .layout-header {
   border-bottom-color: var(--border);
 }
 
-html.hermes-viewport-bg-active .stream-page-nav-row {
+html.hermes-viewport-bg-active .stream-page-scroll > .canvas-toolbar {
   background: transparent;
   box-shadow: none;
 }

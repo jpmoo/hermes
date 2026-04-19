@@ -50,6 +50,7 @@ import {
   NavIconUpOneLevel,
 } from './icons/NavIcons';
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
+import './CanvasPage.css';
 import './StreamPage.css';
 
 /**
@@ -169,8 +170,8 @@ function scrollStreamDrillUpRowBelowNav(streamEl, listEl, noteId) {
   const li = findStreamLiByNoteId(listEl, noteId);
   if (!li) return false;
   const nav =
-    streamEl.parentElement?.querySelector?.(':scope > .stream-page-nav-row') ??
-    streamEl.querySelector?.(':scope > .stream-page-nav-row');
+    streamEl.parentElement?.querySelector?.(':scope > .canvas-toolbar') ??
+    streamEl.querySelector?.(':scope > .canvas-toolbar');
   const navH = nav ? nav.getBoundingClientRect().height : 0;
   const pad = 8;
   const s = streamEl.getBoundingClientRect();
@@ -228,9 +229,9 @@ function readCssRemVarPx(varName, fallbackRem) {
  */
 function measureStreamFloatMoveTopPx(streamScrollEl) {
   const nav =
-    streamScrollEl?.parentElement?.querySelector?.(':scope > .stream-page-nav-row') ??
-    streamScrollEl?.querySelector?.(':scope > .stream-page-nav-row') ??
-    document.querySelector('.stream-page-scroll > .stream-page-nav-row');
+    streamScrollEl?.parentElement?.querySelector?.(':scope > .canvas-toolbar') ??
+    streamScrollEl?.querySelector?.(':scope > .canvas-toolbar') ??
+    document.querySelector('.stream-page-scroll > .canvas-toolbar');
   if (nav && typeof nav.getBoundingClientRect === 'function') {
     const br = nav.getBoundingClientRect();
     if (br.height > 2) {
@@ -1756,11 +1757,11 @@ export default function StreamPage() {
   );
 
   const historyControl = (
-    <div className="stream-page-history-wrap">
+    <div className="stream-page-history-wrap canvas-toolbar-history-wrap">
       <button
         ref={historyBtnRef}
         type="button"
-        className="stream-page-nav-btn stream-page-nav-btn--icon"
+        className="canvas-icon-btn"
         aria-label="History"
         title="History"
         onClick={() => setHistoryOpen((v) => !v)}
@@ -1861,21 +1862,23 @@ export default function StreamPage() {
             />
           ) : null}
           {threadRootId ? (
-            <div className={`stream-page-nav-row ${threadExiting ? 'stream-page-nav-row--exit' : ''}`}>
-              <div className="stream-page-nav-left">
+            <div
+              className={`canvas-toolbar ${threadExiting ? 'stream-page-toolbar--exit' : ''}`}
+            >
+              <div className="canvas-toolbar-left">
                 {focusId && !noteIdEq(focusId, actualRootId) ? (
-                  <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
+                  <button type="button" className="canvas-icon-btn" onClick={upOneLevel} aria-label="Up one level" title="Up one level">
                     <NavIconUpOneLevel className="stream-page-nav-icon" />
                   </button>
                 ) : null}
-                <button type="button" className="stream-page-nav-btn stream-page-nav-btn--icon stream-page-nav-btn--root" onClick={closeThread} aria-label="Root level" title="Root level">
+                <button type="button" className="canvas-icon-btn" onClick={closeThread} aria-label="Root level" title="Root level">
                   <NavIconRootLevel className="stream-page-nav-icon" />
                 </button>
                 {historyControl}
                 {!loadingThread && thread.length > 0 && tree.length > 0 && summaryVisibleIds.length > 0 ? (
                   <button
                     type="button"
-                    className="stream-page-nav-btn stream-page-nav-btn--icon"
+                    className="canvas-icon-btn"
                     onClick={() => setSummaryModalOpen(true)}
                     aria-label="AI thread summary"
                     title="AI thread summary"
@@ -1886,8 +1889,8 @@ export default function StreamPage() {
               </div>
             </div>
           ) : (
-            <div className="stream-page-nav-row">
-              <div className="stream-page-nav-left">{historyControl}</div>
+            <div className="canvas-toolbar">
+              <div className="canvas-toolbar-left">{historyControl}</div>
             </div>
           )}
           <div

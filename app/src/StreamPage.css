@@ -131,94 +131,19 @@
 }
 
 /*
- * Sibling above .stream-page-scroll-main: full layout width (viewport edge + safe-area padding like
- * .canvas-toolbar), not confined to the centered note column.
+ * Thread chrome matches Canvas: .canvas-toolbar + .canvas-icon-btn from CanvasPage.css (imported in StreamPage.jsx).
+ * Toolbar is position:absolute over the scrollport; offset the list so the first card clears the strip.
  */
-.stream-page-scroll > .stream-page-nav-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.75rem;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 2;
-  transition: opacity 0.2s ease;
-  width: 100%;
-  margin: 0 0 0.5rem;
-  padding: 0.5rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.5rem max(0.75rem, env(safe-area-inset-left, 0px));
-  box-sizing: border-box;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  pointer-events: none;
+.stream-page-scroll > .canvas-toolbar + .stream-page-scroll-main {
+  padding-top: 3.35rem;
 }
 
-.stream-page-scroll > .stream-page-nav-row * {
-  pointer-events: auto;
-}
-
-.stream-page-nav-left {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.stream-page-nav-row--exit {
+.canvas-toolbar.stream-page-toolbar--exit {
   opacity: 0;
   pointer-events: none;
 }
 
-/* Icon nav — same chrome as .canvas-toolbar .canvas-icon-btn (CanvasPage.css) */
-.stream-page-nav-btn {
-  padding: 0.45rem 0.85rem;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  box-shadow: none;
-}
-
-.stream-page-nav-btn--icon {
-  width: 2.35rem;
-  min-width: 2.35rem;
-  height: 2.35rem;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.stream-page-nav-btn:hover {
-  color: var(--accent);
-  border-color: var(--accent-dim);
-  background: var(--bg-card);
-}
-
-/*
- * Wallpaper (viewport portal or in-tree .stream-thread-image-bg): keep thread image visible through
- * controls — rules live here so they win cascade over .stream-page-nav-btn--icon above.
- */
-html.hermes-viewport-bg-active .stream-page-scroll > .stream-page-nav-row .stream-page-nav-btn.stream-page-nav-btn--icon,
-.stream-page-scroll:has(> .stream-thread-image-bg) > .stream-page-nav-row .stream-page-nav-btn.stream-page-nav-btn--icon {
-  background: color-mix(in srgb, var(--bg-card) 14%, transparent);
-  border-color: color-mix(in srgb, var(--border) 38%, transparent);
-  backdrop-filter: blur(4px) saturate(1.08);
-  -webkit-backdrop-filter: blur(4px) saturate(1.08);
-}
-
-html.hermes-viewport-bg-active .stream-page-scroll > .stream-page-nav-row .stream-page-nav-btn.stream-page-nav-btn--icon:hover,
-.stream-page-scroll:has(> .stream-thread-image-bg) > .stream-page-nav-row .stream-page-nav-btn.stream-page-nav-btn--icon:hover {
-  color: var(--accent);
-  border-color: var(--accent-dim);
-  background: color-mix(in srgb, var(--bg-card) 24%, transparent);
-}
-
-.stream-page-nav-btn:focus-visible {
+.stream-page-scroll .canvas-toolbar .canvas-icon-btn:focus-visible {
   outline: 2px solid var(--accent-dim);
   outline-offset: 2px;
 }
