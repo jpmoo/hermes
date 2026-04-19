@@ -12,7 +12,9 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  min-height: 100%;
   min-height: 100vh;
+  min-height: 100svh;
   min-height: 100dvh;
   z-index: 0;
 }
@@ -28,8 +30,9 @@
   top: 50%;
   width: 122%;
   height: 122%;
-  margin-left: -61%;
-  margin-top: -61%;
+  margin: 0;
+  /* Center with transform — % margins resolve against width for both axes, so margin-top was wrong on wide screens. */
+  transform: translate(-50%, -50%);
   will-change: transform;
 }
 

@@ -69,7 +69,7 @@ export default function StreamThreadImageBackground({
   useLayoutEffect(() => {
     if (!blobUrl || !innerRef.current) return;
     if (!animate) {
-      innerRef.current.style.transform = 'translate(0px, 0px)';
+      innerRef.current.style.transform = 'translate(-50%, -50%)';
     }
   }, [blobUrl, animate]);
 
@@ -120,7 +120,7 @@ export default function StreamThreadImageBackground({
       }
       posRef.current = { x, y };
       if (innerRef.current) {
-        innerRef.current.style.transform = `translate(${x}px, ${y}px)`;
+        innerRef.current.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
       }
       rafRef.current = requestAnimationFrame(tick);
     };
