@@ -130,6 +130,31 @@ body {
   color-scheme: var(--color-scheme);
 }
 
+/*
+ * Full-viewport thread background is portaled under #root (z-index 0). Opaque panels inside #root
+ * (layout-main, stream scroll, etc.) would still hide it — this class is toggled from
+ * StreamThreadImageBackground when fullViewport + fetchUrl are active.
+ */
+html.hermes-viewport-bg-active .layout-main {
+  background: transparent;
+}
+
+html.hermes-viewport-bg-active .stream-page-scroll,
+html.hermes-viewport-bg-active .stream-page-scroll-main {
+  background: transparent;
+}
+
+html.hermes-viewport-bg-active .stream-page-nav-row {
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+html.hermes-viewport-bg-active .canvas-page,
+html.hermes-viewport-bg-active .canvas-page--root-bg {
+  background: transparent;
+}
+
 /* Transparent so fixed full-viewport background (portal, z-index 0) shows through; body keeps --bg. */
 #root {
   position: relative;

@@ -131,6 +131,15 @@ export default function StreamThreadImageBackground({
     };
   }, [blobUrl, animate]);
 
+  useEffect(() => {
+    if (!fullViewport || typeof document === 'undefined') return undefined;
+    if (!resolvedFetchUrl) return undefined;
+    document.documentElement.classList.add('hermes-viewport-bg-active');
+    return () => {
+      document.documentElement.classList.remove('hermes-viewport-bg-active');
+    };
+  }, [fullViewport, resolvedFetchUrl]);
+
   const op =
     typeof imageOpacity === 'number' && Number.isFinite(imageOpacity)
       ? Math.min(1, Math.max(0, imageOpacity))
