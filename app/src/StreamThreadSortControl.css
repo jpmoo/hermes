@@ -37,8 +37,10 @@
 
 .stream-thread-sort__panel {
   position: absolute;
+  top: calc(100% + 6px);
   right: 0;
-  bottom: calc(100% + 6px);
+  left: auto;
+  bottom: auto;
   z-index: 20;
   min-width: min(18rem, calc(100vw - 2rem));
   padding: 0.65rem 0.75rem;
