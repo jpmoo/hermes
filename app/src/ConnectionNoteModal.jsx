@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { getNote, getNoteThreadPath, getNoteThreadRoot } from './api';
+import { getNote, getNoteThreadPath } from './api';
 import NoteCard from './NoteCard';
 import MoveNoteModal from './MoveNoteModal';
 
@@ -37,22 +37,10 @@ export default function ConnectionNoteModal({
     }
   }, [linked?.id]);
 
-  const handleOpenMoveNote = useCallback(
-    async (note) => {
-      if (!note?.parent_id) return;
-      try {
-        let root = note.root_id;
-        if (!root) {
-          root = await getNoteThreadRoot(note.id);
-        }
-        if (!root) return;
-        setMoveModal({ note, threadRootId: root });
-      } catch (e) {
-        console.error(e);
-      }
-    },
-    []
-  );
+  const handleOpenMoveNote = useCallback((note) => {
+    if (!note?.parent_id) return;
+    setMoveModal({ note });
+  }, []);
 
   useEffect(() => {
     if (!linked?.id) {
@@ -217,7 +205,6 @@ export default function ConnectionNoteModal({
     <MoveNoteModal
       open={Boolean(moveModal)}
       onClose={() => setMoveModal(null)}
-      threadRootId={moveModal?.threadRootId ?? null}
       noteToMove={moveModal?.note ?? null}
       onMoved={() => {
         refreshNote();

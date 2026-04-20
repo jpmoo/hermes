@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { getThread, updateNote } from './api';
+import { getAllNotesFlat, updateNote } from './api';
 import NoteTypeIcon from './NoteTypeIcon';
 import { firstLinePreview } from './noteHistoryUtils';
 import { effectiveDescendantCount } from './noteDescendantCount';
@@ -98,9 +98,9 @@ function MoveNoteRow({ node, depth, forbidden, selectedId, onPick }) {
 }
 
 /**
- * Pick another note in the same thread as the new parent for `noteToMove` (reparent).
+ * Pick any note in the library as the new parent for `noteToMove` (reparent), including other threads.
  */
-export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove, onMoved }) {
+export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
   const [flat, setFlat] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState(null);
@@ -109,18 +109,18 @@ export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove,
   const treeWrapRef = useRef(null);
 
   useEffect(() => {
-    if (!open || !threadRootId) return undefined;
+    if (!open || !noteToMove) return undefined;
     setSelectedParentId(null);
     setError(null);
     setFlat([]);
     let cancelled = false;
     setLoading(true);
-    getThread(threadRootId, false)
+    getAllNotesFlat()
       .then((rows) => {
         if (!cancelled) setFlat(Array.isArray(rows) ? rows : []);
       })
       .catch((e) => {
-        if (!cancelled) setError(e?.message || 'Could not load thread');
+        if (!cancelled) setError(e?.message || 'Could not load notes');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -128,7 +128,7 @@ export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove,
     return () => {
       cancelled = true;
     };
-  }, [open, threadRootId]);
+  }, [open, noteToMove?.id]);
 
   const tree = useMemo(() => buildTree(flat), [flat]);
 
@@ -231,20 +231,20 @@ export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove,
       }}
     >
       <div className="move-note-modal" role="dialog" aria-modal="true" aria-labelledby="move-note-modal-title">
-        <h2 id="move-note-modal-title">Move note in thread</h2>
+        <h2 id="move-note-modal-title">Move note</h2>
         <p className="move-note-modal-lead">
-          Choose the note this should become a reply to. The whole branch (this note and everything under it) moves
-          together. Scroll the list, or use ↑ ↓ (Home / End) to move the selection.
+          Choose any note as the new parent — same thread or another. The whole branch (this note and everything
+          nested under it) moves together. Scroll the list, or use ↑ ↓ (Home / End) to change the selection.
         </p>
         {error ? <p className="move-note-modal-error">{error}</p> : null}
         <div
           className="move-note-modal-tree-wrap"
           ref={treeWrapRef}
           tabIndex={-1}
-          aria-label="Thread notes — pick new parent"
+          aria-label="All notes — pick new parent"
         >
           {loading ? (
-            <p className="move-note-modal-muted">Loading thread…</p>
+            <p className="move-note-modal-muted">Loading notes…</p>
           ) : (
             <div className="move-note-modal-tree">
               {tree.map((n) => (

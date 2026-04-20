@@ -2157,9 +2157,8 @@ export default function StreamPage() {
           visibleNoteIds={summaryVisibleIds}
         />
         <MoveNoteModal
-          open={Boolean(moveNoteTarget && threadRootId)}
+          open={Boolean(moveNoteTarget)}
           onClose={() => setMoveNoteTarget(null)}
-          threadRootId={threadRootId}
           noteToMove={moveNoteTarget}
           onMoved={() => {
             refreshAll();

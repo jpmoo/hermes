@@ -47,6 +47,13 @@ export async function getThread(id, starredOnly = false) {
   return r.json();
 }
 
+/** Full note forest as a flat list (all threads). For move-note picker, etc. */
+export async function getAllNotesFlat() {
+  const r = await fetch(`${API}/notes/all-flat`, { headers: headers() });
+  if (!r.ok) throw new Error('Failed to load notes');
+  return r.json();
+}
+
 export async function postThreadAiSummary(body) {
   const r = await fetch(`${API}/notes/thread-ai-summary`, {
     method: 'POST',

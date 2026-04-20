@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getTags, searchByTags, searchSemantic, searchContent, getNoteThreadRoot } from './api';
+import { getTags, searchByTags, searchSemantic, searchContent } from './api';
 import MoveNoteModal from './MoveNoteModal';
 import Layout from './Layout';
 import { HoverInsightProvider } from './HoverInsightContext';
@@ -145,18 +145,9 @@ function SearchViewInner() {
       .catch(() => setAllTags([]));
   };
 
-  const handleOpenMoveNote = useCallback(async (note) => {
+  const handleOpenMoveNote = useCallback((note) => {
     if (!note?.parent_id) return;
-    try {
-      let root = note.root_id;
-      if (!root) {
-        root = await getNoteThreadRoot(note.id);
-      }
-      if (!root) return;
-      setMoveModal({ note, threadRootId: root });
-    } catch (e) {
-      console.error(e);
-    }
+    setMoveModal({ note });
   }, []);
 
   const toggleTag = (tag) => {
@@ -345,7 +336,6 @@ function SearchViewInner() {
       <MoveNoteModal
         open={Boolean(moveModal)}
         onClose={() => setMoveModal(null)}
-        threadRootId={moveModal?.threadRootId ?? null}
         noteToMove={moveModal?.note ?? null}
         onMoved={() => {
           refreshAfterNoteChange();

@@ -2507,9 +2507,8 @@ export default function CanvasPage() {
             visibleNoteIds={summaryIds}
           />
           <MoveNoteModal
-            open={Boolean(moveNoteTarget && threadRootId)}
+            open={Boolean(moveNoteTarget)}
             onClose={() => setMoveNoteTarget(null)}
-            threadRootId={threadRootId}
             noteToMove={moveNoteTarget}
             onMoved={() => {
               refreshThread();

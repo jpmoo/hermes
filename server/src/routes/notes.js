@@ -1119,6 +1119,26 @@ router.post('/:id/spaztick-task', async (req, res) => {
   }
 });
 
+/** All notes for the current user (flat rows). Client builds the forest for move-note and similar pickers. */
+router.get('/all-flat', async (req, res) => {
+  try {
+    const userId = req.userId;
+    const r = await pool.query(
+      `SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
+              (SELECT COUNT(*)::int FROM note_connections nc
+               WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
+       FROM notes n WHERE n.user_id = $1
+       ORDER BY ${SQL_NOTE_SORT_AT} ASC NULLS LAST, n.id ASC`,
+      [userId]
+    );
+    res.json(r.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load notes' });
+  }
+});
+
 // Get single note (with tags)
 router.get('/:id', async (req, res) => {
   try {
