@@ -34,6 +34,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
   padding-bottom: 2rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
