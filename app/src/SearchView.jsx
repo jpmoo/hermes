@@ -178,11 +178,6 @@ function SearchViewInner() {
         )}
 
         <div className="search-view-query">
-          <p className="search-view-query-lead">
-            Narrow by note type, tags, and/or text. Tags update results as you select them; use Search
-            for text (alone or together with tags).
-          </p>
-
           <div className="search-view-types-tags-row">
             <div className="search-view-query-section">
               <p className="search-view-section-label" id="search-section-types">
@@ -226,19 +221,20 @@ function SearchViewInner() {
             <p className="search-view-section-label" id="search-section-text">
               Text <span className="search-view-section-optional">(optional if tags are selected)</span>
             </p>
-            <div className="search-view-text-row">
+            <div className="search-view-text-controls-row">
               <input
                 type="search"
                 placeholder="Search notes…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                className="search-view-input"
+                className="search-view-input search-view-input--flex"
                 aria-labelledby="search-section-text"
               />
-            </div>
-            <div className="search-view-modes-row">
-              <div className="search-view-modes" role="radiogroup" aria-label="How to match text">
-                <label className="search-view-mode">
+              <div className="search-view-modes-inline" role="radiogroup" aria-label="How to match text">
+                <label
+                  className="search-view-mode-inline"
+                  title="Exact text in note body"
+                >
                   <input
                     type="radio"
                     name="searchMode"
@@ -246,10 +242,12 @@ function SearchViewInner() {
                     checked={searchMode === 'keyword'}
                     onChange={() => setSearchMode('keyword')}
                   />
-                  <span className="search-view-mode-label">Keyword</span>
-                  <span className="search-view-mode-hint">Exact text in note body</span>
+                  <span>Keyword</span>
                 </label>
-                <label className="search-view-mode">
+                <label
+                  className="search-view-mode-inline"
+                  title="Meaning and similarity (Ollama)"
+                >
                   <input
                     type="radio"
                     name="searchMode"
@@ -257,8 +255,7 @@ function SearchViewInner() {
                     checked={searchMode === 'semantic'}
                     onChange={() => setSearchMode('semantic')}
                   />
-                  <span className="search-view-mode-label">Semantic</span>
-                  <span className="search-view-mode-hint">Meaning &amp; similarity (Ollama)</span>
+                  <span>Semantic</span>
                 </label>
               </div>
               <button
