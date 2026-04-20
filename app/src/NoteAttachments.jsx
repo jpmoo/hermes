@@ -94,7 +94,8 @@ function AttachmentIcon(props) {
 }
 
 /**
- * Oval profile image for person-type cards (stream/canvas). Opens the same preview modal as attachment thumbnails.
+ * Oval profile image for person- and organization-type cards (stream/canvas).
+ * Opens the same preview modal as attachment thumbnails.
  */
 export function PersonProfileAvatar({ att }) {
   const [imgSrc, setImgSrc] = useState(null);
@@ -158,7 +159,7 @@ export function PersonProfileAvatar({ att }) {
       ) : null}
       <button
         type="button"
-        className="note-card-person-avatar-btn"
+        className="note-card-profile-avatar-btn"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -169,9 +170,9 @@ export function PersonProfileAvatar({ att }) {
         title={att.filename || 'Profile image'}
       >
         {imgSrc ? (
-          <img src={imgSrc} alt="" className="note-card-person-avatar-img" />
+          <img src={imgSrc} alt="" className="note-card-profile-avatar-img" />
         ) : (
-          <span className="note-card-person-avatar-skeleton" aria-hidden />
+          <span className="note-card-profile-avatar-skeleton" aria-hidden />
         )}
       </button>
     </>

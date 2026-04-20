@@ -608,17 +608,17 @@
   font-weight: 500;
 }
 
-/* Person type: first image attachment as left oval profile (stream + canvas) */
-.note-card-person-with-avatar {
+/* Person / organization: first image as left oval; text column vertically centered with thumbnail */
+.note-card-profile-row {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.85rem;
   width: 100%;
   min-width: 0;
 }
 
-.note-card-person-with-avatar-main {
+.note-card-profile-row-main {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -626,7 +626,7 @@
   gap: inherit;
 }
 
-.note-card-person-avatar-btn {
+.note-card-profile-avatar-btn {
   flex-shrink: 0;
   width: 3.1rem;
   height: 3.85rem;
@@ -638,27 +638,26 @@
   overflow: hidden;
   cursor: zoom-in;
   line-height: 0;
-  align-self: flex-start;
 }
 
-.note-card-person-avatar-btn:disabled {
+.note-card-profile-avatar-btn:disabled {
   cursor: wait;
   opacity: 0.85;
 }
 
-.note-card-person-avatar-btn:focus-visible {
+.note-card-profile-avatar-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.note-card-person-avatar-img {
+.note-card-profile-avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.note-card-person-avatar-skeleton {
+.note-card-profile-avatar-skeleton {
   display: block;
   width: 100%;
   height: 100%;
@@ -670,10 +669,10 @@
     var(--bg-card-hover) 90%
   );
   background-size: 200% 100%;
-  animation: note-card-person-avatar-shimmer 1.1s ease-in-out infinite;
+  animation: note-card-profile-avatar-shimmer 1.1s ease-in-out infinite;
 }
 
-@keyframes note-card-person-avatar-shimmer {
+@keyframes note-card-profile-avatar-shimmer {
   0% {
     background-position: 100% 0;
   }

@@ -92,10 +92,11 @@ export default function NoteCard({
     return n > 0 ? n : null;
   }, [note]);
 
-  /** Person cards: first image is shown as left profile; excluded from inline thumbnails. */
-  const personProfileAttachment = useMemo(() => {
+  /** Person and organization cards: first image is left profile; excluded from inline thumbnails. */
+  const profileImageAttachment = useMemo(() => {
     if (editing) return null;
-    if ((note.note_type || 'note') !== 'person') return null;
+    const t = note.note_type || 'note';
+    if (t !== 'person' && t !== 'organization') return null;
     return firstImageAttachment(note);
   }, [editing, note.note_type, note.attachments]);
 
@@ -432,7 +433,7 @@ export default function NoteCard({
     const el = raw instanceof Element ? raw : raw?.parentElement;
     return Boolean(
       el?.closest(
-        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-person-avatar-btn, .note-card-stream-thread-sort, .stream-thread-sort'
+        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-profile-avatar-btn, .note-card-stream-thread-sort, .stream-thread-sort'
       )
     );
   }, []);
@@ -499,7 +500,7 @@ export default function NoteCard({
     cardClass,
     'note-card--has-type-icon',
     editing ? 'note-card--editing' : '',
-    personProfileAttachment ? 'note-card--has-person-avatar' : '',
+    profileImageAttachment ? 'note-card--has-profile-avatar' : '',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
   ]
@@ -576,7 +577,7 @@ export default function NoteCard({
         attachments={note.attachments}
         onDeleted={handleDeleteAttachment}
         excludeAttachmentIds={
-          personProfileAttachment ? [personProfileAttachment.id] : undefined
+          profileImageAttachment ? [profileImageAttachment.id] : undefined
         }
       />
       {tags.length > 0 && (
@@ -679,10 +680,10 @@ export default function NoteCard({
               <button type="button" onClick={handleCancelEdit}>Cancel</button>
             </div>
           </form>
-        ) : personProfileAttachment ? (
-          <div className="note-card-person-with-avatar">
-            <PersonProfileAvatar att={personProfileAttachment} />
-            <div className="note-card-person-with-avatar-main">{readOnlyNoteColumn}</div>
+        ) : profileImageAttachment ? (
+          <div className="note-card-profile-row">
+            <PersonProfileAvatar att={profileImageAttachment} />
+            <div className="note-card-profile-row-main">{readOnlyNoteColumn}</div>
           </div>
         ) : (
           readOnlyNoteColumn
