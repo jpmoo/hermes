@@ -225,3 +225,25 @@ export function sortStarredPinned(nodes) {
   });
   return [...starred, ...rest];
 }
+
+/**
+ * Reorder only the top-level array: starred rows first, then the rest (by thread sort key).
+ * Does not recurse; each node's `children` are unchanged. Matches Stream's multi-root list.
+ */
+export function sortStarredPinnedRootsOnly(nodes) {
+  if (!nodes?.length) return nodes || [];
+  const starred = [];
+  const rest = [];
+  for (const n of nodes) {
+    if (n.starred) starred.push(n);
+    else rest.push(n);
+  }
+  const cmp = (a, b) => {
+    const d = noteThreadSortKeyMs(a) - noteThreadSortKeyMs(b);
+    if (d !== 0) return d;
+    return String(a.id).localeCompare(String(b.id));
+  };
+  starred.sort(cmp);
+  rest.sort(cmp);
+  return [...starred, ...rest];
+}

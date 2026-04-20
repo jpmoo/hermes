@@ -10,13 +10,17 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getRoots, getThread, getNoteThreadRoot, updateNote } from './api';
+import { getRoots, getThread, getNoteThreadRoot, updateNote, fetchUserSettings } from './api';
 import Layout from './Layout';
 import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from './outlineExpansionStorage';
 import NoteTypeIcon from './NoteTypeIcon';
 import NoteRichText, { toggleTaskMarkerAtIndex } from './NoteRichText';
 import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
-import { sortNoteTreeByThreadOrder, sortStarredPinned } from './noteThreadSort';
+import {
+  resolveStreamThreadSortPrefsForHead,
+  sortNoteTreeWithStreamPrefs,
+  sortStarredPinnedRootsOnly,
+} from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
@@ -337,7 +341,9 @@ export default function OutlineView() {
   const [collapseAllTick, setCollapseAllTick] = useState(0);
   const loadRootInflight = useRef(new Map());
   const rootThreadsRef = useRef({});
-  const { logout } = useAuth();
+  /** Same persisted prefs as Stream (`streamThreadSort` in user settings). */
+  const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const { visibleNoteTypes } = useNoteTypeFilter();
   const {
@@ -353,6 +359,31 @@ export default function OutlineView() {
   useEffect(() => {
     rootThreadsRef.current = rootThreads;
   }, [rootThreads]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setStreamThreadSortByRoot({});
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await fetchUserSettings();
+        if (cancelled) return;
+        setStreamThreadSortByRoot(
+          s.streamThreadSort && typeof s.streamThreadSort === 'object' && !Array.isArray(s.streamThreadSort)
+            ? s.streamThreadSort
+            : {}
+        );
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setStreamThreadSortByRoot({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     setLoading(true);
@@ -372,8 +403,8 @@ export default function OutlineView() {
     }
     const p = getThread(id, false)
       .then((flat) => {
-        const rootsSorted = sortStarredPinned(sortNoteTreeByThreadOrder(buildTree(flat)));
-        const built = rootsSorted[0];
+        const treeRoots = buildTree(flat);
+        const built = treeRoots[0];
         if (built) {
           setRootThreads((prev) => ({ ...prev, [id]: built }));
         }
@@ -411,10 +442,18 @@ export default function OutlineView() {
     [roots, rootThreads]
   );
 
-  const tree = useMemo(
-    () => sortStarredPinned(sortNoteTreeByThreadOrder(filterTreeByVisibleNoteTypes(treeRaw, visibleNoteTypes))),
-    [treeRaw, visibleNoteTypes]
-  );
+  const tree = useMemo(() => {
+    const filtered = filterTreeByVisibleNoteTypes(treeRaw, visibleNoteTypes);
+    const withStreamOrder = filtered.map((root) => {
+      const rawRoot = treeRaw.find((r) => String(r.id) === String(root.id)) ?? root;
+      const rid = String(rawRoot.id).trim().toLowerCase();
+      const stored = streamThreadSortByRoot[rid];
+      const headHasDirectReplies = Boolean(rawRoot.children?.length);
+      const prefs = resolveStreamThreadSortPrefsForHead(stored, headHasDirectReplies);
+      return sortNoteTreeWithStreamPrefs([root], prefs)[0];
+    });
+    return sortStarredPinnedRootsOnly(withStreamOrder);
+  }, [treeRaw, visibleNoteTypes, streamThreadSortByRoot]);
 
   const treeRef = useRef(tree);
   treeRef.current = tree;
