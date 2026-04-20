@@ -93,6 +93,91 @@ function AttachmentIcon(props) {
   );
 }
 
+/**
+ * Oval profile image for person-type cards (stream/canvas). Opens the same preview modal as attachment thumbnails.
+ */
+export function PersonProfileAvatar({ att }) {
+  const [imgSrc, setImgSrc] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const isImage = isImageMime(att?.mime_type, att?.filename);
+
+  useEffect(() => {
+    if (!isImage || !att?.id) return undefined;
+    let objectUrl;
+    let cancelled = false;
+    const t = getToken();
+    fetch(noteFileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((blob) => {
+        if (cancelled || !blob) return;
+        objectUrl = URL.createObjectURL(blob);
+        setImgSrc(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setImgSrc(null);
+    };
+  }, [att?.id, isImage]);
+
+  const download = useCallback(
+    async (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const t = getToken();
+      const r = await fetch(noteFileUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} });
+      if (!r.ok) return;
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = att.filename || 'download';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    },
+    [att.id, att.filename]
+  );
+
+  const closePreview = useCallback(() => setPreviewOpen(false), []);
+
+  if (!isImage || !att?.id) return null;
+
+  return (
+    <>
+      {previewOpen && imgSrc ? (
+        <AttachmentPreviewModal
+          att={att}
+          url={imgSrc}
+          kind="image"
+          onClose={closePreview}
+          onDownload={(e) => download(e)}
+        />
+      ) : null}
+      <button
+        type="button"
+        className="note-card-person-avatar-btn"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (imgSrc) setPreviewOpen(true);
+        }}
+        disabled={!imgSrc}
+        aria-label={`View ${att.filename || 'profile image'}`}
+        title={att.filename || 'Profile image'}
+      >
+        {imgSrc ? (
+          <img src={imgSrc} alt="" className="note-card-person-avatar-img" />
+        ) : (
+          <span className="note-card-person-avatar-skeleton" aria-hidden />
+        )}
+      </button>
+    </>
+  );
+}
+
 function AttachmentItem({ att, onDeleted }) {
   const [imgSrc, setImgSrc] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -254,11 +339,19 @@ function AttachmentItem({ att, onDeleted }) {
   );
 }
 
-export default function NoteAttachments({ attachments, onDeleted }) {
+export default function NoteAttachments({ attachments, onDeleted, excludeAttachmentIds }) {
   if (!attachments?.length) return null;
+  const exclude =
+    excludeAttachmentIds != null && excludeAttachmentIds.length > 0
+      ? new Set(excludeAttachmentIds.map((id) => String(id)))
+      : null;
+  const list = exclude
+    ? attachments.filter((a) => a?.id != null && !exclude.has(String(a.id)))
+    : attachments;
+  if (!list.length) return null;
   return (
     <div className="note-attachments">
-      {attachments.map((a) => (
+      {list.map((a) => (
         <AttachmentItem key={a.id} att={a} onDeleted={onDeleted} />
       ))}
     </div>

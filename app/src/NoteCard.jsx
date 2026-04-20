@@ -15,7 +15,7 @@ import {
   createSpaztickTaskFromNote,
 } from './api';
 import NoteRichText, { toggleTaskMarkerAtIndex } from './NoteRichText';
-import NoteAttachments from './NoteAttachments';
+import NoteAttachments, { PersonProfileAvatar } from './NoteAttachments';
 import NoteTypeEventFields from './NoteTypeEventFields';
 import MentionsTextarea from './MentionsTextarea';
 import {
@@ -38,6 +38,7 @@ import {
   NoteCardIconSpaztick,
 } from './icons/NoteCardActionIcons';
 import { effectiveDescendantCount } from './noteDescendantCount';
+import { firstImageAttachment } from './attachmentUtils';
 import './NoteCard.css';
 
 export default function NoteCard({
@@ -90,6 +91,13 @@ export default function NoteCard({
     const n = effectiveDescendantCount(note);
     return n > 0 ? n : null;
   }, [note]);
+
+  /** Person cards: first image is shown as left profile; excluded from inline thumbnails. */
+  const personProfileAttachment = useMemo(() => {
+    if (editing) return null;
+    if ((note.note_type || 'note') !== 'person') return null;
+    return firstImageAttachment(note);
+  }, [editing, note.note_type, note.attachments]);
 
   useEffect(() => {
     setEditContent(note.content || '');
@@ -424,7 +432,7 @@ export default function NoteCard({
     const el = raw instanceof Element ? raw : raw?.parentElement;
     return Boolean(
       el?.closest(
-        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-stream-thread-sort, .stream-thread-sort'
+        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-person-avatar-btn, .note-card-stream-thread-sort, .stream-thread-sort'
       )
     );
   }, []);
@@ -491,6 +499,7 @@ export default function NoteCard({
     cardClass,
     'note-card--has-type-icon',
     editing ? 'note-card--editing' : '',
+    personProfileAttachment ? 'note-card--has-person-avatar' : '',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
   ]
@@ -545,6 +554,43 @@ export default function NoteCard({
           '--hermes-link-rc': typeIconVarForStripe,
         }
       : null;
+
+  const readOnlyNoteColumn = (
+    <>
+      <div className="note-card-content">
+        {renderedContent?.trim() ? (
+          <NoteRichText
+            text={renderedContent}
+            tagNames={tags.map((t) => t.name)}
+            className="note-card-content-rich"
+            onNoteClick={openLinkedNote}
+            onTaskToggle={handleToggleTask}
+            sourceNoteId={note.id}
+          />
+        ) : note.attachments?.length ? null : (
+          '—'
+        )}
+      </div>
+      {eventRangeLabel ? <p className="note-card-event-range">{eventRangeLabel}</p> : null}
+      <NoteAttachments
+        attachments={note.attachments}
+        onDeleted={handleDeleteAttachment}
+        excludeAttachmentIds={
+          personProfileAttachment ? [personProfileAttachment.id] : undefined
+        }
+      />
+      {tags.length > 0 && (
+        <div className="note-card-tags">
+          {tags.map((t) => (
+            <span key={t.id} className="note-card-tag">
+              {t.name}
+              <button type="button" className="note-card-tag-remove" onClick={(e) => handleRemoveTag(e, t.id)} aria-label={`Remove ${t.name}`}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <article
@@ -633,35 +679,13 @@ export default function NoteCard({
               <button type="button" onClick={handleCancelEdit}>Cancel</button>
             </div>
           </form>
+        ) : personProfileAttachment ? (
+          <div className="note-card-person-with-avatar">
+            <PersonProfileAvatar att={personProfileAttachment} />
+            <div className="note-card-person-with-avatar-main">{readOnlyNoteColumn}</div>
+          </div>
         ) : (
-          <>
-            <div className="note-card-content">
-              {renderedContent?.trim() ? (
-                <NoteRichText
-                  text={renderedContent}
-                  tagNames={tags.map((t) => t.name)}
-                  className="note-card-content-rich"
-                  onNoteClick={openLinkedNote}
-                  onTaskToggle={handleToggleTask}
-                  sourceNoteId={note.id}
-                />
-              ) : note.attachments?.length ? null : (
-                '—'
-              )}
-            </div>
-            {eventRangeLabel ? <p className="note-card-event-range">{eventRangeLabel}</p> : null}
-            <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
-            {tags.length > 0 && (
-              <div className="note-card-tags">
-                {tags.map((t) => (
-                  <span key={t.id} className="note-card-tag">
-                    {t.name}
-                    <button type="button" className="note-card-tag-remove" onClick={(e) => handleRemoveTag(e, t.id)} aria-label={`Remove ${t.name}`}>×</button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </>
+          readOnlyNoteColumn
         )}
         </div>
         <div className="note-card-meta">

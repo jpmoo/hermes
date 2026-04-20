@@ -29,7 +29,7 @@ export function firstImageAttachment(note) {
   const list = note?.attachments;
   if (!Array.isArray(list)) return null;
   for (const a of list) {
-    if (!a || typeof a.id !== 'string') continue;
+    if (!a || a.id == null) continue;
     if (isImageMime(a.mime_type, a.filename)) return a;
   }
   return null;
