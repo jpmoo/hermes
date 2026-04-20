@@ -18,7 +18,7 @@ import {
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
-import { userBackgroundFileUrl } from './attachmentUtils';
+import { userBackgroundFileUrl, firstImageAttachment, noteFileUrl } from './attachmentUtils';
 import {
   getThread,
   getRoots,
@@ -409,8 +409,9 @@ export default function CanvasPage() {
     userBackgroundFetchRevision,
     streamBackgroundAnimate,
     streamBackgroundCrtEffect,
+    streamThreadImageBgEnabled,
+    streamThreadImageBgOpacity,
   } = useNoteTypeColors();
-  const showCanvasRootBg = canvasUseStreamRootBackground && streamRootBackgroundPresent;
   const [searchParams, setSearchParams] = useSearchParams();
   const threadRootId = searchParams.get('thread')?.trim() || null;
   const focusParam = searchParams.get('focus')?.trim() || null;
@@ -675,6 +676,51 @@ export default function CanvasPage() {
   const sequenceOrderedNotesRef = useRef(sequenceOrderedNotes);
   sequenceOrderedNotesRef.current = sequenceOrderedNotes;
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
+
+  /** Same “focused thread head” rule as Stream (`streamHeadHideDeleteId`) for thread image background. */
+  const canvasStreamHeadHideDeleteId = useMemo(() => {
+    if (!threadRootId) return null;
+    const urlFocus = focusParam?.trim() || null;
+    const merged = focusId ?? urlFocus;
+    if (merged != null) return merged;
+    if (displayTree.length === 1) return displayTree[0].id;
+    return null;
+  }, [threadRootId, focusId, focusParam, displayTree]);
+
+  const threadBgHeadNote = useMemo(() => {
+    if (!threadRootId || canvasStreamHeadHideDeleteId == null) return null;
+    return (
+      threadById.get(canvasStreamHeadHideDeleteId) ??
+      thread.find((n) => noteIdEq(n.id, canvasStreamHeadHideDeleteId)) ??
+      null
+    );
+  }, [threadRootId, canvasStreamHeadHideDeleteId, threadById, thread]);
+
+  const threadBgImageAtt = useMemo(() => firstImageAttachment(threadBgHeadNote), [threadBgHeadNote]);
+
+  const showCanvasNoteAttachmentBg = Boolean(
+    threadRootId && streamThreadImageBgEnabled && threadBgImageAtt?.id
+  );
+  const showCanvasRootUploadBg =
+    canvasUseStreamRootBackground && streamRootBackgroundPresent && !showCanvasNoteAttachmentBg;
+
+  const canvasBackgroundFetchUrl = useMemo(() => {
+    if (showCanvasNoteAttachmentBg) return noteFileUrl(threadBgImageAtt.id);
+    if (showCanvasRootUploadBg) return userBackgroundFileUrl(userBackgroundFetchRevision);
+    return null;
+  }, [
+    showCanvasNoteAttachmentBg,
+    showCanvasRootUploadBg,
+    threadBgImageAtt?.id,
+    userBackgroundFetchRevision,
+  ]);
+
+  const canvasBackgroundOpacity = showCanvasNoteAttachmentBg
+    ? streamThreadImageBgOpacity
+    : streamRootBackgroundOpacity;
+
+  const showCanvasViewportBg = Boolean(canvasBackgroundFetchUrl);
+
   const focusedNode = focusId && actualRootId ? findNode(tree, focusId) : null;
   const replyParentId = focusId && focusedNode ? focusId : threadRootId;
   const focusSnippet = focusedNode?.content?.slice(0, 50) || '';
@@ -1917,11 +1963,11 @@ export default function CanvasPage() {
   return (
     <Layout title={layoutTitle} noteTypeFilterEnabled onLogout={logout} viewLinks={navLinks}>
       <HoverInsightProvider onNoteUpdated={refreshThread} onGoToNote={onGoToNote}>
-        <div className={`canvas-page${showCanvasRootBg ? ' canvas-page--root-bg' : ''}`}>
-          {showCanvasRootBg ? (
+        <div className={`canvas-page${showCanvasViewportBg ? ' canvas-page--root-bg' : ''}`}>
+          {showCanvasViewportBg ? (
             <StreamThreadImageBackground
-              fetchUrl={userBackgroundFileUrl(userBackgroundFetchRevision)}
-              imageOpacity={streamRootBackgroundOpacity}
+              fetchUrl={canvasBackgroundFetchUrl}
+              imageOpacity={canvasBackgroundOpacity}
               animate={streamBackgroundAnimate}
               crtEffect={streamBackgroundCrtEffect}
             />
@@ -2039,7 +2085,7 @@ export default function CanvasPage() {
             </div>
           </div>
 
-          <div className={`canvas-page-main${showCanvasRootBg ? ' canvas-page-main--root-bg' : ''}`}>
+          <div className={`canvas-page-main${showCanvasViewportBg ? ' canvas-page-main--root-bg' : ''}`}>
           {loadingThread ? (
             <p className="canvas-muted">Loading…</p>
           ) : threadRootId && thread.length === 0 ? (
