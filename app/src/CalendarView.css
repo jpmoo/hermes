@@ -170,6 +170,15 @@
   padding: 4px 2px 6px;
   background: color-mix(in srgb, var(--bg) 40%, var(--bg-card));
   align-content: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.calendar-week-bars::-webkit-scrollbar {
+  display: none;
 }
 
 .calendar-event-bar {
