@@ -22,7 +22,7 @@ export function themeMetaThemeColor(themeId) {
     case 'muted-orange':
       return '#f3ebe3';
     case 'muted-green':
-      return '#d4e0d8';
+      return '#b9ccc0';
     case 'muted-blue':
       return '#e6eef6';
     case 'light':

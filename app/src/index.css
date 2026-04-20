@@ -132,12 +132,12 @@ html[data-theme='muted-orange'] {
 /* Emerald / forest — deeper greens, not minty */
 html[data-theme='muted-green'] {
   --color-scheme: light;
-  --bg: #d4e0d8;
-  --bg-card: #eef4f0;
-  --bg-card-hover: #e2ece4;
-  --border: #8fa396;
+  --bg: #b9ccc0;
+  --bg-card: #e4eee8;
+  --bg-card-hover: #d6e5dc;
+  --border: #7a8f84;
   --text: #0f1a14;
-  --text-muted: #3d4a42;
+  --text-muted: #354239;
   --accent: #0d6e45;
   --accent-dim: #0a5a38;
   --star: #159a5c;
@@ -158,12 +158,12 @@ html[data-theme='muted-green'] {
   --note-type-icon-event: color-mix(in srgb, #2a7a52 50%, var(--text-muted));
   --note-type-bg-note: var(--bg-card);
   --note-type-bg-note-hover: var(--bg-card-hover);
-  --note-type-bg-organization: color-mix(in srgb, #e0e6c8 28%, var(--bg-card));
-  --note-type-bg-organization-hover: color-mix(in srgb, #d4dcc0 24%, var(--bg-card-hover));
-  --note-type-bg-person: color-mix(in srgb, #d0e2ec 26%, var(--bg-card));
-  --note-type-bg-person-hover: color-mix(in srgb, #c4d8e6 22%, var(--bg-card-hover));
-  --note-type-bg-event: color-mix(in srgb, #c8e2d4 32%, var(--bg-card));
-  --note-type-bg-event-hover: color-mix(in srgb, #bcd8cc 28%, var(--bg-card-hover));
+  --note-type-bg-organization: color-mix(in srgb, #d4dcc0 30%, var(--bg-card));
+  --note-type-bg-organization-hover: color-mix(in srgb, #c8d0b4 26%, var(--bg-card-hover));
+  --note-type-bg-person: color-mix(in srgb, #c4d8e6 28%, var(--bg-card));
+  --note-type-bg-person-hover: color-mix(in srgb, #b8cee0 24%, var(--bg-card-hover));
+  --note-type-bg-event: color-mix(in srgb, #bcd8cc 34%, var(--bg-card));
+  --note-type-bg-event-hover: color-mix(in srgb, #b0d0c4 30%, var(--bg-card-hover));
 }
 
 /* Cool gray-blue — light UI chrome */
