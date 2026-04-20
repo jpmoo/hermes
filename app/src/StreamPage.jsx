@@ -918,9 +918,11 @@ export default function StreamPage() {
     if (!row) return;
     const t = row.note_type || 'note';
     if (!visibleNoteTypes.has(t)) {
-      setFocusId(null);
-      setDrillPendingFocusId(null);
-      setSearchParams({ thread: threadRootId });
+      flushSync(() => {
+        setSearchParams({ thread: threadRootId });
+        setFocusId(null);
+        setDrillPendingFocusId(null);
+      });
     }
   }, [focusId, thread, threadRootId, visibleNoteTypes, setSearchParams]);
 
@@ -933,18 +935,22 @@ export default function StreamPage() {
     const inThread = thread.some((n) => noteIdEq(n.id, focusId));
     if (!inThread) {
       focusFromUrlApplied.current = '';
-      setFocusId(null);
-      setDrillPendingFocusId(null);
-      setSearchParams({ thread: threadRootId });
+      flushSync(() => {
+        setSearchParams({ thread: threadRootId });
+        setFocusId(null);
+        setDrillPendingFocusId(null);
+      });
       return;
     }
     const inFullTree = findNode(treeFull, focusId);
     if (!inFullTree) return;
     if (findNode(tree, focusId)) return;
     focusFromUrlApplied.current = '';
-    setFocusId(null);
-    setDrillPendingFocusId(null);
-    setSearchParams({ thread: threadRootId });
+    flushSync(() => {
+      setSearchParams({ thread: threadRootId });
+      setFocusId(null);
+      setDrillPendingFocusId(null);
+    });
   }, [threadRootId, focusId, tree, treeFull, thread, tree.length, setSearchParams]);
 
   useLayoutEffect(() => {
@@ -1097,9 +1103,9 @@ export default function StreamPage() {
     window.setTimeout(() => {
       setBranchHeadExiting(false);
       flushSync(() => {
+        setSearchParams({ thread: threadRootId });
         setFocusId(null);
         setDrillPendingFocusId(null);
-        setSearchParams({ thread: threadRootId });
       });
       setStreamScrollIntent({ kind: 'note', id: actualRootId, block: 'start' });
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
@@ -1481,9 +1487,9 @@ export default function StreamPage() {
           animateToFullThread();
         } else {
           flushSync(() => {
+            setSearchParams({ thread: threadRootId });
             setFocusId(null);
             setDrillPendingFocusId(null);
-            setSearchParams({ thread: threadRootId });
           });
           setStreamScrollIntent({ kind: 'note', id: actualRootId, block: 'start' });
         }

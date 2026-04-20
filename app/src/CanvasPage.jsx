@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import Layout from './Layout';
@@ -791,7 +792,7 @@ export default function CanvasPage() {
   const composeTypeLabel =
     NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
 
-  const fk = canvasFocusKey(focusId);
+  const fk = canvasFocusKey(focusId ?? focusParam);
   const layoutStorageKeyRef = useRef(layoutStorageKey);
   const fkRef = useRef(fk);
   layoutStorageKeyRef.current = layoutStorageKey;
@@ -1308,13 +1309,18 @@ export default function CanvasPage() {
 
   const applyFocus = useCallback(
     (id) => {
-      setFocusId(id);
-      if (!threadRootId) return;
-      if (id && !noteIdEq(id, threadRootId)) {
-        setSearchParams({ thread: threadRootId, focus: id });
-      } else {
-        setSearchParams({ thread: threadRootId });
+      if (!threadRootId) {
+        setFocusId(id);
+        return;
       }
+      flushSync(() => {
+        setFocusId(id);
+        if (id && !noteIdEq(id, threadRootId)) {
+          setSearchParams({ thread: threadRootId, focus: id });
+        } else {
+          setSearchParams({ thread: threadRootId });
+        }
+      });
     },
     [threadRootId, setSearchParams]
   );
@@ -1395,13 +1401,17 @@ export default function CanvasPage() {
     if (!threadRootId || !focusId || noteIdEq(focusId, actualRootId)) return;
     const p = parentInFilteredTree(tree, focusId);
     if (!p) {
-      setFocusId(null);
-      setSearchParams({ thread: threadRootId });
+      flushSync(() => {
+        setSearchParams({ thread: threadRootId });
+        setFocusId(null);
+      });
       return;
     }
     if (noteIdEq(p, actualRootId)) {
-      setFocusId(null);
-      setSearchParams({ thread: threadRootId });
+      flushSync(() => {
+        setSearchParams({ thread: threadRootId });
+        setFocusId(null);
+      });
     } else {
       applyFocus(p);
     }
@@ -1409,8 +1419,10 @@ export default function CanvasPage() {
 
   /** Clear thread/focus but stay on Canvas (all threads view). */
   const goToCanvasRoot = useCallback(() => {
-    setFocusId(null);
-    setSearchParams({});
+    flushSync(() => {
+      setSearchParams({});
+      setFocusId(null);
+    });
   }, [setSearchParams]);
 
   const makeOpenThread = useCallback(
