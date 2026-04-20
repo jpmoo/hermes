@@ -11,6 +11,13 @@
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Hide scrollbar; scrolling still works (wheel, touch, trackpad). */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.outline-view::-webkit-scrollbar {
+  display: none;
 }
 
 .outline-view-back {
