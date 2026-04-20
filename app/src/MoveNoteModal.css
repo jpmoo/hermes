@@ -14,6 +14,8 @@
   width: 100%;
   max-width: min(32rem, calc(100vw - 2rem));
   max-height: min(85vh, 720px);
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
@@ -52,19 +54,31 @@
 }
 
 .move-note-modal-tree-wrap {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  /* Explicit cap so the list always scrolls inside long threads (Safari flex + iOS touch). */
+  max-height: min(52vh, 26rem);
   margin-bottom: 0.75rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 35%, transparent) transparent;
 }
 
 .move-note-modal-tree-wrap::-webkit-scrollbar {
-  display: none;
+  width: 8px;
+}
+
+.move-note-modal-tree-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
+  border-radius: 4px;
 }
 
 .move-note-modal-tree {

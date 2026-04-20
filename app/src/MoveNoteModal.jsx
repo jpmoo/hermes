@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getThread, updateNote } from './api';
 import NoteTypeIcon from './NoteTypeIcon';
 import { firstLinePreview } from './noteHistoryUtils';
@@ -44,6 +44,19 @@ function collectDescendantIds(node) {
   return ids;
 }
 
+/** Depth-first order of pickable targets (matches on-screen row order). */
+function orderedPickableIds(nodes, forbidden) {
+  const out = [];
+  function walk(ns) {
+    for (const n of ns || []) {
+      if (!forbidden.has(String(n.id))) out.push(n.id);
+      walk(n.children);
+    }
+  }
+  walk(nodes);
+  return out;
+}
+
 function MoveNoteRow({ node, depth, forbidden, selectedId, onPick }) {
   const fid = String(node.id);
   const isForbidden = forbidden.has(fid);
@@ -53,6 +66,7 @@ function MoveNoteRow({ node, depth, forbidden, selectedId, onPick }) {
     <>
       <button
         type="button"
+        data-move-note-id={String(node.id)}
         className={[
           'move-note-modal-row',
           isForbidden ? 'move-note-modal-row--forbidden' : '',
@@ -92,6 +106,7 @@ export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove,
   const [selectedParentId, setSelectedParentId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const treeWrapRef = useRef(null);
 
   useEffect(() => {
     if (!open || !threadRootId) return undefined;
@@ -115,15 +130,6 @@ export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove,
     };
   }, [open, threadRootId]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
   const tree = useMemo(() => buildTree(flat), [flat]);
 
   const forbidden = useMemo(() => {
@@ -134,7 +140,58 @@ export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove,
     return new Set([...self, ...desc]);
   }, [tree, noteToMove?.id]);
 
+  const pickableOrder = useMemo(() => orderedPickableIds(tree, forbidden), [tree, forbidden]);
+
   const subCount = noteToMove ? effectiveDescendantCount(noteToMove) : 0;
+
+  useLayoutEffect(() => {
+    if (!open || selectedParentId == null) return;
+    const wrap = treeWrapRef.current;
+    if (!wrap) return;
+    const id = String(selectedParentId).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const el = wrap.querySelector(`[data-move-note-id="${id}"]`);
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [open, selectedParentId]);
+
+  useEffect(() => {
+    if (!open || loading) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose?.();
+        return;
+      }
+      if (pickableOrder.length === 0) return;
+      const cur =
+        selectedParentId != null
+          ? pickableOrder.findIndex((id) => String(id) === String(selectedParentId))
+          : -1;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = cur < 0 ? 0 : (cur + 1) % pickableOrder.length;
+        setSelectedParentId(pickableOrder[next]);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = cur <= 0 ? pickableOrder.length - 1 : cur - 1;
+        setSelectedParentId(pickableOrder[prev]);
+        return;
+      }
+      if (e.key === 'Home') {
+        e.preventDefault();
+        setSelectedParentId(pickableOrder[0]);
+        return;
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        setSelectedParentId(pickableOrder[pickableOrder.length - 1]);
+        return;
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [open, loading, onClose, pickableOrder, selectedParentId]);
 
   const handleConfirm = useCallback(async () => {
     if (!noteToMove?.id || selectedParentId == null) return;
@@ -177,10 +234,15 @@ export default function MoveNoteModal({ open, onClose, threadRootId, noteToMove,
         <h2 id="move-note-modal-title">Move note in thread</h2>
         <p className="move-note-modal-lead">
           Choose the note this should become a reply to. The whole branch (this note and everything under it) moves
-          together.
+          together. Scroll the list, or use ↑ ↓ (Home / End) to move the selection.
         </p>
         {error ? <p className="move-note-modal-error">{error}</p> : null}
-        <div className="move-note-modal-tree-wrap">
+        <div
+          className="move-note-modal-tree-wrap"
+          ref={treeWrapRef}
+          tabIndex={-1}
+          aria-label="Thread notes — pick new parent"
+        >
           {loading ? (
             <p className="move-note-modal-muted">Loading thread…</p>
           ) : (
