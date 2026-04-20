@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { getTags, searchByTags, searchSemantic, searchContent } from './api';
+import { getTags, searchByTags, searchSemantic, searchContent, getNoteThreadRoot } from './api';
+import MoveNoteModal from './MoveNoteModal';
 import Layout from './Layout';
 import { HoverInsightProvider } from './HoverInsightContext';
 import NoteCard from './NoteCard';
@@ -23,6 +24,7 @@ function SearchViewInner() {
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [textSearchRequested, setTextSearchRequested] = useState(false);
+  const [moveModal, setMoveModal] = useState(null);
   const qRef = useRef(q);
   qRef.current = q;
 
@@ -142,6 +144,20 @@ function SearchViewInner() {
       })
       .catch(() => setAllTags([]));
   };
+
+  const handleOpenMoveNote = useCallback(async (note) => {
+    if (!note?.parent_id) return;
+    try {
+      let root = note.root_id;
+      if (!root) {
+        root = await getNoteThreadRoot(note.id);
+      }
+      if (!root) return;
+      setMoveModal({ note, threadRootId: root });
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   const toggleTag = (tag) => {
     setSelectedTagIds((prev) =>
@@ -306,6 +322,7 @@ function SearchViewInner() {
                     }}
                     onNoteUpdate={refreshAfterNoteChange}
                     onNoteDelete={refreshAfterNoteChange}
+                    onMoveNote={handleOpenMoveNote}
                   />
                 </li>
               ))}
@@ -325,6 +342,16 @@ function SearchViewInner() {
           )}
         </div>
       </div>
+      <MoveNoteModal
+        open={Boolean(moveModal)}
+        onClose={() => setMoveModal(null)}
+        threadRootId={moveModal?.threadRootId ?? null}
+        noteToMove={moveModal?.note ?? null}
+        onMoved={() => {
+          refreshAfterNoteChange();
+          setMoveModal(null);
+        }}
+      />
     </HoverInsightProvider>
   );
 }

@@ -34,6 +34,7 @@ import {
   NoteCardIconDelete,
   NoteCardIconEdit,
   NoteCardIconInsight,
+  NoteCardIconMove,
   NoteCardIconTag,
   NoteCardIconSpaztick,
 } from './icons/NoteCardActionIcons';
@@ -60,6 +61,8 @@ export default function NoteCard({
   hideDelete = false,
   /** Stream thread head: optional control (e.g. reply sort), bottom-right of card. */
   streamThreadSortSlot = null,
+  /** Reparent within thread: shown only when `note.parent_id` is set (not a thread root note). */
+  onMoveNote = null,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
@@ -433,7 +436,7 @@ export default function NoteCard({
     const el = raw instanceof Element ? raw : raw?.parentElement;
     return Boolean(
       el?.closest(
-        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-profile-avatar-btn, .note-card-stream-thread-sort, .stream-thread-sort'
+        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-profile-avatar-btn, .note-card-stream-thread-sort, .stream-thread-sort, .note-card-move-btn'
       )
     );
   }, []);
@@ -726,6 +729,21 @@ export default function NoteCard({
                 >
                   <NoteCardIconEdit className="note-card-icon-btn__svg" />
                 </button>
+                {onMoveNote && note.parent_id != null ? (
+                  <button
+                    type="button"
+                    className="note-card-icon-btn note-card-move-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onMoveNote(note);
+                    }}
+                    title="Move to another note in this thread"
+                    aria-label="Move note in thread"
+                  >
+                    <NoteCardIconMove className="note-card-icon-btn__svg" />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="note-card-icon-btn"

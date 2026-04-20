@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { getNote, getNoteThreadPath } from './api';
+import { getNote, getNoteThreadPath, getNoteThreadRoot } from './api';
 import NoteCard from './NoteCard';
+import MoveNoteModal from './MoveNoteModal';
 
 const CONFIRM_UNLINK =
   'Remove the link between these two notes? The notes are not deleted—only the connection is removed.';
@@ -24,6 +25,7 @@ export default function ConnectionNoteModal({
     note: null,
     loading: true,
   });
+  const [moveModal, setMoveModal] = useState(null);
 
   const refreshNote = useCallback(async () => {
     if (!linked?.id) return;
@@ -34,6 +36,23 @@ export default function ConnectionNoteModal({
       console.error(e);
     }
   }, [linked?.id]);
+
+  const handleOpenMoveNote = useCallback(
+    async (note) => {
+      if (!note?.parent_id) return;
+      try {
+        let root = note.root_id;
+        if (!root) {
+          root = await getNoteThreadRoot(note.id);
+        }
+        if (!root) return;
+        setMoveModal({ note, threadRootId: root });
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (!linked?.id) {
@@ -91,6 +110,7 @@ export default function ConnectionNoteModal({
   const navTarget = fetched.note || linked;
 
   return (
+    <>
     <div
       className="hover-insight-modal-backdrop"
       data-insight-ui
@@ -155,6 +175,7 @@ export default function ConnectionNoteModal({
                 }}
                 hoverInsightEnabled={false}
                 hasReplies={(fetched.note.reply_count ?? 0) > 0}
+                onMoveNote={handleOpenMoveNote}
               />
             </div>
           ) : (
@@ -193,5 +214,17 @@ export default function ConnectionNoteModal({
         </div>
       </div>
     </div>
+    <MoveNoteModal
+      open={Boolean(moveModal)}
+      onClose={() => setMoveModal(null)}
+      threadRootId={moveModal?.threadRootId ?? null}
+      noteToMove={moveModal?.note ?? null}
+      onMoved={() => {
+        refreshNote();
+        onNoteUpdated?.();
+        setMoveModal(null);
+      }}
+    />
+    </>
   );
 }

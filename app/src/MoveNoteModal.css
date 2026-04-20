@@ -1,0 +1,165 @@
+.move-note-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.move-note-modal {
+  width: 100%;
+  max-width: min(32rem, calc(100vw - 2rem));
+  max-height: min(85vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem 1rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+}
+
+.move-note-modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.move-note-modal-lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.move-note-modal-error {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  color: var(--status-danger-text, #8f2424);
+}
+
+.move-note-modal-muted {
+  margin: 0;
+  padding: 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.move-note-modal-tree-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.move-note-modal-tree-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.move-note-modal-tree {
+  padding: 0.35rem 0;
+  text-align: left;
+}
+
+.move-note-modal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.4rem 0.65rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.move-note-modal-row:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+}
+
+.move-note-modal-row--selected:not(.move-note-modal-row--forbidden) {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-card));
+  outline: 1px solid color-mix(in srgb, var(--accent-dim) 45%, var(--border));
+}
+
+.move-note-modal-row--forbidden {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.move-note-modal-type-icon {
+  flex-shrink: 0;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-top: 0.12rem;
+}
+
+.move-note-modal-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.move-note-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding-top: 0.25rem;
+}
+
+.move-note-modal-btn {
+  padding: 0.45rem 0.95rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.move-note-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.move-note-modal-btn--ghost:hover:not(:disabled) {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.move-note-modal-btn--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  font-weight: 500;
+}
+
+.move-note-modal-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}

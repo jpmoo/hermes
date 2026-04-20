@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
+import MoveNoteModal from './MoveNoteModal';
 import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
@@ -431,6 +432,7 @@ export default function CanvasPage() {
   const [noteHistory, setNoteHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [moveNoteTarget, setMoveNoteTarget] = useState(null);
   /** Per thread root — same storage as Stream sort prefs. */
   const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
   const [sequenceMenuOpen, setSequenceMenuOpen] = useState(false);
@@ -1334,6 +1336,10 @@ export default function CanvasPage() {
     return getThread(threadRootId, false).then(setThread).catch(() => {});
   }, [threadRootId]);
 
+  const handleOpenMoveNote = useCallback((note) => {
+    setMoveNoteTarget(note);
+  }, []);
+
   const applyFocus = useCallback(
     (id) => {
       if (!threadRootId) {
@@ -2224,6 +2230,7 @@ export default function CanvasPage() {
                           onStarredChange={refreshThread}
                           onNoteUpdate={refreshThread}
                           onNoteDelete={refreshThread}
+                          onMoveNote={threadRootId ? handleOpenMoveNote : undefined}
                         />
                       </div>
                       <button
@@ -2498,6 +2505,16 @@ export default function CanvasPage() {
             threadRootId={threadRootId}
             focusNoteId={focusId && !noteIdEq(focusId, actualRootId) ? focusId : null}
             visibleNoteIds={summaryIds}
+          />
+          <MoveNoteModal
+            open={Boolean(moveNoteTarget && threadRootId)}
+            onClose={() => setMoveNoteTarget(null)}
+            threadRootId={threadRootId}
+            noteToMove={moveNoteTarget}
+            onMoved={() => {
+              refreshThread();
+              setMoveNoteTarget(null);
+            }}
           />
         </div>
       </HoverInsightProvider>

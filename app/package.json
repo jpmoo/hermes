@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npm run copy-logos",
     "dev": "vite",
-    "copy-logos": "cp ../assets/HermesLogo.png ../assets/HermesLogoSmall.png public/ && cp ../assets/grid.svg public/grid.svg && cp ../assets/dotted.svg public/dotted.svg && cp ../assets/refresh.svg public/refresh.svg",
+    "copy-logos": "cp ../assets/HermesLogo.png ../assets/HermesLogoSmall.png public/ && cp ../assets/grid.svg public/grid.svg && cp ../assets/dotted.svg public/dotted.svg && cp ../assets/refresh.svg public/refresh.svg && cp ../assets/move.svg public/move.svg",
     "prebuild": "npm run copy-logos",
     "build": "vite build",
     "preview": "vite preview"

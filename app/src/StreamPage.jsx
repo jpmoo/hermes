@@ -50,6 +50,7 @@ import {
   NavIconUpOneLevel,
 } from './icons/NavIcons';
 import ThreadSummaryModal, { collectVisibleNoteIds } from './ThreadSummaryModal';
+import MoveNoteModal from './MoveNoteModal';
 import './CanvasPage.css';
 import './StreamPage.css';
 
@@ -412,6 +413,7 @@ function StreamList({
   /** Thread head only: sort control target id + slot (must match hide-delete head). */
   streamHeadSortTargetId = null,
   streamHeadSortSlot = null,
+  onMoveNote = null,
 }) {
   return (
     <>
@@ -467,6 +469,7 @@ function StreamList({
               onStarredChange={onStarredChange}
               onNoteUpdate={onNoteUpdate}
               onNoteDelete={onNoteDelete}
+              onMoveNote={onMoveNote}
             />
             {n.children?.length > 0 && depth === 0 && (
               <ul className="stream-page-replies">
@@ -485,6 +488,7 @@ function StreamList({
                   streamFocusHideDeleteId={streamFocusHideDeleteId}
                   streamHeadSortTargetId={streamHeadSortTargetId}
                   streamHeadSortSlot={streamHeadSortSlot}
+                  onMoveNote={onMoveNote}
                 />
               </ul>
             )}
@@ -587,6 +591,7 @@ export default function StreamPage() {
 
   const [floatOpen, setFloatOpen] = useState(null);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [moveNoteTarget, setMoveNoteTarget] = useState(null);
   const [noteHistory, setNoteHistory] = useState([]);
   /** Per thread root: stream reply sort prefs (persisted in user settings). */
   const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
@@ -1596,6 +1601,10 @@ export default function StreamPage() {
     else loadRoots();
   };
 
+  const handleOpenMoveNote = useCallback((note) => {
+    setMoveNoteTarget(note);
+  }, []);
+
   const handleNewRoot = async (e) => {
     e.preventDefault();
     const text = newRootContent.trim();
@@ -1935,6 +1944,7 @@ export default function StreamPage() {
                       streamFocusHideDeleteId={streamHeadHideDeleteId}
                       streamHeadSortTargetId={streamHeadHideDeleteId}
                       streamHeadSortSlot={streamHeadSortSlot}
+                      onMoveNote={handleOpenMoveNote}
                     />
                   </ul>
                 </div>
@@ -2145,6 +2155,16 @@ export default function StreamPage() {
           threadRootId={threadRootId}
           focusNoteId={summaryFocusNoteId}
           visibleNoteIds={summaryVisibleIds}
+        />
+        <MoveNoteModal
+          open={Boolean(moveNoteTarget && threadRootId)}
+          onClose={() => setMoveNoteTarget(null)}
+          threadRootId={threadRootId}
+          noteToMove={moveNoteTarget}
+          onMoved={() => {
+            refreshAll();
+            setMoveNoteTarget(null);
+          }}
         />
       </HoverInsightProvider>
     </Layout>
