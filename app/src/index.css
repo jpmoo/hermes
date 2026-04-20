@@ -54,8 +54,8 @@ html {
   --hermes-compose-content-fade: 18rem;
   /* When reply/new is expanded, mask starts higher — tune with expanded textarea height. */
   --hermes-compose-content-fade-expanded: 34rem;
-  /* Note cards (stream, search, canvas): offset down-right, aligned with hover panels */
-  --hermes-card-shadow: 4px 4px 6px -3px rgba(28, 27, 24, 0.14);
+  /* Note cards: classic down-right drop shadow (stream, search, canvas, hover panels) */
+  --hermes-card-shadow: 4px 5px 14px rgba(28, 27, 24, 0.12), 2px 3px 6px rgba(28, 27, 24, 0.08);
 }
 
 html[data-theme='dark'] {
@@ -92,7 +92,7 @@ html[data-theme='dark'] {
   --note-type-bg-person-hover: color-mix(in srgb, #46709c 31%, var(--bg-card-hover));
   --note-type-bg-event: color-mix(in srgb, #3d7557 25%, var(--bg-card));
   --note-type-bg-event-hover: color-mix(in srgb, #46815f 30%, var(--bg-card-hover));
-  --hermes-card-shadow: 4px 4px 12px -2px rgba(0, 0, 0, 0.55);
+  --hermes-card-shadow: 4px 6px 18px rgba(0, 0, 0, 0.45), 2px 3px 8px rgba(0, 0, 0, 0.35);
 }
 
 /* Warm paper — light UI chrome */
