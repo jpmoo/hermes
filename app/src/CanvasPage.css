@@ -608,7 +608,6 @@
   flex-direction: column;
   margin: 0;
   cursor: grab;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
   overflow: hidden;
 }
 

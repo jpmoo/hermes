@@ -61,7 +61,7 @@
   max-height: min(70vh, 520px);
   overflow-x: hidden;
   overflow-y: auto;
-  box-shadow: 4px 4px 4px -4px rgba(28, 27, 24, 0.12);
+  box-shadow: var(--hermes-card-shadow);
   animation: hover-insight-slide-in 0.28s ease-out both;
 }
 

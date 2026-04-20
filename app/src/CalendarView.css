@@ -161,6 +161,21 @@
   color: var(--text-muted);
 }
 
+.calendar-day--today {
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-card));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-dim) 45%, transparent);
+}
+
+.calendar-day--outside.calendar-day--today {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 12%, color-mix(in srgb, var(--bg) 55%, var(--bg-card)));
+}
+
+.calendar-day--today .calendar-day-num {
+  font-weight: 700;
+  color: var(--accent-dim);
+}
+
 .calendar-week-bars {
   flex: 1;
   min-height: 0;

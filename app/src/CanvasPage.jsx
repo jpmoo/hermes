@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
@@ -420,6 +420,13 @@ export default function CanvasPage() {
   const [thread, setThread] = useState([]);
   const [loadingThread, setLoadingThread] = useState(true);
   const [focusId, setFocusId] = useState(null);
+  /**
+   * Pin saved-canvas bucket while `focus=` catches up after drill navigation.
+   * `undefined` = use URL only; `null` = thread-root bucket (`__root__`); string = focused note id.
+   */
+  const [canvasLayoutFkOverride, setCanvasLayoutFkOverride] = useState(
+    /** @type {undefined | string | null} */ (undefined)
+  );
   const [canvasLayouts, setCanvasLayouts] = useState({});
   const [noteHistory, setNoteHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -792,7 +799,23 @@ export default function CanvasPage() {
   const composeTypeLabel =
     NOTE_TYPE_OPTIONS.find((o) => o.value === composeNoteType)?.label ?? composeNoteType;
 
-  const fk = canvasFocusKey(focusId ?? focusParam);
+  /** Saved layout / zoom / lines: keyed like bookmark URL (`focus=` or root). Override only until URL matches. */
+  const fk = useMemo(() => {
+    if (canvasLayoutFkOverride !== undefined) {
+      return canvasFocusKey(canvasLayoutFkOverride);
+    }
+    return canvasFocusKey(focusParam || null);
+  }, [canvasLayoutFkOverride, focusParam]);
+
+  useLayoutEffect(() => {
+    if (canvasLayoutFkOverride === undefined) return;
+    const want = canvasLayoutFkOverride === null ? null : String(canvasLayoutFkOverride);
+    const have = focusParam ? String(focusParam) : null;
+    if (want === have) {
+      setCanvasLayoutFkOverride(undefined);
+    }
+  }, [focusParam, canvasLayoutFkOverride]);
+
   const layoutStorageKeyRef = useRef(layoutStorageKey);
   const fkRef = useRef(fk);
   layoutStorageKeyRef.current = layoutStorageKey;
@@ -803,6 +826,10 @@ export default function CanvasPage() {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
     return JSON.stringify(block?.cards ?? null);
   }, [canvasLayouts, layoutStorageKey, fk]);
+
+  useEffect(() => {
+    setCanvasLayoutFkOverride(undefined);
+  }, [threadRootId]);
 
   useEffect(() => {
     if (!threadRootId) {
@@ -1313,7 +1340,9 @@ export default function CanvasPage() {
         setFocusId(id);
         return;
       }
+      const layoutTarget = id && !noteIdEq(id, threadRootId) ? String(id) : null;
       flushSync(() => {
+        setCanvasLayoutFkOverride(layoutTarget);
         setFocusId(id);
         if (id && !noteIdEq(id, threadRootId)) {
           setSearchParams({ thread: threadRootId, focus: id });
@@ -1402,6 +1431,7 @@ export default function CanvasPage() {
     const p = parentInFilteredTree(tree, focusId);
     if (!p) {
       flushSync(() => {
+        setCanvasLayoutFkOverride(null);
         setSearchParams({ thread: threadRootId });
         setFocusId(null);
       });
@@ -1409,6 +1439,7 @@ export default function CanvasPage() {
     }
     if (noteIdEq(p, actualRootId)) {
       flushSync(() => {
+        setCanvasLayoutFkOverride(null);
         setSearchParams({ thread: threadRootId });
         setFocusId(null);
       });
@@ -1420,6 +1451,7 @@ export default function CanvasPage() {
   /** Clear thread/focus but stay on Canvas (all threads view). */
   const goToCanvasRoot = useCallback(() => {
     flushSync(() => {
+      setCanvasLayoutFkOverride(undefined);
       setSearchParams({});
       setFocusId(null);
     });

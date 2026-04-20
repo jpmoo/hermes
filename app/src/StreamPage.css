@@ -702,9 +702,8 @@
   scroll-margin-top: 0.5rem;
 }
 
-/* Soft shadow + tighter padding on stream cards */
+/* Tighter padding on stream cards (shadow from .note-card + --hermes-card-shadow) */
 .stream-page-scroll article.note-card {
-  box-shadow: 4px 4px 4px -4px rgba(28, 27, 24, 0.12);
   padding: 0.65rem 0.95rem;
 }
 

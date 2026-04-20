@@ -102,6 +102,8 @@ export default function CalendarView() {
     [cursor.y, cursor.m]
   );
 
+  const todayKey = todayYmd();
+
   const prevMonth = () => {
     setCursor(({ y, m }) => {
       if (m === 0) return { y: y - 1, m: 11 };
@@ -222,14 +224,24 @@ export default function CalendarView() {
                 {weekSegments.map(({ week, bars, nLanes }) => (
                   <div key={week[0].key} className="calendar-week">
                     <div className="calendar-week-days">
-                      {week.map((cell) => (
+                      {week.map((cell) => {
+                        const isToday = cell.key === todayKey;
+                        return (
                         <div
                           key={cell.key}
-                          className={`calendar-day ${cell.inMonth ? '' : 'calendar-day--outside'}`}
+                          className={[
+                            'calendar-day',
+                            cell.inMonth ? '' : 'calendar-day--outside',
+                            isToday ? 'calendar-day--today' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          aria-current={isToday ? 'date' : undefined}
                         >
                           <span className="calendar-day-num">{cell.date.getDate()}</span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     <div
                       className="calendar-week-bars"
