@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { createNote, getEventsInRange } from './api';
 import Layout from './Layout';
 import NoteTypeEventFields from './NoteTypeEventFields';
-import { eventFieldsToPayload, formatEventRange } from './noteEventUtils';
+import {
+  calendarFeedPickToComposeFields,
+  eventFieldsToPayload,
+  formatEventRange,
+  isoToDateTimeFields,
+} from './noteEventUtils';
 import {
   assignEventLanes,
   buildMonthWeeks,
@@ -17,6 +21,7 @@ import {
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
 import { userBackgroundFileUrl } from './attachmentUtils';
+import ComposeCalendarPills from './ComposeCalendarPills';
 import './CalendarView.css';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -31,7 +36,6 @@ function todayYmd() {
 
 export default function CalendarView() {
   const { logout } = useAuth();
-  const navigate = useNavigate();
   const {
     streamRootBackgroundPresent,
     streamRootBackgroundOpacity,
@@ -55,6 +59,7 @@ export default function CalendarView() {
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [modalSeedLabel, setModalSeedLabel] = useState('');
 
   const weeks = useMemo(() => buildMonthWeeks(cursor.y, cursor.m), [cursor.y, cursor.m]);
 
@@ -120,6 +125,7 @@ export default function CalendarView() {
 
   const openModal = () => {
     setError(null);
+    setModalSeedLabel('');
     setBody('');
     setStartDate(todayYmd());
     setStartTime('');
@@ -127,6 +133,34 @@ export default function CalendarView() {
     setEndTime('');
     setModalOpen(true);
   };
+
+  const seedModalFromCalendarEvent = useCallback((ev) => {
+    const title = typeof ev?.content === 'string' ? ev.content : '';
+    const start = ev?.event_start_at ? isoToDateTimeFields(ev.event_start_at, false) : { date: '', time: '' };
+    const end = ev?.event_end_at ? isoToDateTimeFields(ev.event_end_at, true) : { date: '', time: '' };
+    setError(null);
+    setModalSeedLabel('From existing event');
+    setBody(title);
+    setStartDate(start.date || todayYmd());
+    setStartTime(start.time || '');
+    setEndDate(end.date || '');
+    setEndTime(end.time || '');
+    setModalOpen(true);
+  }, []);
+
+  const seedModalFromFeedPick = useCallback((ev) => {
+    const titleRaw = typeof ev?.title === 'string' ? ev.title.trim() : '';
+    const feedName = typeof ev?.feedName === 'string' ? ev.feedName.trim() : '';
+    const title = feedName && titleRaw ? `${titleRaw} (${feedName})` : titleRaw;
+    const fields = calendarFeedPickToComposeFields(ev);
+    setError(null);
+    setModalSeedLabel('From calendar feed');
+    setBody(title);
+    setStartDate(fields.startDate || todayYmd());
+    setStartTime(fields.startTime || '');
+    setEndDate(fields.endDate || '');
+    setEndTime(fields.endTime || '');
+  }, []);
 
   useEffect(() => {
     if (!modalOpen) return undefined;
@@ -138,12 +172,7 @@ export default function CalendarView() {
   }, [modalOpen]);
 
   const goToEventInStream = (ev) => {
-    const root = ev.thread_root_id;
-    if (!root) return;
-    navigate({
-      pathname: '/stream',
-      search: `?thread=${encodeURIComponent(root)}&focus=${encodeURIComponent(ev.id)}`,
-    });
+    seedModalFromCalendarEvent(ev);
   };
 
   const handleCreateEvent = async (e) => {
@@ -272,7 +301,6 @@ export default function CalendarView() {
                 ))}
               </div>
             </div>
-            <p className="calendar-view-hint">Click an event to open it in Stream (focused in the thread).</p>
           </>
         )}
 
@@ -299,6 +327,7 @@ export default function CalendarView() {
                   placeholder="What is this event?"
                   rows={4}
                 />
+                {modalSeedLabel ? <p className="calendar-modal-seed-label">{modalSeedLabel}</p> : null}
                 <NoteTypeEventFields
                   idPrefix="calendar-new"
                   noteType="event"
@@ -314,6 +343,13 @@ export default function CalendarView() {
                   onEndTimeChange={setEndTime}
                   disabled={submitting}
                 />
+                <div className="calendar-modal-pills">
+                  <ComposeCalendarPills
+                    disabled={submitting}
+                    onPickEvent={seedModalFromFeedPick}
+                    variant="modal"
+                  />
+                </div>
                 <div className="calendar-modal-actions">
                   <button type="button" onClick={() => setModalOpen(false)} disabled={submitting}>
                     Cancel

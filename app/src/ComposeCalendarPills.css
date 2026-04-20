@@ -7,6 +7,12 @@
   align-self: center;
 }
 
+.compose-calendar-pills--modal {
+  width: 100%;
+  min-width: 0;
+  margin: 0.75rem 0 0;
+}
+
 .compose-calendar-pills-scroll {
   display: flex;
   flex-wrap: nowrap;

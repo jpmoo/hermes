@@ -4,7 +4,7 @@ import { useNoteTypeColors } from './NoteTypeColorContext';
 import { localCalendarLookoutBounds, normalizeCalendarLookoutDays } from './calendarLookoutDays';
 import './ComposeCalendarPills.css';
 
-export default function ComposeCalendarPills({ onPickEvent, disabled }) {
+export default function ComposeCalendarPills({ onPickEvent, disabled, variant = 'toolbar' }) {
   const { calendarFeeds, calendarLookoutDays } = useNoteTypeColors();
   const lookoutNorm = useMemo(() => normalizeCalendarLookoutDays(calendarLookoutDays), [calendarLookoutDays]);
   const [events, setEvents] = useState([]);
@@ -48,7 +48,9 @@ export default function ComposeCalendarPills({ onPickEvent, disabled }) {
 
   return (
     <div
-      className="compose-calendar-pills compose-calendar-pills--toolbar"
+      className={`compose-calendar-pills ${
+        variant === 'modal' ? 'compose-calendar-pills--modal' : 'compose-calendar-pills--toolbar'
+      }`}
       aria-label={lookoutNorm === 0 ? 'Today’s calendar events' : 'Calendar events in the selected date range'}
     >
       <div className="compose-calendar-pills-scroll">

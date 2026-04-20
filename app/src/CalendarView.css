@@ -223,13 +223,6 @@
   outline-offset: 1px;
 }
 
-.calendar-view-hint {
-  flex-shrink: 0;
-  margin: 1rem 0 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
 /* Modal */
 .calendar-modal-overlay {
   position: fixed;
@@ -280,6 +273,18 @@
   font-size: 0.95rem;
   font-family: inherit;
   resize: vertical;
+}
+
+.calendar-modal-seed-label {
+  margin: -0.4rem 0 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.calendar-modal-pills {
+  margin-top: 0.15rem;
 }
 
 .calendar-modal-actions {
