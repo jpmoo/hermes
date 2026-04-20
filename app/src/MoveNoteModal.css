@@ -86,11 +86,58 @@
   text-align: left;
 }
 
+.move-note-modal-tree-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.move-note-modal-expand,
+.move-note-modal-expand-spacer {
+  flex-shrink: 0;
+  width: 1.35rem;
+  min-height: 1.75rem;
+  box-sizing: border-box;
+}
+
+.move-note-modal-expand {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+
+.move-note-modal-expand:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+  color: var(--text);
+}
+
+.move-note-modal-expand:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-dim) 55%, var(--border));
+  outline-offset: 1px;
+}
+
+.move-note-modal-expand-spacer {
+  display: block;
+}
+
 .move-note-modal-row {
   display: flex;
   align-items: flex-start;
   gap: 0.4rem;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   margin: 0;
   padding: 0.4rem 0.65rem;
   border: none;

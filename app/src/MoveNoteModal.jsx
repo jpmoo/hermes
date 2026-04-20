@@ -44,55 +44,82 @@ function collectDescendantIds(node) {
   return ids;
 }
 
-/** Depth-first order of pickable targets (matches on-screen row order). */
-function orderedPickableIds(nodes, forbidden) {
+/** Depth-first order of visible pickable targets (matches on-screen row order). */
+function orderedPickableIds(nodes, forbidden, expandedIds) {
   const out = [];
   function walk(ns) {
     for (const n of ns || []) {
       if (!forbidden.has(String(n.id))) out.push(n.id);
-      walk(n.children);
+      const kids = n.children || [];
+      if (kids.length && expandedIds.has(String(n.id))) walk(kids);
     }
   }
   walk(nodes);
   return out;
 }
 
-function MoveNoteRow({ node, depth, forbidden, selectedId, onPick }) {
+function MoveNoteRow({ node, depth, forbidden, selectedId, onPick, expandedIds, onToggleExpand }) {
   const fid = String(node.id);
+  const hasChildren = (node.children || []).length > 0;
+  const expanded = expandedIds.has(fid);
   const isForbidden = forbidden.has(fid);
   const isSelected = selectedId != null && String(selectedId) === fid;
   const label = firstLinePreview(node.content || '') || '(empty)';
+  const pad = `${depth * 1.25 + 0.5}rem`;
   return (
     <>
-      <button
-        type="button"
-        data-move-note-id={String(node.id)}
-        className={[
-          'move-note-modal-row',
-          isForbidden ? 'move-note-modal-row--forbidden' : '',
-          isSelected ? 'move-note-modal-row--selected' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-        style={{ paddingLeft: `${depth * 1.25 + 0.5}rem` }}
-        disabled={isForbidden}
-        onClick={() => {
-          if (!isForbidden) onPick(node.id);
-        }}
-      >
-        <NoteTypeIcon type={node.note_type || 'note'} className="move-note-modal-type-icon" />
-        <span className="move-note-modal-row-label">{label}</span>
-      </button>
-      {(node.children || []).map((c) => (
-        <MoveNoteRow
-          key={c.id}
-          node={c}
-          depth={depth + 1}
-          forbidden={forbidden}
-          selectedId={selectedId}
-          onPick={onPick}
-        />
-      ))}
+      <div className="move-note-modal-tree-line" style={{ paddingLeft: pad }}>
+        {hasChildren ? (
+          <button
+            type="button"
+            className="move-note-modal-expand"
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Collapse nested notes' : 'Expand nested notes'}
+            title={expanded ? 'Collapse' : 'Expand'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleExpand(node.id);
+            }}
+          >
+            {expanded ? '▼' : '▶'}
+          </button>
+        ) : (
+          <span className="move-note-modal-expand-spacer" aria-hidden />
+        )}
+        <button
+          type="button"
+          data-move-note-id={String(node.id)}
+          className={[
+            'move-note-modal-row',
+            isForbidden ? 'move-note-modal-row--forbidden' : '',
+            isSelected ? 'move-note-modal-row--selected' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          disabled={isForbidden}
+          onClick={() => {
+            if (!isForbidden) onPick(node.id);
+          }}
+        >
+          <NoteTypeIcon type={node.note_type || 'note'} className="move-note-modal-type-icon" />
+          <span className="move-note-modal-row-label">{label}</span>
+        </button>
+      </div>
+      {hasChildren && expanded
+        ? (node.children || []).map((c) => (
+            <MoveNoteRow
+              key={c.id}
+              node={c}
+              depth={depth + 1}
+              forbidden={forbidden}
+              selectedId={selectedId}
+              onPick={onPick}
+              expandedIds={expandedIds}
+              onToggleExpand={onToggleExpand}
+            />
+          ))
+        : null}
     </>
   );
 }
@@ -104,6 +131,7 @@ export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
   const [flat, setFlat] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const treeWrapRef = useRef(null);
@@ -111,6 +139,7 @@ export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
   useEffect(() => {
     if (!open || !noteToMove) return undefined;
     setSelectedParentId(null);
+    setExpandedIds(new Set());
     setError(null);
     setFlat([]);
     let cancelled = false;
@@ -140,7 +169,26 @@ export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
     return new Set([...self, ...desc]);
   }, [tree, noteToMove?.id]);
 
-  const pickableOrder = useMemo(() => orderedPickableIds(tree, forbidden), [tree, forbidden]);
+  const pickableOrder = useMemo(
+    () => orderedPickableIds(tree, forbidden, expandedIds),
+    [tree, forbidden, expandedIds]
+  );
+
+  const handleToggleExpand = useCallback((id) => {
+    const sid = String(id);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (selectedParentId == null) return;
+    const visible = new Set(pickableOrder.map((id) => String(id)));
+    if (!visible.has(String(selectedParentId))) setSelectedParentId(null);
+  }, [pickableOrder, selectedParentId]);
 
   const subCount = noteToMove ? effectiveDescendantCount(noteToMove) : 0;
 
@@ -234,7 +282,8 @@ export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
         <h2 id="move-note-modal-title">Move note</h2>
         <p className="move-note-modal-lead">
           Choose any note as the new parent — same thread or another. The whole branch (this note and everything
-          nested under it) moves together. Scroll the list, or use ↑ ↓ (Home / End) to change the selection.
+          nested under it) moves together. Use ▶ / ▼ to show or hide nested notes (all collapsed when you open this).
+          Scroll the list, or use ↑ ↓ (Home / End) to change the selection.
         </p>
         {error ? <p className="move-note-modal-error">{error}</p> : null}
         <div
@@ -255,6 +304,8 @@ export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
                   forbidden={forbidden}
                   selectedId={selectedParentId}
                   onPick={setSelectedParentId}
+                  expandedIds={expandedIds}
+                  onToggleExpand={handleToggleExpand}
                 />
               ))}
             </div>
