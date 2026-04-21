@@ -679,7 +679,6 @@
   list-style: none;
   margin: 0.25rem 0 0.25rem 1rem;
   padding-left: 0.5rem;
-  border-left: 1px solid var(--border);
   /*
    * Stack above the sibling thread-head <article>. The head card contains controls with z-index:2
    * (e.g. type cycle); if this list stays at z-index:1, those controls can win hit-testing over the

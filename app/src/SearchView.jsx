@@ -12,6 +12,8 @@ import { SearchNoteTypeFilterProvider, useSearchNoteTypeFilter } from './SearchN
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
 import { userBackgroundFileUrl } from './attachmentUtils';
+import { useMediaQuery } from './useMediaQuery';
+import { HERMES_COMPACT_VIEWPORT_QUERY } from './canvasLayoutApi';
 import './SearchView.css';
 
 function SearchViewInner() {
@@ -35,9 +37,14 @@ function SearchViewInner() {
     streamRootBackgroundOpacity,
     canvasUseStreamRootBackground,
     userBackgroundFetchRevision,
-    streamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
   } = useNoteTypeColors();
+  const isMobileViewport = useMediaQuery(HERMES_COMPACT_VIEWPORT_QUERY);
+  const streamBackgroundAnimate =
+    (streamBackgroundDriftAllPlatforms || streamBackgroundDriftDisableMobile) &&
+    !(streamBackgroundDriftDisableMobile && isMobileViewport);
   const showRootViewportBg = canvasUseStreamRootBackground && streamRootBackgroundPresent;
 
   const filteredResults = useMemo(

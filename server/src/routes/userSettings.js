@@ -144,6 +144,28 @@ function streamBackgroundAnimateFromStored(raw) {
   return raw.streamBackgroundAnimate !== false;
 }
 
+function streamBackgroundDriftAllPlatformsFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return true;
+  if (
+    Object.prototype.hasOwnProperty.call(raw, 'streamBackgroundDriftAllPlatforms') ||
+    Object.prototype.hasOwnProperty.call(raw, 'streamBackgroundDriftDisableMobile')
+  ) {
+    return raw.streamBackgroundDriftAllPlatforms === true;
+  }
+  return streamBackgroundAnimateFromStored(raw);
+}
+
+function streamBackgroundDriftDisableMobileFromStored(raw) {
+  if (!raw || typeof raw !== 'object') return false;
+  if (
+    Object.prototype.hasOwnProperty.call(raw, 'streamBackgroundDriftAllPlatforms') ||
+    Object.prototype.hasOwnProperty.call(raw, 'streamBackgroundDriftDisableMobile')
+  ) {
+    return raw.streamBackgroundDriftDisableMobile === true;
+  }
+  return false;
+}
+
 /** Horizontal scanline mask on background image (CRT-style). */
 function streamBackgroundCrtEffectFromStored(raw) {
   if (!raw || typeof raw !== 'object') return false;
@@ -529,6 +551,8 @@ router.get('/settings', requireAuth, async (req, res) => {
     const streamThreadImageBgEnabled = streamThreadImageBgEnabledFromStored(raw);
     const streamThreadImageBgOpacity = streamThreadImageBgOpacityFromStored(raw);
     const streamBackgroundAnimate = streamBackgroundAnimateFromStored(raw);
+    const streamBackgroundDriftAllPlatforms = streamBackgroundDriftAllPlatformsFromStored(raw);
+    const streamBackgroundDriftDisableMobile = streamBackgroundDriftDisableMobileFromStored(raw);
     const streamBackgroundCrtEffect = streamBackgroundCrtEffectFromStored(raw);
     const streamRootBackgroundOpacity = streamRootBackgroundOpacityFromStored(raw);
     const canvasUseStreamRootBackground = canvasUseStreamRootBackgroundFromStored(raw);
@@ -558,6 +582,8 @@ router.get('/settings', requireAuth, async (req, res) => {
       streamThreadImageBgEnabled,
       streamThreadImageBgOpacity,
       streamBackgroundAnimate,
+      streamBackgroundDriftAllPlatforms,
+      streamBackgroundDriftDisableMobile,
       streamBackgroundCrtEffect,
       streamRootBackgroundPresent,
       streamRootBackgroundOpacity,
@@ -593,6 +619,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
       streamThreadImageBgEnabled,
       streamThreadImageBgOpacity,
       streamBackgroundAnimate,
+      streamBackgroundDriftAllPlatforms,
+      streamBackgroundDriftDisableMobile,
       streamBackgroundCrtEffect,
       streamRootBackgroundOpacity,
       canvasUseStreamRootBackground,
@@ -825,12 +853,42 @@ router.patch('/settings', requireAuth, async (req, res) => {
     if (streamBackgroundAnimate !== undefined) {
       if (streamBackgroundAnimate === null) {
         delete cur.streamBackgroundAnimate;
+        delete cur.streamBackgroundDriftAllPlatforms;
+        delete cur.streamBackgroundDriftDisableMobile;
       } else if (streamBackgroundAnimate !== true && streamBackgroundAnimate !== false) {
         return res
           .status(400)
           .json({ error: 'streamBackgroundAnimate must be true, false, or null' });
       } else {
-        cur.streamBackgroundAnimate = streamBackgroundAnimate;
+        cur.streamBackgroundDriftAllPlatforms = streamBackgroundAnimate;
+        cur.streamBackgroundDriftDisableMobile = false;
+        delete cur.streamBackgroundAnimate;
+      }
+    }
+
+    if (streamBackgroundDriftAllPlatforms !== undefined) {
+      if (streamBackgroundDriftAllPlatforms === null) {
+        delete cur.streamBackgroundDriftAllPlatforms;
+      } else if (streamBackgroundDriftAllPlatforms !== true && streamBackgroundDriftAllPlatforms !== false) {
+        return res
+          .status(400)
+          .json({ error: 'streamBackgroundDriftAllPlatforms must be true, false, or null' });
+      } else {
+        cur.streamBackgroundDriftAllPlatforms = streamBackgroundDriftAllPlatforms;
+        delete cur.streamBackgroundAnimate;
+      }
+    }
+
+    if (streamBackgroundDriftDisableMobile !== undefined) {
+      if (streamBackgroundDriftDisableMobile === null) {
+        delete cur.streamBackgroundDriftDisableMobile;
+      } else if (streamBackgroundDriftDisableMobile !== true && streamBackgroundDriftDisableMobile !== false) {
+        return res
+          .status(400)
+          .json({ error: 'streamBackgroundDriftDisableMobile must be true, false, or null' });
+      } else {
+        cur.streamBackgroundDriftDisableMobile = streamBackgroundDriftDisableMobile;
+        delete cur.streamBackgroundAnimate;
       }
     }
 
@@ -941,6 +999,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
     const outStreamThreadImageBgEnabled = streamThreadImageBgEnabledFromStored(cur);
     const outStreamThreadImageBgOpacity = streamThreadImageBgOpacityFromStored(cur);
     const outStreamBackgroundAnimate = streamBackgroundAnimateFromStored(cur);
+    const outStreamBackgroundDriftAllPlatforms = streamBackgroundDriftAllPlatformsFromStored(cur);
+    const outStreamBackgroundDriftDisableMobile = streamBackgroundDriftDisableMobileFromStored(cur);
     const outStreamBackgroundCrtEffect = streamBackgroundCrtEffectFromStored(cur);
     const outStreamRootBackgroundOpacity = streamRootBackgroundOpacityFromStored(cur);
     const outCanvasUseStreamRootBackground = canvasUseStreamRootBackgroundFromStored(cur);
@@ -969,6 +1029,8 @@ router.patch('/settings', requireAuth, async (req, res) => {
       streamThreadImageBgEnabled: outStreamThreadImageBgEnabled,
       streamThreadImageBgOpacity: outStreamThreadImageBgOpacity,
       streamBackgroundAnimate: outStreamBackgroundAnimate,
+      streamBackgroundDriftAllPlatforms: outStreamBackgroundDriftAllPlatforms,
+      streamBackgroundDriftDisableMobile: outStreamBackgroundDriftDisableMobile,
       streamBackgroundCrtEffect: outStreamBackgroundCrtEffect,
       streamRootBackgroundPresent: outStreamRootBackgroundPresent,
       streamRootBackgroundOpacity: outStreamRootBackgroundOpacity,

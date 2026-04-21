@@ -44,8 +44,10 @@ export default function SettingsModal({ onClose }) {
     setStreamThreadImageBgEnabled,
     streamThreadImageBgOpacity,
     setStreamThreadImageBgOpacity,
-    streamBackgroundAnimate,
-    setStreamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    setStreamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
+    setStreamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
     setStreamBackgroundCrtEffect,
     streamRootBackgroundPresent,
@@ -341,23 +343,40 @@ export default function SettingsModal({ onClose }) {
           </p>
           <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
             <input
-              id="settings-stream-bg-animate"
+              id="settings-stream-bg-drift-all"
               type="checkbox"
               className="settings-modal-similar-notes-checkbox"
-              checked={streamBackgroundAnimate}
-              onChange={(e) => setStreamBackgroundAnimate(e.target.checked)}
+              checked={streamBackgroundDriftAllPlatforms}
+              onChange={(e) => setStreamBackgroundDriftAllPlatforms(e.target.checked)}
               aria-describedby="settings-stream-bg-animate-hint"
             />
             <label
               className="settings-modal-similar-notes-checkbox-label"
-              htmlFor="settings-stream-bg-animate"
+              htmlFor="settings-stream-bg-drift-all"
             >
-              Animate background (slow drift)
+              Drift on all platforms
+            </label>
+          </div>
+          <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
+            <input
+              id="settings-stream-bg-drift-no-mobile"
+              type="checkbox"
+              className="settings-modal-similar-notes-checkbox"
+              checked={streamBackgroundDriftDisableMobile}
+              onChange={(e) => setStreamBackgroundDriftDisableMobile(e.target.checked)}
+              aria-describedby="settings-stream-bg-animate-hint"
+            />
+            <label
+              className="settings-modal-similar-notes-checkbox-label"
+              htmlFor="settings-stream-bg-drift-no-mobile"
+            >
+              Don&apos;t drift on mobile/iOS
             </label>
           </div>
           <p id="settings-stream-bg-animate-hint" className="settings-modal-similar-notes-hint">
-            When off, the image stays centered and scaled to cover the viewport (no motion). Applies to
-            Stream and Canvas. Saved to your account.
+            If both are off, there is no drift at all. If only &ldquo;don&apos;t drift on mobile/iOS&rdquo; is on,
+            drift runs on desktop/tablet only. Applies to Stream, Canvas, Outline, Search, and Calendar.
+            Saved to your account.
           </p>
           <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
             <input

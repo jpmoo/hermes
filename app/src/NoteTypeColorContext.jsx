@@ -75,7 +75,8 @@ export function NoteTypeColorProvider({ children }) {
   const [markdownListAlternatingShades, setMarkdownListAlternatingShades] = useState(true);
   const [streamThreadImageBgEnabled, setStreamThreadImageBgEnabled] = useState(false);
   const [streamThreadImageBgOpacity, setStreamThreadImageBgOpacity] = useState(0.28);
-  const [streamBackgroundAnimate, setStreamBackgroundAnimate] = useState(true);
+  const [streamBackgroundDriftAllPlatforms, setStreamBackgroundDriftAllPlatforms] = useState(true);
+  const [streamBackgroundDriftDisableMobile, setStreamBackgroundDriftDisableMobile] = useState(false);
   const [streamBackgroundCrtEffect, setStreamBackgroundCrtEffect] = useState(false);
   const [streamRootBackgroundPresent, setStreamRootBackgroundPresent] = useState(false);
   const [streamRootBackgroundOpacity, setStreamRootBackgroundOpacity] = useState(0.28);
@@ -153,7 +154,13 @@ export function NoteTypeColorProvider({ children }) {
             typeof op === 'number' && Number.isFinite(op) ? Math.min(1, Math.max(0, op)) : 0.28
           );
         }
-        setStreamBackgroundAnimate(data.streamBackgroundAnimate !== false);
+        const legacyAnimate = data.streamBackgroundAnimate !== false;
+        setStreamBackgroundDriftAllPlatforms(
+          data.streamBackgroundDriftAllPlatforms === undefined
+            ? legacyAnimate
+            : data.streamBackgroundDriftAllPlatforms === true
+        );
+        setStreamBackgroundDriftDisableMobile(data.streamBackgroundDriftDisableMobile === true);
         setStreamBackgroundCrtEffect(data.streamBackgroundCrtEffect === true);
         setStreamRootBackgroundPresent(data.streamRootBackgroundPresent === true);
         {
@@ -269,7 +276,8 @@ export function NoteTypeColorProvider({ children }) {
       setMarkdownListAlternatingShades(true);
       setStreamThreadImageBgEnabled(false);
       setStreamThreadImageBgOpacity(0.28);
-      setStreamBackgroundAnimate(true);
+      setStreamBackgroundDriftAllPlatforms(true);
+      setStreamBackgroundDriftDisableMobile(false);
       setStreamBackgroundCrtEffect(false);
       setStreamRootBackgroundPresent(false);
       setStreamRootBackgroundOpacity(0.28);
@@ -485,7 +493,8 @@ export function NoteTypeColorProvider({ children }) {
       patchUserSettings({
         streamThreadImageBgEnabled,
         streamThreadImageBgOpacity,
-        streamBackgroundAnimate,
+        streamBackgroundDriftAllPlatforms,
+        streamBackgroundDriftDisableMobile,
         streamBackgroundCrtEffect,
       }).catch((e) => console.error(e));
     }, 450);
@@ -495,7 +504,8 @@ export function NoteTypeColorProvider({ children }) {
   }, [
     streamThreadImageBgEnabled,
     streamThreadImageBgOpacity,
-    streamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
     user?.id,
     serverReady,
@@ -632,7 +642,16 @@ export function NoteTypeColorProvider({ children }) {
   }, []);
 
   const setStreamBackgroundAnimateSetting = useCallback((on) => {
-    setStreamBackgroundAnimate(Boolean(on));
+    setStreamBackgroundDriftAllPlatforms(Boolean(on));
+    setStreamBackgroundDriftDisableMobile(false);
+  }, []);
+
+  const setStreamBackgroundDriftAllPlatformsSetting = useCallback((on) => {
+    setStreamBackgroundDriftAllPlatforms(Boolean(on));
+  }, []);
+
+  const setStreamBackgroundDriftDisableMobileSetting = useCallback((on) => {
+    setStreamBackgroundDriftDisableMobile(Boolean(on));
   }, []);
 
   const setStreamBackgroundCrtEffectSetting = useCallback((on) => {
@@ -659,7 +678,8 @@ export function NoteTypeColorProvider({ children }) {
       await patchUserSettings({
         streamThreadImageBgEnabled,
         streamThreadImageBgOpacity,
-        streamBackgroundAnimate,
+        streamBackgroundDriftAllPlatforms,
+        streamBackgroundDriftDisableMobile,
         streamBackgroundCrtEffect,
         streamRootBackgroundOpacity,
         canvasUseStreamRootBackground,
@@ -670,7 +690,8 @@ export function NoteTypeColorProvider({ children }) {
   }, [
     streamThreadImageBgEnabled,
     streamThreadImageBgOpacity,
-    streamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
     streamRootBackgroundOpacity,
     canvasUseStreamRootBackground,
@@ -686,7 +707,8 @@ export function NoteTypeColorProvider({ children }) {
       await patchUserSettings({
         streamThreadImageBgEnabled,
         streamThreadImageBgOpacity,
-        streamBackgroundAnimate,
+        streamBackgroundDriftAllPlatforms,
+        streamBackgroundDriftDisableMobile,
         streamBackgroundCrtEffect,
         streamRootBackgroundOpacity,
         canvasUseStreamRootBackground,
@@ -697,7 +719,8 @@ export function NoteTypeColorProvider({ children }) {
   }, [
     streamThreadImageBgEnabled,
     streamThreadImageBgOpacity,
-    streamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
     streamRootBackgroundOpacity,
     canvasUseStreamRootBackground,
@@ -779,8 +802,12 @@ export function NoteTypeColorProvider({ children }) {
       setStreamThreadImageBgEnabled: setStreamThreadImageBgEnabledSetting,
       streamThreadImageBgOpacity,
       setStreamThreadImageBgOpacity: setStreamThreadImageBgOpacitySetting,
-      streamBackgroundAnimate,
+      streamBackgroundAnimate: streamBackgroundDriftAllPlatforms || streamBackgroundDriftDisableMobile,
       setStreamBackgroundAnimate: setStreamBackgroundAnimateSetting,
+      streamBackgroundDriftAllPlatforms,
+      setStreamBackgroundDriftAllPlatforms: setStreamBackgroundDriftAllPlatformsSetting,
+      streamBackgroundDriftDisableMobile,
+      setStreamBackgroundDriftDisableMobile: setStreamBackgroundDriftDisableMobileSetting,
       streamBackgroundCrtEffect,
       setStreamBackgroundCrtEffect: setStreamBackgroundCrtEffectSetting,
       streamRootBackgroundPresent,
@@ -829,8 +856,11 @@ export function NoteTypeColorProvider({ children }) {
       setStreamThreadImageBgEnabledSetting,
       streamThreadImageBgOpacity,
       setStreamThreadImageBgOpacitySetting,
-      streamBackgroundAnimate,
+      streamBackgroundDriftAllPlatforms,
+      streamBackgroundDriftDisableMobile,
       setStreamBackgroundAnimateSetting,
+      setStreamBackgroundDriftAllPlatformsSetting,
+      setStreamBackgroundDriftDisableMobileSetting,
       streamBackgroundCrtEffect,
       setStreamBackgroundCrtEffectSetting,
       streamRootBackgroundPresent,

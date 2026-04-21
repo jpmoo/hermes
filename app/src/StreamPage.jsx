@@ -42,6 +42,8 @@ import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import { firstImageAttachment, userBackgroundFileUrl, noteFileUrl } from './attachmentUtils';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
+import { useMediaQuery } from './useMediaQuery';
+import { HERMES_COMPACT_VIEWPORT_QUERY } from './canvasLayoutApi';
 import {
   NavIconAttach,
   NavIconBrain,
@@ -611,12 +613,17 @@ export default function StreamPage() {
   const {
     streamThreadImageBgEnabled,
     streamThreadImageBgOpacity,
-    streamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
     streamRootBackgroundPresent,
     streamRootBackgroundOpacity,
     userBackgroundFetchRevision,
   } = useNoteTypeColors();
+  const isMobileViewport = useMediaQuery(HERMES_COMPACT_VIEWPORT_QUERY);
+  const streamBackgroundAnimate =
+    (streamBackgroundDriftAllPlatforms || streamBackgroundDriftDisableMobile) &&
+    !(streamBackgroundDriftDisableMobile && isMobileViewport);
 
   useLayoutEffect(() => {
     const listEl = threadListRef.current;

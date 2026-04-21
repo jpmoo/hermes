@@ -25,6 +25,8 @@ import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
 import { userBackgroundFileUrl } from './attachmentUtils';
+import { useMediaQuery } from './useMediaQuery';
+import { HERMES_COMPACT_VIEWPORT_QUERY } from './canvasLayoutApi';
 import './OutlineView.css';
 
 const OutlineExpandContext = createContext({
@@ -351,9 +353,14 @@ export default function OutlineView() {
     streamRootBackgroundOpacity,
     canvasUseStreamRootBackground,
     userBackgroundFetchRevision,
-    streamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
   } = useNoteTypeColors();
+  const isMobileViewport = useMediaQuery(HERMES_COMPACT_VIEWPORT_QUERY);
+  const streamBackgroundAnimate =
+    (streamBackgroundDriftAllPlatforms || streamBackgroundDriftDisableMobile) &&
+    !(streamBackgroundDriftDisableMobile && isMobileViewport);
   const showRootViewportBg = canvasUseStreamRootBackground && streamRootBackgroundPresent;
 
   useEffect(() => {

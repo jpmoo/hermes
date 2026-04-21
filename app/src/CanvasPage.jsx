@@ -409,7 +409,8 @@ export default function CanvasPage() {
     streamRootBackgroundOpacity,
     canvasUseStreamRootBackground,
     userBackgroundFetchRevision,
-    streamBackgroundAnimate,
+    streamBackgroundDriftAllPlatforms,
+    streamBackgroundDriftDisableMobile,
     streamBackgroundCrtEffect,
     streamThreadImageBgEnabled,
     streamThreadImageBgOpacity,
@@ -514,6 +515,9 @@ export default function CanvasPage() {
   const isCanvasMobileViewportRef = useRef(false);
   const { visibleNoteTypes } = useNoteTypeFilter();
   const isCanvasMobileViewport = useMediaQuery(CANVAS_MOBILE_MEDIA_QUERY);
+  const streamBackgroundAnimate =
+    (streamBackgroundDriftAllPlatforms || streamBackgroundDriftDisableMobile) &&
+    !(streamBackgroundDriftDisableMobile && isCanvasMobileViewport);
 
   useEffect(() => {
     setLastStreamSearchFromParams(searchParams);
