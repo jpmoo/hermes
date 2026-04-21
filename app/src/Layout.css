@@ -199,6 +199,11 @@
   line-height: 1;
 }
 
+.layout-type-filter-dropdown-icon {
+  width: 1.32rem;
+  height: 1.32rem;
+}
+
 .layout-type-filter-dropdown-count {
   font-size: 0.78rem;
   font-weight: 600;
@@ -206,9 +211,7 @@
 }
 
 .layout-type-filter-dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.45rem);
+  position: fixed;
   z-index: 20;
   min-width: 13.5rem;
   padding: 0.5rem;
@@ -330,7 +333,6 @@
   }
 
   .layout-type-filter-dropdown-menu {
-    right: -0.1rem;
     min-width: min(84vw, 14.5rem);
   }
 
