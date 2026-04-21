@@ -75,6 +75,11 @@ export default function SettingsModal({ onClose }) {
 
   const effectiveSimilarMin =
     similarNotesMinChars != null ? similarNotesMinChars : similarNotesMinDefault;
+  const streamBackgroundDriftMode = streamBackgroundDriftAllPlatforms
+    ? 'all'
+    : streamBackgroundDriftDisableMobile
+      ? 'desktop_ipad'
+      : 'none';
 
   useEffect(() => {
     const onKey = (e) => {
@@ -344,39 +349,59 @@ export default function SettingsModal({ onClose }) {
           <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
             <input
               id="settings-stream-bg-drift-all"
-              type="checkbox"
+              type="radio"
+              name="settings-stream-bg-drift-mode"
               className="settings-modal-similar-notes-checkbox"
-              checked={streamBackgroundDriftAllPlatforms}
-              onChange={(e) => setStreamBackgroundDriftAllPlatforms(e.target.checked)}
+              checked={streamBackgroundDriftMode === 'all'}
+              onChange={() => {
+                setStreamBackgroundDriftAllPlatforms(true);
+                setStreamBackgroundDriftDisableMobile(false);
+              }}
               aria-describedby="settings-stream-bg-animate-hint"
             />
-            <label
-              className="settings-modal-similar-notes-checkbox-label"
-              htmlFor="settings-stream-bg-drift-all"
-            >
+            <label className="settings-modal-similar-notes-checkbox-label" htmlFor="settings-stream-bg-drift-all">
               Drift on all platforms
             </label>
           </div>
           <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
             <input
-              id="settings-stream-bg-drift-no-mobile"
-              type="checkbox"
+              id="settings-stream-bg-drift-desktop-ipad"
+              type="radio"
+              name="settings-stream-bg-drift-mode"
               className="settings-modal-similar-notes-checkbox"
-              checked={streamBackgroundDriftDisableMobile}
-              onChange={(e) => setStreamBackgroundDriftDisableMobile(e.target.checked)}
+              checked={streamBackgroundDriftMode === 'desktop_ipad'}
+              onChange={() => {
+                setStreamBackgroundDriftAllPlatforms(false);
+                setStreamBackgroundDriftDisableMobile(true);
+              }}
               aria-describedby="settings-stream-bg-animate-hint"
             />
             <label
               className="settings-modal-similar-notes-checkbox-label"
-              htmlFor="settings-stream-bg-drift-no-mobile"
+              htmlFor="settings-stream-bg-drift-desktop-ipad"
             >
-              Don&apos;t drift on mobile/iOS
+              Drift on desktop/iPad only
+            </label>
+          </div>
+          <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
+            <input
+              id="settings-stream-bg-drift-none"
+              type="radio"
+              name="settings-stream-bg-drift-mode"
+              className="settings-modal-similar-notes-checkbox"
+              checked={streamBackgroundDriftMode === 'none'}
+              onChange={() => {
+                setStreamBackgroundDriftAllPlatforms(false);
+                setStreamBackgroundDriftDisableMobile(false);
+              }}
+              aria-describedby="settings-stream-bg-animate-hint"
+            />
+            <label className="settings-modal-similar-notes-checkbox-label" htmlFor="settings-stream-bg-drift-none">
+              Don&apos;t drift anywhere
             </label>
           </div>
           <p id="settings-stream-bg-animate-hint" className="settings-modal-similar-notes-hint">
-            If both are off, there is no drift at all. If only &ldquo;don&apos;t drift on mobile/iOS&rdquo; is on,
-            drift runs on desktop/tablet only. Applies to Stream, Canvas, Outline, Search, and Calendar.
-            Saved to your account.
+            Applies to Stream, Canvas, Outline, Search, and Calendar. Saved to your account.
           </p>
           <div className="settings-modal-similar-notes-checkbox-row settings-modal-list-alternating-row">
             <input
