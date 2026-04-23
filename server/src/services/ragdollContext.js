@@ -5,6 +5,7 @@ const MAX_CONTEXT_CHARS = 12000;
 const CHILD_SIBLING_LIMIT = 40;
 
 /**
+ * Plain note bodies only (trimmed), joined with blank lines — no headings, markers, or placeholders.
  * @param {object} opts
  * @param {boolean} [opts.includeParent]
  * @param {boolean} [opts.includeSiblings]
@@ -24,28 +25,23 @@ export async function buildRagdollThreadContextText(noteId, userId, opts = {}) {
   if (noteR.rows.length === 0) return null;
   const { parent_id: parentId, content: noteContent } = noteR.rows[0];
 
-  const parts = [];
-  parts.push('## Selected note\n');
-  parts.push((noteContent || '').trim() || '(empty)');
+  /** Plain trimmed bodies only (no headings/separators) — order matches prior sections. */
+  const bodies = [];
+  const main = (noteContent || '').trim();
+  if (main) bodies.push(main);
 
   if (includeConnected) {
     const { persistedLinks } = await loadPersistedLinksMetadata(noteId, userId);
-    const texts = (persistedLinks || [])
-      .map((p) => (p.content != null ? String(p.content).trim() : ''))
-      .filter(Boolean);
-    if (texts.length > 0) {
-      parts.push('\n\n## Connected notes (linked)\n');
-      parts.push(texts.join('\n---\n'));
+    for (const p of persistedLinks || []) {
+      const t = p.content != null ? String(p.content).trim() : '';
+      if (t) bodies.push(t);
     }
   }
 
   if (includeParent && parentId) {
     const pr = await pool.query(`SELECT content FROM notes WHERE id = $1 AND user_id = $2`, [parentId, userId]);
-    const pc = pr.rows[0]?.content?.trim();
-    if (pc) {
-      parts.push('\n\n## Parent note\n');
-      parts.push(pc);
-    }
+    const pc = (pr.rows[0]?.content || '').trim();
+    if (pc) bodies.push(pc);
   }
 
   if (includeSiblings) {
@@ -60,10 +56,9 @@ export async function buildRagdollThreadContextText(noteId, userId, opts = {}) {
        LIMIT ${CHILD_SIBLING_LIMIT}`,
       [userId, noteId, parentId]
     );
-    const sibTexts = siblingsR.rows.map((r) => r.content?.trim()).filter(Boolean);
-    if (sibTexts.length > 0) {
-      parts.push('\n\n## Sibling notes (same parent)\n');
-      parts.push(sibTexts.join('\n---\n'));
+    for (const row of siblingsR.rows) {
+      const t = (row.content || '').trim();
+      if (t) bodies.push(t);
     }
   }
 
@@ -72,16 +67,15 @@ export async function buildRagdollThreadContextText(noteId, userId, opts = {}) {
       `SELECT id, content FROM notes WHERE parent_id = $1 AND user_id = $2 ORDER BY created_at ASC LIMIT ${CHILD_SIBLING_LIMIT}`,
       [noteId, userId]
     );
-    const kidTexts = kidsR.rows.map((r) => r.content?.trim()).filter(Boolean);
-    if (kidTexts.length > 0) {
-      parts.push('\n\n## Direct replies (children)\n');
-      parts.push(kidTexts.join('\n---\n'));
+    for (const row of kidsR.rows) {
+      const t = (row.content || '').trim();
+      if (t) bodies.push(t);
     }
   }
 
-  let text = parts.join('');
+  let text = bodies.join('\n\n');
   if (text.length > MAX_CONTEXT_CHARS) {
-    text = `${text.slice(0, MAX_CONTEXT_CHARS)}\n\n[… context truncated …]`;
+    text = text.slice(0, MAX_CONTEXT_CHARS);
   }
   return text;
 }

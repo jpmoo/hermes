@@ -96,22 +96,8 @@ router.post('/relevant', async (req, res) => {
         thresholdRaw != null && thresholdRaw !== '' ? Number.parseFloat(thresholdRaw, 10) : undefined;
     }
 
-    const scopeBits = ['the selected note'];
-    if (includeOpts.includeConnected) scopeBits.push('linked (connected) notes');
-    if (includeOpts.includeParent) scopeBits.push('parent');
-    if (includeOpts.includeSiblings) scopeBits.push('siblings');
-    if (includeOpts.includeChildren) scopeBits.push('direct replies (children)');
-    const scopeLine = `Included context: ${scopeBits.join(', ')}.`;
-
-    const prompt = [
-      'You are helping find reference documents related to the following short notes from a personal knowledge base.',
-      scopeLine,
-      'Find sources that would help understand, extend, or fact-check this material.',
-      '',
-      context,
-    ].join('\n');
-
-    const body = { prompt };
+    // RAGDoll uses `prompt` for embedding / retrieval as-is — send only assembled note context (no system preamble).
+    const body = { prompt: context };
     if (groups?.length) body.group = groups;
     if (Number.isFinite(threshold)) body.threshold = threshold;
 
