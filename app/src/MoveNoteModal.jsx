@@ -1,9 +1,19 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { getAllNotesFlat, updateNote } from './api';
+import { fetchUserSettings, getAllNotesFlat, updateNote } from './api';
 import NoteTypeIcon from './NoteTypeIcon';
 import { firstLinePreview } from './noteHistoryUtils';
 import { effectiveDescendantCount } from './noteDescendantCount';
+import { sortNoteForestForMoveModal } from './noteThreadSort';
 import './MoveNoteModal.css';
+
+function normalizeStreamThreadSortKeys(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  for (const k of Object.keys(raw)) {
+    out[String(k).trim().toLowerCase()] = raw[k];
+  }
+  return out;
+}
 
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
@@ -129,6 +139,7 @@ function MoveNoteRow({ node, depth, forbidden, selectedId, onPick, expandedIds, 
  */
 export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
   const [flat, setFlat] = useState([]);
+  const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
   const [loading, setLoading] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
@@ -142,11 +153,17 @@ export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
     setExpandedIds(new Set());
     setError(null);
     setFlat([]);
+    setStreamThreadSortByRoot({});
     let cancelled = false;
     setLoading(true);
-    getAllNotesFlat()
-      .then((rows) => {
-        if (!cancelled) setFlat(Array.isArray(rows) ? rows : []);
+    Promise.all([getAllNotesFlat(), fetchUserSettings().catch(() => ({}))])
+      .then(([rows, settings]) => {
+        if (cancelled) return;
+        setFlat(Array.isArray(rows) ? rows : []);
+        const raw = settings?.streamThreadSort;
+        setStreamThreadSortByRoot(
+          raw && typeof raw === 'object' && !Array.isArray(raw) ? normalizeStreamThreadSortKeys(raw) : {}
+        );
       })
       .catch((e) => {
         if (!cancelled) setError(e?.message || 'Could not load notes');
@@ -159,7 +176,10 @@ export default function MoveNoteModal({ open, onClose, noteToMove, onMoved }) {
     };
   }, [open, noteToMove?.id]);
 
-  const tree = useMemo(() => buildTree(flat), [flat]);
+  const tree = useMemo(() => {
+    const built = buildTree(flat);
+    return sortNoteForestForMoveModal(built, streamThreadSortByRoot);
+  }, [flat, streamThreadSortByRoot]);
 
   const forbidden = useMemo(() => {
     if (!noteToMove?.id) return new Set();

@@ -247,3 +247,26 @@ export function sortStarredPinnedRootsOnly(nodes) {
   rest.sort(cmp);
   return [...starred, ...rest];
 }
+
+/**
+ * Move-note picker: top-level rows match Stream’s root list (starred first, then by thread sort key);
+ * within each thread, sibling order matches that thread’s stream prefs (same as {@link sortNoteTreeWithStreamPrefs}).
+ * @param {any[]|null|undefined} roots from buildTree (notes with no parent, each a thread root)
+ * @param {Record<string, unknown>|null|undefined} streamThreadSortByRoot persisted map (keys = thread root ids)
+ */
+export function sortNoteForestForMoveModal(roots, streamThreadSortByRoot) {
+  if (!roots?.length) return roots || [];
+  const byRoot =
+    streamThreadSortByRoot && typeof streamThreadSortByRoot === 'object' && !Array.isArray(streamThreadSortByRoot)
+      ? streamThreadSortByRoot
+      : {};
+  const orderedRoots = sortStarredPinnedRootsOnly(roots);
+  return orderedRoots.map((root) => {
+    const rid = String(root.id).trim().toLowerCase();
+    const stored = byRoot[rid];
+    const headHasDirectReplies = Boolean((root.children || []).length);
+    const prefs = resolveStreamThreadSortPrefsForHead(stored, headHasDirectReplies);
+    const sorted = sortNoteTreeWithStreamPrefs([root], prefs);
+    return sorted[0] ?? root;
+  });
+}
