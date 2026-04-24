@@ -559,13 +559,16 @@ function StreamList({
             e.stopPropagation();
             resetManualDrag();
           }}
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           role="button"
           tabIndex={0}
           aria-label="Drag to reorder reply"
           title="Drag to reorder"
-        />
+        >
+          ⋮⋮
+        </span>
       ) : null}
       <div className="stream-page-note-li__card">
         <NoteCard

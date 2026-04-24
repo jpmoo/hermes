@@ -675,11 +675,11 @@
   scroll-margin-bottom: 1rem;
 }
 
-/* Manual sort: compact handle in gutter; card flexes beside it */
+/* Manual sort: outline-style handle in gutter; vertically centered with the card */
 .stream-page-note-li__row {
   display: flex;
-  align-items: flex-start;
-  gap: 0.3rem;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .stream-page-note-li__card {
@@ -687,25 +687,30 @@
   min-width: 0;
 }
 
+/* Mirrors .outline-drag-handle (OutlineView.css) */
 .stream-page-manual-sort-handle {
   flex-shrink: 0;
-  width: 0.65rem;
-  height: 0.85rem;
-  min-height: 0;
-  margin-top: 0.38rem;
-  border-radius: 4px;
-  cursor: grab;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  min-height: 1.75rem;
+  margin: 0;
+  padding: 0 0.1rem;
+  font-size: 0.65rem;
+  line-height: 1;
+  letter-spacing: -0.12em;
   color: var(--text-muted);
-  opacity: 0.5;
-  background-image: radial-gradient(currentColor 0.85px, transparent 1.35px);
-  background-size: 2.5px 4px;
-  background-position: 50% 50%;
-  background-repeat: repeat-y;
+  cursor: grab;
+  user-select: none;
+  border-radius: 4px;
+  border: 1px solid transparent;
 }
 
 .stream-page-manual-sort-handle:hover {
-  opacity: 0.92;
-  background-color: var(--bg-card-hover);
+  color: var(--accent);
+  border-color: var(--border);
+  background: var(--bg-card);
 }
 
 .stream-page-manual-sort-handle:active {
