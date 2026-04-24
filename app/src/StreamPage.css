@@ -721,7 +721,8 @@
   display: flex;
   align-items: center;
   position: relative;
-  z-index: 1;
+  /* Below reply rows so handles stay clickable after a drag (was z-index:1 and blocked the next grab). */
+  z-index: 0;
   scroll-margin-top: 0;
   scroll-margin-bottom: 0;
 }
@@ -759,10 +760,10 @@
   z-index: 5;
 }
 
-/* Each reply row participates above the head card for the same reason. */
+/* Reply rows above drop-slot hit targets so drag handles stay usable between drags. */
 .stream-page-replies > li[data-stream-note] {
   position: relative;
-  z-index: 0;
+  z-index: 1;
 }
 
 .stream-page-list > li,

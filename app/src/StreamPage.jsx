@@ -448,17 +448,27 @@ function StreamList({
 
   const [manualDragId, setManualDragId] = useState(null);
   const [manualDropSlot, setManualDropSlot] = useState(null);
+  /** Defer inserting drop-slot rows until after drag starts so the browser keeps a stable drag source. */
+  const [manualDropUi, setManualDropUi] = useState(false);
   const manualDragClientYRef = useRef(null);
+  const manualDragIdRef = useRef(null);
+  manualDragIdRef.current = manualDragId;
+
+  const resetManualDrag = useCallback(() => {
+    manualDragIdRef.current = null;
+    setManualDragId(null);
+    setManualDropSlot(null);
+    setManualDropUi(false);
+  }, []);
 
   useEffect(() => {
-    if (!manualDragId) return undefined;
-    const clear = () => {
-      setManualDragId(null);
-      setManualDropSlot(null);
+    if (!showManualHandles) return undefined;
+    const onWinDragEnd = () => {
+      if (manualDragIdRef.current) resetManualDrag();
     };
-    window.addEventListener('dragend', clear);
-    return () => window.removeEventListener('dragend', clear);
-  }, [manualDragId]);
+    window.addEventListener('dragend', onWinDragEnd, true);
+    return () => window.removeEventListener('dragend', onWinDragEnd, true);
+  }, [showManualHandles, resetManualDrag]);
 
   useEffect(() => {
     if (!showManualHandles || manualDragId == null) return undefined;
@@ -496,7 +506,7 @@ function StreamList({
           );
         }
       }
-      rafId = window.requestAnimationFrame(tick);
+      if (!stopped) rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
 
@@ -508,7 +518,7 @@ function StreamList({
     };
   }, [showManualHandles, manualDragId, streamScrollElRef]);
 
-  const showDropLines = showManualHandles && manualDragId != null;
+  const showDropLines = showManualHandles && manualDragId != null && manualDropUi;
 
   const renderNoteRow = (n, parentTagsForInherit) => (
     <div className="stream-page-note-li__row">
@@ -521,8 +531,17 @@ function StreamList({
             const id = String(n.id);
             e.dataTransfer.setData('text/plain', id);
             e.dataTransfer.effectAllowed = 'move';
+            manualDragIdRef.current = id;
             setManualDragId(id);
             setManualDropSlot(null);
+            setManualDropUi(false);
+            window.requestAnimationFrame(() => {
+              setManualDropUi(true);
+            });
+          }}
+          onDragEnd={(e) => {
+            e.stopPropagation();
+            resetManualDrag();
           }}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
@@ -578,13 +597,15 @@ function StreamList({
       onDrop={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        const draggedId = e.dataTransfer.getData('text/plain')?.trim();
-        if (!draggedId || !onStreamManualReorder) return;
-        const ids = nodes.map((x) => x.id);
-        const next = reorderIdsForDropSlot(ids, draggedId, slotIndex);
-        if (next) onStreamManualReorder(next);
-        setManualDragId(null);
-        setManualDropSlot(null);
+        try {
+          const draggedId = e.dataTransfer.getData('text/plain')?.trim();
+          if (!draggedId || !onStreamManualReorder) return;
+          const ids = nodes.map((x) => x.id);
+          const next = reorderIdsForDropSlot(ids, draggedId, slotIndex);
+          if (next) onStreamManualReorder(next);
+        } finally {
+          resetManualDrag();
+        }
       }}
     >
       <div className="stream-page-drop-slot-line" aria-hidden />
