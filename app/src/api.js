@@ -350,6 +350,19 @@ export async function deleteNoteFile(attachmentId) {
   if (!r.ok) throw new Error('Failed to delete file');
 }
 
+/** Reassign a stored file blob to another note (same user). */
+export async function reassignNoteFileBlob(blobId, noteId) {
+  const r = await fetch(`${API}/note-files/${blobId}/assign-note`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify({ note_id: noteId }),
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to move attachment');
+  }
+}
+
 export async function getOrphanAttachments() {
   const r = await fetch(`${API}/note-files/orphans`, { headers: headers() });
   const data = await r.json().catch(() => ({}));

@@ -17,6 +17,7 @@ import {
   resolveStreamThreadSortPrefsForHead,
   sortNotesByStreamOrderNoStarBias,
 } from './noteThreadSort';
+import { mergeIntoAboveSiblingIdFromSortedChildren, mergeNoteIntoSiblingAbove } from './noteMerge';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
@@ -1346,6 +1347,17 @@ export default function CanvasPage() {
     return getThread(threadRootId, false).then(setThread).catch(() => {});
   }, [threadRootId]);
 
+  const handleMergeNoteIntoAbove = useCallback(
+    async (note, aboveNoteId) => {
+      const childIds = thread
+        .filter((row) => row.parent_id != null && noteIdEq(row.parent_id, note.id))
+        .map((row) => row.id);
+      await mergeNoteIntoSiblingAbove(String(aboveNoteId), String(note.id), childIds);
+      await refreshThread();
+    },
+    [thread, refreshThread]
+  );
+
   const handleOpenMoveNote = useCallback((note) => {
     setMoveNoteTarget(note);
   }, []);
@@ -2212,6 +2224,13 @@ export default function CanvasPage() {
                       : actualRootId
                         ? threadById.get(actualRootId)?.tags ?? []
                         : [];
+                  const mergeAboveSiblingId =
+                    threadRootId && n.parent_id
+                      ? mergeIntoAboveSiblingIdFromSortedChildren(
+                          n,
+                          findNode(tree, n.parent_id)?.children || []
+                        )
+                      : null;
                   return (
                     <div
                       key={id}
@@ -2241,6 +2260,8 @@ export default function CanvasPage() {
                           onNoteUpdate={refreshThread}
                           onNoteDelete={refreshThread}
                           onMoveNote={threadRootId ? handleOpenMoveNote : undefined}
+                          mergeAboveSiblingId={mergeAboveSiblingId}
+                          onMergeNoteIntoAbove={threadRootId ? handleMergeNoteIntoAbove : undefined}
                         />
                       </div>
                       <button

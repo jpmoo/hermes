@@ -34,6 +34,7 @@ import {
   NoteCardIconDelete,
   NoteCardIconEdit,
   NoteCardIconInsight,
+  NoteCardIconMerge,
   NoteCardIconMove,
   NoteCardIconTag,
   NoteCardIconSpaztick,
@@ -63,6 +64,9 @@ export default function NoteCard({
   streamThreadSortSlot = null,
   /** Reparent within thread: shown only when `note.parent_id` is set (not a thread root note). */
   onMoveNote = null,
+  /** When set with `onMergeNoteIntoAbove`, show merge-into-sibling-above (Stream/Canvas thread replies). */
+  mergeAboveSiblingId = null,
+  onMergeNoteIntoAbove = null,
 }) {
   const navigate = useNavigate();
   const hoverInsight = useHoverInsight();
@@ -86,6 +90,7 @@ export default function NoteCard({
   const [dropdownParentTags, setDropdownParentTags] = useState([]);
   const [inheritLoading, setInheritLoading] = useState(false);
   const [spaztickBusy, setSpaztickBusy] = useState(false);
+  const [mergeBusy, setMergeBusy] = useState(false);
 
   const tags = note.tags || [];
   const eventRangeLabel = formatEventRange(note);
@@ -250,6 +255,28 @@ export default function NoteCard({
       window.alert(err?.message || 'Could not create Spaztick task');
     } finally {
       setSpaztickBusy(false);
+    }
+  };
+
+  const handleMergeIntoAbove = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!mergeAboveSiblingId || !onMergeNoteIntoAbove || mergeBusy) return;
+    if (
+      !window.confirm(
+        'Merge this note into the one directly above it? The above note will gain this note’s text, tags, and files (after its current attachments). Replies to this note will be attached to the note above. This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+    setMergeBusy(true);
+    try {
+      await onMergeNoteIntoAbove(note, mergeAboveSiblingId);
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || 'Merge failed');
+    } finally {
+      setMergeBusy(false);
     }
   };
 
@@ -820,6 +847,18 @@ export default function NoteCard({
                 {!hideDelete ? (
                   <>
                     <span className="note-card-action-spacer" aria-hidden="true" />
+                    {mergeAboveSiblingId && onMergeNoteIntoAbove ? (
+                      <button
+                        type="button"
+                        className="note-card-icon-btn"
+                        disabled={mergeBusy}
+                        onClick={handleMergeIntoAbove}
+                        title="Merge into note above"
+                        aria-label="Merge into note above"
+                      >
+                        <NoteCardIconMerge className="note-card-icon-btn__svg" />
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="note-card-icon-btn note-card-icon-btn--danger"
@@ -830,6 +869,17 @@ export default function NoteCard({
                       <NoteCardIconDelete className="note-card-icon-btn__svg" />
                     </button>
                   </>
+                ) : mergeAboveSiblingId && onMergeNoteIntoAbove ? (
+                  <button
+                    type="button"
+                    className="note-card-icon-btn"
+                    disabled={mergeBusy}
+                    onClick={handleMergeIntoAbove}
+                    title="Merge into note above"
+                    aria-label="Merge into note above"
+                  >
+                    <NoteCardIconMerge className="note-card-icon-btn__svg" />
+                  </button>
                 ) : null}
               </>
             )}

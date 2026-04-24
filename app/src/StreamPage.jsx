@@ -23,6 +23,7 @@ import {
   updateNote,
 } from './api';
 import { firstLinePreview, historyPrimaryLabel } from './noteHistoryUtils';
+import { mergeNoteIntoSiblingAbove } from './noteMerge';
 import Layout from './Layout';
 import NoteCard from './NoteCard';
 import NoteTypeEventFields from './NoteTypeEventFields';
@@ -458,6 +459,7 @@ function StreamList({
   onStreamManualReorder = null,
   /** Stream thread scrollport (`.stream-page-scroll-main`); used for edge auto-scroll while dragging replies. */
   streamScrollElRef = null,
+  onMergeNoteIntoAbove = null,
 }) {
   const showManualHandles =
     streamManualSortActive && depth > 0 && typeof onStreamManualReorder === 'function';
@@ -536,7 +538,7 @@ function StreamList({
 
   const showDropLines = showManualHandles && manualDragId != null && manualDropUi;
 
-  const renderNoteRow = (n, parentTagsForInherit) => (
+  const renderNoteRow = (n, parentTagsForInherit, mergeAboveSiblingId) => (
     <div className="stream-page-note-li__row">
       {showManualHandles ? (
         <span
@@ -597,6 +599,8 @@ function StreamList({
           onNoteUpdate={onNoteUpdate}
           onNoteDelete={onNoteDelete}
           onMoveNote={onMoveNote}
+          mergeAboveSiblingId={mergeAboveSiblingId}
+          onMergeNoteIntoAbove={onMergeNoteIntoAbove}
         />
       </div>
     </div>
@@ -651,6 +655,8 @@ function StreamList({
             : n.parent_id
               ? threadById?.get(n.parent_id)?.tags ?? []
               : [];
+        const mergeAboveSiblingId =
+          depth > 0 && i > 0 && onMergeNoteIntoAbove ? String(nodes[i - 1].id) : null;
         return (
           <Fragment key={n.id}>
             {showDropLines ? renderDropSlot(i) : null}
@@ -661,7 +667,7 @@ function StreamList({
                 !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined
               }
             >
-              {renderNoteRow(n, parentTagsForInherit)}
+              {renderNoteRow(n, parentTagsForInherit, mergeAboveSiblingId)}
               {n.children?.length > 0 && depth === 0 && (
                 <ul className="stream-page-replies">
                   <StreamList
@@ -683,6 +689,7 @@ function StreamList({
                     streamManualSortActive={streamManualSortActive}
                     onStreamManualReorder={onStreamManualReorder}
                     streamScrollElRef={streamScrollElRef}
+                    onMergeNoteIntoAbove={onMergeNoteIntoAbove}
                   />
                 </ul>
               )}
@@ -1053,6 +1060,17 @@ export default function StreamPage() {
       }
     },
     [loadThread]
+  );
+
+  const handleMergeNoteIntoAbove = useCallback(
+    async (note, aboveNoteId) => {
+      const childIds = thread
+        .filter((row) => row.parent_id != null && noteIdEq(row.parent_id, note.id))
+        .map((row) => row.id);
+      await mergeNoteIntoSiblingAbove(String(aboveNoteId), String(note.id), childIds);
+      await loadThread(true);
+    },
+    [thread, loadThread]
   );
 
   const streamHeadSortSlot = useMemo(
@@ -2173,6 +2191,7 @@ export default function StreamPage() {
                       streamManualSortActive={threadSortPrefs.sortMode === 'manual'}
                       onStreamManualReorder={handleStreamManualReorder}
                       streamScrollElRef={streamScrollRef}
+                      onMergeNoteIntoAbove={handleMergeNoteIntoAbove}
                     />
                   </ul>
                 </div>

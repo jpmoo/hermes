@@ -32,6 +32,33 @@ router.get('/orphans', async (req, res) => {
   }
 });
 
+/** Move a stored blob to another note (same user owns blob source note and target note). */
+router.patch('/:id/assign-note', async (req, res) => {
+  const blobId = req.params.id;
+  const noteId = req.body?.note_id;
+  if (noteId == null || String(noteId).trim() === '') {
+    return res.status(400).json({ error: 'note_id required' });
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE note_file_blobs f SET note_id = $1::uuid
+       FROM notes src, notes dst
+       WHERE f.id = $2::uuid AND f.user_id = $3
+         AND src.id = f.note_id AND src.user_id = $3
+         AND dst.id = $1::uuid AND dst.user_id = $3
+       RETURNING f.id`,
+      [String(noteId).trim(), blobId, req.userId]
+    );
+    if (r.rows.length === 0) {
+      return res.status(404).json({ error: 'Attachment or target note not found' });
+    }
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to reassign attachment' });
+  }
+});
+
 /** Delete one orphan blob (normal DELETE /:id requires a live note). */
 router.delete('/orphans/:id', async (req, res) => {
   try {
