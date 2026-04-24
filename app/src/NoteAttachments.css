@@ -44,7 +44,7 @@
   position: absolute;
   top: 3px;
   left: 3px;
-  z-index: 2;
+  z-index: 4;
   display: flex;
   flex-direction: row;
   gap: 2px;
@@ -82,6 +82,7 @@
 .note-attachment-thumb-hit {
   position: absolute;
   inset: 0;
+  z-index: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -138,7 +139,7 @@
   position: absolute;
   top: 3px;
   right: 3px;
-  z-index: 3;
+  z-index: 5;
   width: 1.35rem;
   height: 1.35rem;
   padding: 0;
@@ -162,7 +163,7 @@
 .note-attachment-tile-caption {
   width: 100%;
   max-width: 5.25rem;
-  font-size: 0.65rem;
+  font-size: calc(0.65rem - 1px);
   line-height: 1.2;
   color: var(--text-muted);
   text-align: center;

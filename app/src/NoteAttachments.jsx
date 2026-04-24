@@ -312,30 +312,6 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
         />
       ) : null}
       <div className="note-attachment-thumb-frame">
-        {showReorder ? (
-          <div className="note-attachment-reorder-cluster">
-            <button
-              type="button"
-              className="note-attachment-reorder-btn"
-              disabled={index === 0 || reorderBusy}
-              onClick={onMoveLeft}
-              aria-label="Move attachment left"
-              title="Move left"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="note-attachment-reorder-btn"
-              disabled={index >= total - 1 || reorderBusy}
-              onClick={onMoveRight}
-              aria-label="Move attachment right"
-              title="Move right"
-            >
-              ›
-            </button>
-          </div>
-        ) : null}
         {isImage && imgSrc ? (
           <button
             type="button"
@@ -360,6 +336,30 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
             <NonImageAttachmentPlaceholder />
           </button>
         )}
+        {showReorder ? (
+          <div className="note-attachment-reorder-cluster">
+            <button
+              type="button"
+              className="note-attachment-reorder-btn"
+              disabled={index === 0 || reorderBusy}
+              onClick={onMoveLeft}
+              aria-label="Move attachment left"
+              title="Move left"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="note-attachment-reorder-btn"
+              disabled={index >= total - 1 || reorderBusy}
+              onClick={onMoveRight}
+              aria-label="Move attachment right"
+              title="Move right"
+            >
+              ›
+            </button>
+          </div>
+        ) : null}
         {onDeleted ? (
           <button
             type="button"
@@ -406,12 +406,18 @@ export default function NoteAttachments({ attachments, onDeleted, excludeAttachm
   const persistSwap = useCallback(
     async (i, j) => {
       if (!onReorderAttachments || i === j) return;
-      const ids = list.map((a) => String(a.id));
-      const next = [...ids];
-      [next[i], next[j]] = [next[j], next[i]];
+      /* API requires every blob on the note; visible list may omit profile image etc. */
+      const fullIds = attachments.map((a) => String(a.id));
+      const idI = String(list[i].id);
+      const idJ = String(list[j].id);
+      const idxI = fullIds.indexOf(idI);
+      const idxJ = fullIds.indexOf(idJ);
+      if (idxI < 0 || idxJ < 0) return;
+      const next = [...fullIds];
+      [next[idxI], next[idxJ]] = [next[idxJ], next[idxI]];
       await onReorderAttachments(next);
     },
-    [list, onReorderAttachments]
+    [attachments, list, onReorderAttachments]
   );
 
   return (
