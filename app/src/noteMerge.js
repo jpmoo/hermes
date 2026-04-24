@@ -1,4 +1,11 @@
-import { getNote, updateNote, deleteNote, addNoteTag, reassignNoteFileBlob } from './api';
+import {
+  getNote,
+  updateNote,
+  deleteNote,
+  addNoteTag,
+  reassignNoteFileBlob,
+  patchNoteAttachmentOrder,
+} from './api';
 
 /**
  * @param {unknown} note
@@ -18,6 +25,7 @@ export function mergeIntoAboveSiblingIdFromSortedChildren(note, sortedSiblingsUn
  * Merge `sourceNoteId` into sibling `aboveNoteId`: append text and tags, move attachments,
  * reparent direct children of source to above, then delete source.
  * If either note was starred, the surviving (above) note is starred.
+ * Source attachments are moved after the target’s existing attachments (display order).
  *
  * @param {string} aboveNoteId
  * @param {string} sourceNoteId
@@ -41,9 +49,18 @@ export async function mergeNoteIntoSiblingAbove(aboveNoteId, sourceNoteId, direc
     await updateNote(cid, { parent_id: aboveId });
   }
 
-  const attachments = source.attachments || [];
-  for (const att of attachments) {
+  const normBlobId = (a) => String(a?.id ?? '').trim().toLowerCase();
+  const aboveBlobIdsOrdered = (above.attachments || []).map(normBlobId).filter(Boolean);
+  const sourceAttachments = source.attachments || [];
+  const sourceBlobIdsOrdered = sourceAttachments.map(normBlobId).filter(Boolean);
+
+  for (const att of sourceAttachments) {
     if (att?.id) await reassignNoteFileBlob(att.id, aboveId);
+  }
+
+  const mergedBlobOrder = [...aboveBlobIdsOrdered, ...sourceBlobIdsOrdered];
+  if (mergedBlobOrder.length > 0) {
+    await patchNoteAttachmentOrder(aboveId, mergedBlobOrder);
   }
 
   const aboveTagIds = new Set((above.tags || []).map((t) => String(t.id)));

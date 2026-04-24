@@ -269,9 +269,6 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
     setReorderBusy(true);
     try {
       await onReorderPersist(index, index - 1);
-    } catch (err) {
-      console.error(err);
-      window.alert(err?.message || 'Could not reorder');
     } finally {
       setReorderBusy(false);
     }
@@ -284,9 +281,6 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
     setReorderBusy(true);
     try {
       await onReorderPersist(index, index + 1);
-    } catch (err) {
-      console.error(err);
-      window.alert(err?.message || 'Could not reorder');
     } finally {
       setReorderBusy(false);
     }
@@ -342,6 +336,7 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
               type="button"
               className="note-attachment-reorder-btn"
               disabled={index === 0 || reorderBusy}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={onMoveLeft}
               aria-label="Move attachment left"
               title="Move left"
@@ -352,6 +347,7 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
               type="button"
               className="note-attachment-reorder-btn"
               disabled={index >= total - 1 || reorderBusy}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={onMoveRight}
               aria-label="Move attachment right"
               title="Move right"
@@ -407,12 +403,17 @@ export default function NoteAttachments({ attachments, onDeleted, excludeAttachm
     async (i, j) => {
       if (!onReorderAttachments || i === j) return;
       /* API requires every blob on the note; visible list may omit profile image etc. */
-      const fullIds = attachments.map((a) => String(a.id));
-      const idI = String(list[i].id);
-      const idJ = String(list[j].id);
+      const norm = (x) => String(x ?? '').trim().toLowerCase();
+      const fullIds = attachments.map((a) => norm(a.id));
+      const idI = norm(list[i].id);
+      const idJ = norm(list[j].id);
       const idxI = fullIds.indexOf(idI);
       const idxJ = fullIds.indexOf(idJ);
-      if (idxI < 0 || idxJ < 0) return;
+      if (idxI < 0 || idxJ < 0) {
+        console.error('attachment reorder: id not in full list', { idI, idJ, fullIds, listIds: list.map((x) => norm(x.id)) });
+        window.alert('Could not reorder attachments. Try refreshing the page.');
+        return;
+      }
       const next = [...fullIds];
       [next[idxI], next[idxJ]] = [next[idxJ], next[idxI]];
       await onReorderAttachments(next);

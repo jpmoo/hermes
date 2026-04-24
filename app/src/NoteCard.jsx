@@ -442,8 +442,13 @@ export default function NoteCard({
 
   const handleReorderAttachments = useCallback(
     async (orderedBlobIds) => {
-      await patchNoteAttachmentOrder(note.id, orderedBlobIds);
-      onNoteUpdate?.();
+      try {
+        await patchNoteAttachmentOrder(note.id, orderedBlobIds);
+        onNoteUpdate?.();
+      } catch (err) {
+        console.error(err);
+        window.alert(err?.message || 'Could not reorder attachments');
+      }
     },
     [note.id, onNoteUpdate]
   );

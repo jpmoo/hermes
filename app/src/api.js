@@ -329,10 +329,11 @@ export async function removeNoteTag(noteId, tagId) {
 }
 
 export async function patchNoteAttachmentOrder(noteId, orderedBlobIds) {
+  const ids = orderedBlobIds.map((x) => String(x ?? '').trim().toLowerCase()).filter(Boolean);
   const r = await fetch(`${API}/notes/${encodeURIComponent(noteId)}/attachments-order`, {
     method: 'PATCH',
     headers: headers(),
-    body: JSON.stringify({ ordered_blob_ids: orderedBlobIds }),
+    body: JSON.stringify({ ordered_blob_ids: ids }),
   });
   if (!r.ok) {
     const data = await r.json().catch(() => ({}));

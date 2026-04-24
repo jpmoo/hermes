@@ -228,7 +228,8 @@ router.patch('/:id/attachments-order', async (req, res) => {
   if (!Array.isArray(raw) || raw.length === 0) {
     return res.status(400).json({ error: 'ordered_blob_ids (non-empty array) required' });
   }
-  const ordered = raw.map((x) => String(x).trim()).filter(Boolean);
+  const normId = (x) => String(x ?? '').trim().toLowerCase();
+  const ordered = raw.map(normId).filter(Boolean);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -236,7 +237,7 @@ router.patch('/:id/attachments-order', async (req, res) => {
       `SELECT id::text FROM note_file_blobs WHERE note_id = $1::uuid AND user_id = $2`,
       [noteId, userId]
     );
-    const existing = new Set(cur.rows.map((r) => r.id));
+    const existing = new Set(cur.rows.map((r) => normId(r.id)));
     if (ordered.length !== existing.size) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'ordered_blob_ids must list every attachment on this note exactly once' });
