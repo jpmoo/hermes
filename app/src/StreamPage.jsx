@@ -66,10 +66,26 @@ import './CanvasPage.css';
 import './StreamPage.css';
 
 /**
- * Must exceed max `--stream-exit-delay` + `--stream-exit-duration` from exit stagger
- * (see useLayoutEffect on thread list when branchHeadExiting).
+ * Upper bound for “exit to root” stagger (see useLayoutEffect on thread list when branchHeadExiting).
+ * Actual commit uses {@link maxStreamNotesExitToRootStaggerMs} so small threads do not sit blank
+ * until this cap after rows have already faded out (`animation-fill-mode: forwards`).
  */
 const NOTES_EXIT_TO_ROOT_COMMIT_MS = 2900;
+const STREAM_EXIT_END_BUFFER_MS = 72;
+
+/** Must match per-li delay/duration math in the branchHeadExiting useLayoutEffect. */
+function maxStreamNotesExitToRootStaggerMs(listEl) {
+  if (!listEl) return NOTES_EXIT_TO_ROOT_COMMIT_MS;
+  const lis = listEl.querySelectorAll('li[data-stream-note]');
+  if (lis.length === 0) return NOTES_EXIT_TO_ROOT_COMMIT_MS;
+  let maxEnd = 0;
+  for (let i = 0; i < lis.length; i++) {
+    const delay = Math.min(i, 18) * 44 + (i % 5) * 32;
+    const duration = 720 + (i % 12) * 105;
+    maxEnd = Math.max(maxEnd, delay + duration);
+  }
+  return maxEnd + STREAM_EXIT_END_BUFFER_MS;
+}
 
 function buildTree(flat) {
   const byId = new Map(flat.map((n) => [n.id, { ...n, children: [] }]));
@@ -1307,6 +1323,7 @@ export default function StreamPage() {
     if (!focusId || noteIdEq(focusId, actualRootId)) return;
     levelNavBusyRef.current = true;
     focusFromUrlApplied.current = '';
+    const exitCommitMs = maxStreamNotesExitToRootStaggerMs(threadListRef.current);
     setBranchHeadExiting(true);
     window.setTimeout(() => {
       setBranchHeadExiting(false);
@@ -1319,7 +1336,7 @@ export default function StreamPage() {
       setLevelDropDelays(buildFullThreadLevelDrops(tree));
       clearLevelDropSoon();
       levelNavBusyRef.current = false;
-    }, NOTES_EXIT_TO_ROOT_COMMIT_MS);
+    }, exitCommitMs);
   }, [threadRootId, focusId, actualRootId, thread, tree, setSearchParams, clearLevelDropSoon]);
 
   const upOneLevel = useCallback(() => {
@@ -1370,7 +1387,9 @@ export default function StreamPage() {
      * measure the real reply slot (fallback = head row = no motion). When we can float, commit focus
      * immediately so the root row exists; keep the staged exit only when there is no float.
      */
+    let stagedRootExitMs = null;
     if (movingToRoot && !canFloat && note) {
+      stagedRootExitMs = maxStreamNotesExitToRootStaggerMs(listEl);
       setBranchHeadExiting(true);
       window.setTimeout(() => {
         setBranchHeadExiting(false);
@@ -1384,7 +1403,7 @@ export default function StreamPage() {
         d.set(leavingHeadId, 440);
         setLevelDropDelays(d);
         clearLevelDropSoon();
-      }, NOTES_EXIT_TO_ROOT_COMMIT_MS);
+      }, stagedRootExitMs);
     } else {
       flushSync(() => {
         setFocusId(parentId);
@@ -1428,7 +1447,7 @@ export default function StreamPage() {
     } else {
       window.setTimeout(() => {
         levelNavBusyRef.current = false;
-      }, NOTES_EXIT_TO_ROOT_COMMIT_MS + 40);
+      }, (stagedRootExitMs ?? 0) + 40);
     }
   }, [
     threadRootId,
