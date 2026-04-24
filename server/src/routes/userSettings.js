@@ -306,6 +306,7 @@ const STREAM_THREAD_SORT_MODES = new Set([
   'datetime_desc',
   'alpha_asc',
   'alpha_desc',
+  'manual',
 ]);
 
 function migrateStreamSortMode(mode) {
@@ -315,6 +316,7 @@ function migrateStreamSortMode(mode) {
   if (mode === 'edit_desc' || mode === 'schedule_desc') return 'datetime_desc';
   if (mode === 'alpha_asc') return 'alpha_asc';
   if (mode === 'alpha_desc') return 'alpha_desc';
+  if (mode === 'manual') return 'manual';
   return 'datetime_asc';
 }
 const MAX_STREAM_THREAD_SORT_KEYS = 160;
@@ -329,7 +331,7 @@ function sanitizeStreamThreadSortMap(input) {
     const id = tid.trim().toLowerCase();
     if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
     const sortMode = migrateStreamSortMode(v.sortMode);
-    const starredFirst = v.starredFirst === false ? false : true;
+    const starredFirst = sortMode === 'manual' ? false : v.starredFirst === false ? false : true;
     out[id] = { sortMode, starredFirst };
   }
   return out;

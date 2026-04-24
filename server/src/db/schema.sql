@@ -25,11 +25,13 @@ CREATE TABLE IF NOT EXISTS notes (
   note_type       TEXT NOT NULL DEFAULT 'note' CHECK (note_type IN ('note', 'person', 'event', 'organization')),
   event_start_at  TIMESTAMPTZ,
   event_end_at    TIMESTAMPTZ,
+  stream_sibling_index INTEGER NULL,
   embedding       vector(768),  -- nomic-embed-text default dimension; adjust if different model
   user_id         UUID REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_parent ON notes(parent_id);
+CREATE INDEX IF NOT EXISTS idx_notes_parent_stream_sibling ON notes (parent_id, stream_sibling_index) WHERE parent_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_last_activity ON notes(last_activity_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_starred ON notes(starred) WHERE starred = true;

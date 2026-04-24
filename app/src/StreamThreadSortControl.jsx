@@ -15,6 +15,7 @@ const SORT_OPTIONS = [
   },
   { value: 'alpha_asc', label: 'Alphabetical (A – Z)' },
   { value: 'alpha_desc', label: 'Alphabetical (Z – A)' },
+  { value: 'manual', label: 'Manual (drag replies in the margin)' },
 ];
 
 function normalizeMode(v) {
@@ -100,7 +101,11 @@ export default function StreamThreadSortControl({ sortMode, starredFirst, onChan
           value={mode}
           onChange={(e) => {
             const next = normalizeMode(e.target.value);
-            onChange({ sortMode: next, starredFirst });
+            if (next === 'manual') {
+              onChange({ sortMode: 'manual', starredFirst: false });
+            } else {
+              onChange({ sortMode: next, starredFirst });
+            }
           }}
         >
           {SORT_OPTIONS.map((o) => (
@@ -109,14 +114,20 @@ export default function StreamThreadSortControl({ sortMode, starredFirst, onChan
             </option>
           ))}
         </select>
-        <label className="stream-thread-sort__check">
-          <input
-            type="checkbox"
-            checked={starredFirst}
-            onChange={(e) => onChange({ sortMode: mode, starredFirst: e.target.checked })}
-          />
-          Starred notes at the top (same order as above within each group)
-        </label>
+        {mode !== 'manual' ? (
+          <label className="stream-thread-sort__check">
+            <input
+              type="checkbox"
+              checked={starredFirst}
+              onChange={(e) => onChange({ sortMode: mode, starredFirst: e.target.checked })}
+            />
+            Starred notes at the top (same order as above within each group)
+          </label>
+        ) : (
+          <p className="stream-thread-sort__manual-hint">
+            Drag the handle beside each reply to reorder. Order is saved per parent note.
+          </p>
+        )}
       </div>
     ) : null;
 

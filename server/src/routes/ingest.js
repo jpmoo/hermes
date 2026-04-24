@@ -15,7 +15,7 @@ import { proposeTagsForNote } from '../services/aiTags.js';
 const router = Router();
 
 const NOTE_RETURNING =
-  'id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at';
+  'id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at, stream_sibling_index';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -126,8 +126,14 @@ router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res)
         const content = await resolveNoteContentFromIngestFile(buf, filename, mime, { source: 'ingest' });
 
         const r = await pool.query(
-          `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at)
-           VALUES ($1, $2, $3, $4, 'note', NULL, NULL)
+          `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at, stream_sibling_index)
+           VALUES (
+             $1, $2, $3, $4, 'note', NULL, NULL,
+             COALESCE(
+               (SELECT MAX(stream_sibling_index) + 1 FROM notes c WHERE c.parent_id = $1::uuid AND c.user_id = $4::uuid),
+               0
+             )
+           )
            RETURNING ${NOTE_RETURNING}`,
           [parentId, content, externalAnchor, userId]
         );
@@ -166,8 +172,14 @@ router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res)
     const { parentId } = parentRes;
 
     const r = await pool.query(
-      `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at)
-       VALUES ($1, $2, $3, $4, 'note', NULL, NULL)
+      `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at, stream_sibling_index)
+       VALUES (
+         $1, $2, $3, $4, 'note', NULL, NULL,
+         COALESCE(
+           (SELECT MAX(stream_sibling_index) + 1 FROM notes c WHERE c.parent_id = $1::uuid AND c.user_id = $4::uuid),
+           0
+         )
+       )
        RETURNING ${NOTE_RETURNING}`,
       [parentId, text, externalAnchor, userId]
     );

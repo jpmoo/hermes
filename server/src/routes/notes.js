@@ -29,7 +29,7 @@ router.use(requireAuth);
 
 /** Columns returned for list/detail note JSON (PostgreSQL → camel stays snake_case). */
 const NOTE_RETURNING =
-  'id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at';
+  'id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at, stream_sibling_index';
 
 const NOTE_RETURNING_N = NOTE_RETURNING.split(', ')
   .map((col) => `n.${col}`)
@@ -229,7 +229,7 @@ router.get('/roots', async (req, res) => {
           SELECT DISTINCT s.root_id FROM subtree s
           JOIN notes n ON n.id = s.note_id AND n.user_id = $1 AND n.starred = true
         )
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count,
@@ -239,7 +239,7 @@ router.get('/roots', async (req, res) => {
         ORDER BY ${SQL_NOTE_SORT_AT} ASC NULLS LAST
       `
       : `
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count,
@@ -279,13 +279,13 @@ router.get('/thread/:id', async (req, res) => {
     const userId = req.userId;
     const r = await pool.query(
       `WITH RECURSIVE tree AS (
-        SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at, 0 AS depth,
+        SELECT id, parent_id, content, created_at, updated_at, last_activity_at, starred, external_anchor, note_type, event_start_at, event_end_at, stream_sibling_index, 0 AS depth,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = notes.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $2 AND (nc.anchor_note_id = notes.id OR nc.linked_note_id = notes.id)) AS connection_count
         FROM notes WHERE id = $1 AND user_id = $2
         UNION ALL
-        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, t.depth + 1,
+        SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index, t.depth + 1,
                (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
                (SELECT COUNT(*)::int FROM note_connections nc
                 WHERE nc.user_id = $2 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
@@ -321,7 +321,7 @@ router.get('/thread/:id', async (req, res) => {
 
 /** Match rows then resolve thread root per note (avoids building the full tree before filtering). */
 const NOTE_LIST_FROM_MATCHES = `
-  SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+  SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index,
          r.root_id,
          (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
          (SELECT COUNT(*)::int FROM note_connections nc
@@ -461,7 +461,7 @@ router.get('/search-by-tags', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, r.root_id,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index, r.root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
               WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
@@ -470,7 +470,7 @@ router.get('/search-by-tags', async (req, res) => {
       JOIN roots r ON r.id = n.id
       WHERE n.user_id = $1
       ${starredOnly ? 'AND n.starred = true' : ''}
-      GROUP BY n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, r.root_id
+      GROUP BY n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index, r.root_id
       ${havingClause}
       ORDER BY ${SQL_NOTE_SORT_AT} DESC NULLS LAST
     `;
@@ -512,7 +512,7 @@ router.get('/events-in-range', async (req, res) => {
     }
     const userId = req.userId;
     const q = `
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index,
              r.root_id AS thread_root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
@@ -555,7 +555,7 @@ router.get('/search-semantic', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index,
              r.root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
@@ -581,7 +581,7 @@ router.get('/search-semantic', async (req, res) => {
         UNION ALL
         SELECT n.id, r.root_id FROM notes n JOIN roots r ON r.id = n.parent_id
       )
-      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+      SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index,
              1 - (n.embedding <=> $1::vector) AS similarity, r.root_id,
              (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
              (SELECT COUNT(*)::int FROM note_connections nc
@@ -1124,7 +1124,7 @@ router.get('/all-flat', async (req, res) => {
   try {
     const userId = req.userId;
     const r = await pool.query(
-      `SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at,
+      `SELECT n.id, n.parent_id, n.content, n.created_at, n.updated_at, n.last_activity_at, n.starred, n.external_anchor, n.note_type, n.event_start_at, n.event_end_at, n.stream_sibling_index,
               (SELECT COUNT(*)::int FROM notes c WHERE c.parent_id = n.id) AS reply_count,
               (SELECT COUNT(*)::int FROM note_connections nc
                WHERE nc.user_id = $1 AND (nc.anchor_note_id = n.id OR nc.linked_note_id = n.id)) AS connection_count
@@ -1198,8 +1198,17 @@ router.post('/', async (req, res) => {
       eventEnd = e;
     }
     const r = await pool.query(
-      `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO notes (parent_id, content, external_anchor, user_id, note_type, event_start_at, event_end_at, stream_sibling_index)
+       VALUES (
+         $1, $2, $3, $4, $5, $6, $7,
+         CASE
+           WHEN $1::uuid IS NULL THEN NULL
+           ELSE COALESCE(
+             (SELECT MAX(stream_sibling_index) + 1 FROM notes c WHERE c.parent_id = $1::uuid AND c.user_id = $4::uuid),
+             0
+           )
+         END
+       )
        RETURNING ${NOTE_RETURNING}`,
       [parentId || null, text, externalAnchor || null, userId, noteType, eventStart, eventEnd]
     );
@@ -1224,6 +1233,7 @@ router.patch('/:id', async (req, res) => {
       event_start_at: eventStartBody,
       event_end_at: eventEndBody,
       parent_id: parentIdBody,
+      stream_sibling_index: streamSiblingBody,
     } = req.body;
     const userId = req.userId;
     const has = (k) => Object.prototype.hasOwnProperty.call(req.body, k);
@@ -1237,8 +1247,9 @@ router.patch('/:id', async (req, res) => {
     if (externalAnchor !== undefined) { updates.push(`external_anchor = $${i++}`); values.push(externalAnchor); }
 
     if (has('parent_id')) {
-      const own = await pool.query('SELECT 1 FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
+      const own = await pool.query('SELECT parent_id FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
       if (own.rows.length === 0) return res.status(404).json({ error: 'Note not found' });
+      const priorParentId = own.rows[0]?.parent_id;
       let newParentId = parentIdBody;
       if (newParentId === '') newParentId = null;
       if (newParentId != null) {
@@ -1265,8 +1276,28 @@ router.patch('/:id', async (req, res) => {
           return res.status(400).json({ error: 'Cannot move a note under itself or its descendants' });
         }
       }
+      const parentKey = (v) => (v == null ? '' : String(v));
+      const parentChanged = parentKey(priorParentId) !== parentKey(newParentId);
       updates.push(`parent_id = $${i++}`);
       values.push(newParentId);
+      if (parentChanged && !has('stream_sibling_index')) {
+        updates.push('stream_sibling_index = NULL');
+      }
+    }
+
+    if (has('stream_sibling_index')) {
+      const raw = streamSiblingBody;
+      if (raw !== null && raw !== undefined) {
+        const n = Number(raw);
+        if (!Number.isInteger(n) || n < 0 || n > 1_000_000) {
+          return res.status(400).json({ error: 'stream_sibling_index must be null or an integer from 0 to 1000000' });
+        }
+        updates.push(`stream_sibling_index = $${i++}`);
+        values.push(n);
+      } else {
+        updates.push(`stream_sibling_index = $${i++}`);
+        values.push(null);
+      }
     }
 
     if (touchMeta) {

@@ -675,6 +675,43 @@
   scroll-margin-bottom: 1rem;
 }
 
+/* Manual sort: handle in the reply gutter; card flexes beside it */
+.stream-page-note-li__row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.stream-page-note-li__card {
+  flex: 1;
+  min-width: 0;
+}
+
+.stream-page-manual-sort-handle {
+  flex-shrink: 0;
+  width: 0.95rem;
+  align-self: stretch;
+  min-height: 2.25rem;
+  margin-top: 0.12rem;
+  border-radius: 6px;
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0.5;
+  background-image: radial-gradient(currentColor 1px, transparent 1.6px);
+  background-size: 3px 5px;
+  background-position: 50% 40%;
+  background-repeat: space repeat;
+}
+
+.stream-page-manual-sort-handle:hover {
+  opacity: 0.92;
+  background-color: var(--bg-card-hover);
+}
+
+.stream-page-manual-sort-handle:active {
+  cursor: grabbing;
+}
+
 .stream-page-replies {
   list-style: none;
   margin: 0.25rem 0 0.25rem 1rem;

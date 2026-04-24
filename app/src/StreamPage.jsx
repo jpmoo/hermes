@@ -12,6 +12,7 @@ import {
   getNoteThreadRoot,
   fetchUserSettings,
   patchUserSettings,
+  updateNote,
 } from './api';
 import { firstLinePreview, historyPrimaryLabel } from './noteHistoryUtils';
 import Layout from './Layout';
@@ -81,6 +82,19 @@ function buildTree(flat) {
 function noteIdEq(a, b) {
   if (a == null || b == null) return false;
   return String(a) === String(b);
+}
+
+/** Reorder UUID/id list: move `draggedId` to the slot of `dropTargetId` (insert-before semantics). */
+function reorderSiblingIds(ids, draggedId, dropTargetId) {
+  const from = ids.indexOf(draggedId);
+  const to = ids.indexOf(dropTargetId);
+  if (from < 0 || to < 0 || from === to) return null;
+  const next = [...ids];
+  const [item] = next.splice(from, 1);
+  let insertAt = to;
+  if (from < to) insertAt -= 1;
+  next.splice(insertAt, 0, item);
+  return next;
 }
 
 /** `useSearchParams` can lag `flushSync` + `setSearchParams`; read the real bar URL for focus. */
@@ -416,7 +430,13 @@ function StreamList({
   streamHeadSortTargetId = null,
   streamHeadSortSlot = null,
   onMoveNote = null,
+  /** Thread reply list: show drag handles and persist order (manual sort mode). */
+  streamManualSortActive = false,
+  onStreamManualReorder = null,
 }) {
+  const showManualHandles =
+    streamManualSortActive && depth > 0 && typeof onStreamManualReorder === 'function';
+
   return (
     <>
       {nodes.map((n) => {
@@ -445,34 +465,76 @@ function StreamList({
             style={
               !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined
             }
+            onDragOver={
+              showManualHandles
+                ? (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }
+                : undefined
+            }
+            onDrop={
+              showManualHandles
+                ? (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const draggedId = e.dataTransfer.getData('text/plain')?.trim();
+                    if (!draggedId) return;
+                    const ids = nodes.map((x) => x.id);
+                    const next = reorderSiblingIds(ids, draggedId, n.id);
+                    if (next) onStreamManualReorder(next);
+                  }
+                : undefined
+            }
           >
-            <NoteCard
-              note={n}
-              depth={depth}
-              hideStar={depth === 0}
-              hideDelete={
-                streamFocusHideDeleteId != null &&
-                depth === 0 &&
-                noteIdEq(n.id, streamFocusHideDeleteId)
-              }
-              streamThreadSortSlot={
-                streamHeadSortSlot &&
-                streamHeadSortTargetId != null &&
-                depth === 0 &&
-                noteIdEq(n.id, streamHeadSortTargetId)
-                  ? streamHeadSortSlot
-                  : null
-              }
-              hasReplies={(n.children?.length ?? 0) > 0}
-              hoverInsightEnabled
-              drillOnSingleClick
-              parentTagsForInherit={parentTagsForInherit}
-              onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
-              onStarredChange={onStarredChange}
-              onNoteUpdate={onNoteUpdate}
-              onNoteDelete={onNoteDelete}
-              onMoveNote={onMoveNote}
-            />
+            <div className="stream-page-note-li__row">
+              {showManualHandles ? (
+                <span
+                  className="stream-page-manual-sort-handle"
+                  draggable
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    e.dataTransfer.setData('text/plain', String(n.id));
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Drag to reorder reply"
+                  title="Drag to reorder"
+                />
+              ) : null}
+              <div className="stream-page-note-li__card">
+                <NoteCard
+                  note={n}
+                  depth={depth}
+                  hideStar={depth === 0}
+                  hideDelete={
+                    streamFocusHideDeleteId != null &&
+                    depth === 0 &&
+                    noteIdEq(n.id, streamFocusHideDeleteId)
+                  }
+                  streamThreadSortSlot={
+                    streamHeadSortSlot &&
+                    streamHeadSortTargetId != null &&
+                    depth === 0 &&
+                    noteIdEq(n.id, streamHeadSortTargetId)
+                      ? streamHeadSortSlot
+                      : null
+                  }
+                  hasReplies={(n.children?.length ?? 0) > 0}
+                  hoverInsightEnabled
+                  drillOnSingleClick
+                  parentTagsForInherit={parentTagsForInherit}
+                  onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
+                  onStarredChange={onStarredChange}
+                  onNoteUpdate={onNoteUpdate}
+                  onNoteDelete={onNoteDelete}
+                  onMoveNote={onMoveNote}
+                />
+              </div>
+            </div>
             {n.children?.length > 0 && depth === 0 && (
               <ul className="stream-page-replies">
                 <StreamList
@@ -491,6 +553,8 @@ function StreamList({
                   streamHeadSortTargetId={streamHeadSortTargetId}
                   streamHeadSortSlot={streamHeadSortSlot}
                   onMoveNote={onMoveNote}
+                  streamManualSortActive={streamManualSortActive}
+                  onStreamManualReorder={onStreamManualReorder}
                 />
               </ul>
             )}
@@ -838,6 +902,21 @@ export default function StreamPage() {
       });
     },
     [threadRootId]
+  );
+
+  const handleStreamManualReorder = useCallback(
+    async (orderedIds) => {
+      if (!orderedIds?.length) return;
+      try {
+        await Promise.all(
+          orderedIds.map((nid, idx) => updateNote(nid, { stream_sibling_index: idx }))
+        );
+        await loadThread(true);
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [loadThread]
   );
 
   const streamHeadSortSlot = useMemo(
@@ -1952,6 +2031,8 @@ export default function StreamPage() {
                       streamHeadSortTargetId={streamHeadHideDeleteId}
                       streamHeadSortSlot={streamHeadSortSlot}
                       onMoveNote={handleOpenMoveNote}
+                      streamManualSortActive={threadSortPrefs.sortMode === 'manual'}
+                      onStreamManualReorder={handleStreamManualReorder}
                     />
                   </ul>
                 </div>

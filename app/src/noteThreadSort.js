@@ -1,14 +1,20 @@
 /**
  * Thread display order helpers.
- * Stream: datetime (event start or last edit, tie-break last edit) or full-note word order;
- * optional starred-first groups.
+ * Stream: datetime (event start or last edit, tie-break last edit), full-note word order,
+ * or manual order (`stream_sibling_index` on each note); optional starred-first groups (not used for manual).
  */
 
-/** @typedef {'datetime_asc' | 'datetime_desc' | 'alpha_asc' | 'alpha_desc'} StreamThreadSortMode */
+/** @typedef {'datetime_asc' | 'datetime_desc' | 'alpha_asc' | 'alpha_desc' | 'manual'} StreamThreadSortMode */
 
 /** @typedef {{ sortMode: StreamThreadSortMode, starredFirst: boolean }} StreamThreadSortPrefs */
 
-export const STREAM_THREAD_SORT_MODES = ['datetime_asc', 'datetime_desc', 'alpha_asc', 'alpha_desc'];
+export const STREAM_THREAD_SORT_MODES = [
+  'datetime_asc',
+  'datetime_desc',
+  'alpha_asc',
+  'alpha_desc',
+  'manual',
+];
 
 /** Matches prior default stream ordering (earliest primary time first; starred groups on). */
 export const DEFAULT_STREAM_THREAD_SORT = /** @type {StreamThreadSortPrefs} */ ({
@@ -24,6 +30,7 @@ export function migrateLegacySortMode(mode) {
   if (mode === 'edit_desc' || mode === 'schedule_desc') return 'datetime_desc';
   if (mode === 'alpha_asc') return 'alpha_asc';
   if (mode === 'alpha_desc') return 'alpha_desc';
+  if (mode === 'manual') return 'manual';
   return DEFAULT_STREAM_THREAD_SORT.sortMode;
 }
 
@@ -102,8 +109,32 @@ function compareAlphabeticalFull(a, b, desc) {
   return String(a.id).localeCompare(String(b.id));
 }
 
+function streamSiblingIndexKey(n) {
+  const v = n?.stream_sibling_index;
+  if (v == null || v === '') return null;
+  const num = Number(v);
+  if (!Number.isFinite(num)) return null;
+  return num;
+}
+
+/**
+ * Manual sibling order uses `stream_sibling_index` (integer); unset rows sort after set ones,
+ * tie-break by primary datetime ascending (matches “natural” thread order until the user drags).
+ */
+function compareManualSiblings(a, b) {
+  const ia = streamSiblingIndexKey(a);
+  const ib = streamSiblingIndexKey(b);
+  if (ia !== null && ib !== null && ia !== ib) return ia - ib;
+  if (ia !== null && ib === null) return -1;
+  if (ia === null && ib !== null) return 1;
+  return compareDatetimePrimary(a, b, false);
+}
+
 function compareStreamPrefs(a, b, prefs) {
   const mode = prefs.sortMode;
+  if (mode === 'manual') {
+    return compareManualSiblings(a, b);
+  }
   const desc = mode.endsWith('_desc');
   if (mode.startsWith('datetime_')) {
     return compareDatetimePrimary(a, b, desc);
@@ -135,6 +166,9 @@ function isStarred(n) {
 export function normalizeStreamThreadSortPrefs(raw) {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_STREAM_THREAD_SORT };
   const sortMode = migrateLegacySortMode(raw.sortMode);
+  if (sortMode === 'manual') {
+    return { sortMode: 'manual', starredFirst: false };
+  }
   const starredFirst = coerceStarredFirst(raw.starredFirst);
   return { sortMode, starredFirst };
 }
@@ -172,6 +206,9 @@ function sortLevelStream(nodes, prefs) {
 }
 
 function sortSiblingsStream(nodes, prefs) {
+  if (prefs.sortMode === 'manual') {
+    return [...nodes].sort((a, b) => compareManualSiblings(a, b));
+  }
   if (!prefs.starredFirst) {
     return [...nodes].sort((a, b) => compareStreamPrefs(a, b, prefs));
   }
