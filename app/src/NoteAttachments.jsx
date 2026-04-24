@@ -166,7 +166,7 @@ export function PersonProfileAvatar({ att }) {
   );
 }
 
-function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorderBusy }) {
+function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorderBusy, setReorderBusy }) {
   const [imgSrc, setImgSrc] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewKind, setPreviewKind] = useState(null);
@@ -432,6 +432,7 @@ export default function NoteAttachments({ attachments, onDeleted, excludeAttachm
           onDeleted={onDeleted}
           onReorderPersist={onReorderAttachments ? persistSwap : null}
           reorderBusy={reorderBusy}
+          setReorderBusy={setReorderBusy}
         />
       ))}
     </div>

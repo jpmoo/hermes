@@ -44,6 +44,42 @@ import { effectiveDescendantCount } from './noteDescendantCount';
 import { firstImageAttachment } from './attachmentUtils';
 import './NoteCard.css';
 
+function normBlobId(x) {
+  return String(x ?? '').trim().toLowerCase();
+}
+
+/** Edit UI order: follow `orderedBlobIds`, then any remaining attachments in `attachments` order. */
+function orderAttachmentsByBlobIds(attachments, orderedBlobIds) {
+  if (!attachments?.length) return attachments || [];
+  if (!orderedBlobIds?.length) return [...attachments];
+  const byId = new Map(attachments.map((a) => [normBlobId(a.id), a]));
+  const used = new Set();
+  const out = [];
+  for (const raw of orderedBlobIds) {
+    const a = byId.get(normBlobId(raw));
+    if (a) {
+      out.push(a);
+      used.add(normBlobId(a.id));
+    }
+  }
+  for (const a of attachments) {
+    const id = normBlobId(a.id);
+    if (!used.has(id)) out.push(a);
+  }
+  return out;
+}
+
+/** True if `pendingIds` is a full permutation that differs from current `attachmentsFromNote` order. */
+function attachmentOrderNeedsPersist(pendingIds, attachmentsFromNote) {
+  if (!pendingIds?.length) return false;
+  const fromNote = (attachmentsFromNote || []).map((a) => normBlobId(a.id));
+  if (fromNote.length !== pendingIds.length) return false;
+  for (let i = 0; i < fromNote.length; i++) {
+    if (fromNote[i] !== normBlobId(pendingIds[i])) return true;
+  }
+  return false;
+}
+
 export default function NoteCard({
   note,
   depth = 0,
@@ -92,6 +128,8 @@ export default function NoteCard({
   const [inheritLoading, setInheritLoading] = useState(false);
   const [spaztickBusy, setSpaztickBusy] = useState(false);
   const [mergeBusy, setMergeBusy] = useState(false);
+  /** While editing: pending blob order (null = same as server list). Persisted only on Save. */
+  const [editAttachmentOrderIds, setEditAttachmentOrderIds] = useState(null);
 
   const tags = note.tags || [];
   const eventRangeLabel = formatEventRange(note);
@@ -134,6 +172,13 @@ export default function NoteCard({
   useEffect(() => {
     setDropdownParentTags([]);
   }, [note.id]);
+
+  useEffect(() => {
+    if (!editing || !editAttachmentOrderIds?.length) return;
+    const pendingSig = [...editAttachmentOrderIds].map(normBlobId).sort().join('\0');
+    const noteSig = (note.attachments || []).map((a) => normBlobId(a.id)).sort().join('\0');
+    if (pendingSig !== noteSig) setEditAttachmentOrderIds(null);
+  }, [editing, note.attachments, editAttachmentOrderIds]);
 
   useEffect(() => {
     if (!addingTag) return undefined;
@@ -204,10 +249,15 @@ export default function NoteCard({
       await updateNote(note.id, { content: trimmed, ...meta });
       await syncTagsFromContent(note.id, trimmed, note.tags, note.content || '');
       await syncConnectionsFromContent(note.id, trimmed, note.content || '');
+      if (attachmentOrderNeedsPersist(editAttachmentOrderIds, note.attachments)) {
+        await patchNoteAttachmentOrder(note.id, editAttachmentOrderIds);
+      }
+      setEditAttachmentOrderIds(null);
       setEditing(false);
       onNoteUpdate?.();
     } catch (err) {
       console.error(err);
+      window.alert(err?.message || 'Could not save note');
     }
   };
 
@@ -216,6 +266,7 @@ export default function NoteCard({
     e.stopPropagation();
     setEditContent(note.content || '');
     resetEditMetaFromNote();
+    setEditAttachmentOrderIds(null);
     setEditing(false);
   };
 
@@ -232,6 +283,7 @@ export default function NoteCard({
     ev.stopPropagation();
     setEditContent(note.content || '');
     resetEditMetaFromNote();
+    setEditAttachmentOrderIds(null);
     setEditing(true);
   };
 
@@ -440,18 +492,14 @@ export default function NoteCard({
     }
   };
 
-  const handleReorderAttachments = useCallback(
-    async (orderedBlobIds) => {
-      try {
-        await patchNoteAttachmentOrder(note.id, orderedBlobIds);
-        onNoteUpdate?.();
-      } catch (err) {
-        console.error(err);
-        window.alert(err?.message || 'Could not reorder attachments');
-      }
-    },
-    [note.id, onNoteUpdate]
+  const editFormAttachments = useMemo(
+    () => orderAttachmentsByBlobIds(note.attachments || [], editAttachmentOrderIds),
+    [note.attachments, editAttachmentOrderIds]
   );
+
+  const handleEditAttachmentReorderDraft = useCallback((orderedBlobIds) => {
+    setEditAttachmentOrderIds(orderedBlobIds);
+  }, []);
 
   const handleEditAddFiles = async (e) => {
     e.stopPropagation();
@@ -619,8 +667,6 @@ export default function NoteCard({
       {eventRangeLabel ? <p className="note-card-event-range">{eventRangeLabel}</p> : null}
       <NoteAttachments
         attachments={note.attachments}
-        onDeleted={handleDeleteAttachment}
-        onReorderAttachments={handleReorderAttachments}
         excludeAttachmentIds={
           profileImageAttachment ? [profileImageAttachment.id] : undefined
         }
@@ -701,9 +747,9 @@ export default function NoteCard({
             <div className="note-card-edit-attachments">
               {note.attachments?.length > 0 ? (
                 <NoteAttachments
-                  attachments={note.attachments}
+                  attachments={editFormAttachments}
                   onDeleted={handleDeleteAttachment}
-                  onReorderAttachments={handleReorderAttachments}
+                  onReorderAttachments={handleEditAttachmentReorderDraft}
                 />
               ) : null}
             </div>
