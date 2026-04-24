@@ -163,12 +163,11 @@
   width: 100%;
   max-width: 5.25rem;
   font-size: 0.65rem;
-  line-height: 1.15;
+  line-height: 1.2;
   color: var(--text-muted);
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Full-screen preview (images + PDF) */
