@@ -10,6 +10,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "db:migrate": "node src/db/migrate.js",
+    "db:apply-migrations": "node src/db/runMigrations.js",
     "reembed": "node scripts/reembed-note-embeddings.js"
   },
   "dependencies": {
