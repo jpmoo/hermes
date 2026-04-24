@@ -11,7 +11,7 @@ import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import {
   sortNoteTreeByThreadOrder,
-  sortNoteTreeWithStreamPrefs,
+  sortNoteTreeWithStreamPrefsMap,
   normalizeStreamThreadSortPrefs,
   noteThreadSortKeyMs,
   resolveStreamThreadSortPrefsForHead,
@@ -434,7 +434,7 @@ export default function CanvasPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [moveNoteTarget, setMoveNoteTarget] = useState(null);
-  /** Per thread root — same storage as Stream sort prefs. */
+  /** `streamThreadSort` map (thread root + per drill head), same as Stream. */
   const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
   const [sequenceMenuOpen, setSequenceMenuOpen] = useState(false);
   const [draftArrangement, setDraftArrangement] = useState(CANVAS_ARRANGEMENT.MANUAL);
@@ -607,20 +607,26 @@ export default function CanvasPage() {
     return findNode(treeFull, targetId);
   }, [treeFull, threadRootId, focusForSortHead]);
 
+  const streamSortPrefsHeadId = useMemo(() => {
+    if (!threadRootId) return null;
+    const fh = focusId ?? focusParam;
+    if (fh && !noteIdEq(fh, threadRootId)) return String(fh).trim().toLowerCase();
+    return threadRootId.trim().toLowerCase();
+  }, [threadRootId, focusId, focusParam]);
+
   const threadSortPrefs = useMemo(() => {
-    if (!threadRootId) return normalizeStreamThreadSortPrefs(undefined);
-    const rid = threadRootId.trim().toLowerCase();
-    const stored = streamThreadSortByRoot[rid];
+    if (!streamSortPrefsHeadId) return normalizeStreamThreadSortPrefs(undefined);
+    const stored = streamThreadSortByRoot[streamSortPrefsHeadId];
     return resolveStreamThreadSortPrefsForHead(stored, Boolean(headNodeForStreamSort?.children?.length));
-  }, [streamThreadSortByRoot, threadRootId, headNodeForStreamSort]);
+  }, [streamThreadSortByRoot, streamSortPrefsHeadId, headNodeForStreamSort]);
 
   const tree = useMemo(() => {
     if (!threadRootId) return treeFull;
-    return sortNoteTreeWithStreamPrefs(
+    return sortNoteTreeWithStreamPrefsMap(
       filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes),
-      threadSortPrefs
+      streamThreadSortByRoot
     );
-  }, [threadRootId, treeFull, visibleNoteTypes, threadSortPrefs]);
+  }, [threadRootId, treeFull, visibleNoteTypes, streamThreadSortByRoot]);
   const actualRootId = threadRootId;
   const layoutStorageKey = useMemo(() => canvasLayoutThreadKey(threadRootId), [threadRootId]);
 

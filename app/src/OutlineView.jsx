@@ -16,11 +16,7 @@ import { readOutlineExpansion, setOutlineExpanded, setAllOutlineExpansion } from
 import NoteTypeIcon from './NoteTypeIcon';
 import NoteRichText, { toggleTaskMarkerAtIndex } from './NoteRichText';
 import { filterTreeByVisibleNoteTypes } from './noteTypeFilter';
-import {
-  resolveStreamThreadSortPrefsForHead,
-  sortNoteTreeWithStreamPrefs,
-  sortStarredPinnedRootsOnly,
-} from './noteThreadSort';
+import { sortNoteTreeWithStreamPrefsMap, sortStarredPinnedRootsOnly } from './noteThreadSort';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
@@ -343,7 +339,7 @@ export default function OutlineView() {
   const [collapseAllTick, setCollapseAllTick] = useState(0);
   const loadRootInflight = useRef(new Map());
   const rootThreadsRef = useRef({});
-  /** Same persisted prefs as Stream (`streamThreadSort` in user settings). */
+  /** Same `streamThreadSort` map as Stream (per thread root and per drill head). */
   const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
   const { logout, user } = useAuth();
   const navigate = useNavigate();
@@ -451,14 +447,9 @@ export default function OutlineView() {
 
   const tree = useMemo(() => {
     const filtered = filterTreeByVisibleNoteTypes(treeRaw, visibleNoteTypes);
-    const withStreamOrder = filtered.map((root) => {
-      const rawRoot = treeRaw.find((r) => String(r.id) === String(root.id)) ?? root;
-      const rid = String(rawRoot.id).trim().toLowerCase();
-      const stored = streamThreadSortByRoot[rid];
-      const headHasDirectReplies = Boolean(rawRoot.children?.length);
-      const prefs = resolveStreamThreadSortPrefsForHead(stored, headHasDirectReplies);
-      return sortNoteTreeWithStreamPrefs([root], prefs)[0];
-    });
+    const withStreamOrder = filtered.map((root) =>
+      sortNoteTreeWithStreamPrefsMap([root], streamThreadSortByRoot)[0]
+    );
     return sortStarredPinnedRootsOnly(withStreamOrder);
   }, [treeRaw, visibleNoteTypes, streamThreadSortByRoot]);
 

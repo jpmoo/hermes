@@ -196,6 +196,31 @@ export function sortNoteTreeWithStreamPrefs(nodes, prefs) {
   return sortLevelStream([...nodes], p);
 }
 
+/**
+ * Sort each node's direct children using prefs from `sortMap[parentId]` (lowercase UUID).
+ * Lets Stream remember manual / datetime etc. per drill head, not only per thread root.
+ * @param {any[]|null|undefined} nodes thread roots (or any forest top level)
+ * @param {Record<string, unknown>|null|undefined} sortMap persisted `streamThreadSort` from settings
+ */
+export function sortNoteTreeWithStreamPrefsMap(nodes, sortMap) {
+  const map =
+    sortMap && typeof sortMap === 'object' && !Array.isArray(sortMap) ? sortMap : {};
+  if (!nodes?.length) return nodes;
+  return nodes.map((n) => sortSubtreeWithStreamPrefsMap(n, map));
+}
+
+function sortSubtreeWithStreamPrefsMap(node, sortMap) {
+  const rawChildren = node.children || [];
+  if (rawChildren.length === 0) {
+    return { ...node, children: [] };
+  }
+  const parentKey = String(node.id).trim().toLowerCase();
+  const stored = sortMap[parentKey];
+  const prefs = resolveStreamThreadSortPrefsForHead(stored, rawChildren.length > 0);
+  const rebuilt = rawChildren.map((c) => sortSubtreeWithStreamPrefsMap(c, sortMap));
+  return { ...node, children: sortSiblingsStream(rebuilt, prefs) };
+}
+
 function sortLevelStream(nodes, prefs) {
   const ordered = sortSiblingsStream(nodes, prefs);
   return ordered.map((n) => ({
@@ -289,7 +314,7 @@ export function sortStarredPinnedRootsOnly(nodes) {
  * Move-note picker: top-level rows match Stream’s root list (starred first, then by thread sort key);
  * within each thread, sibling order matches that thread’s stream prefs (same as {@link sortNoteTreeWithStreamPrefs}).
  * @param {any[]|null|undefined} roots from buildTree (notes with no parent, each a thread root)
- * @param {Record<string, unknown>|null|undefined} streamThreadSortByRoot persisted map (keys = thread root ids)
+ * @param {Record<string, unknown>|null|undefined} streamThreadSortByRoot persisted map (thread root + per-head keys)
  */
 export function sortNoteForestForMoveModal(roots, streamThreadSortByRoot) {
   if (!roots?.length) return roots || [];
@@ -299,11 +324,7 @@ export function sortNoteForestForMoveModal(roots, streamThreadSortByRoot) {
       : {};
   const orderedRoots = sortStarredPinnedRootsOnly(roots);
   return orderedRoots.map((root) => {
-    const rid = String(root.id).trim().toLowerCase();
-    const stored = byRoot[rid];
-    const headHasDirectReplies = Boolean((root.children || []).length);
-    const prefs = resolveStreamThreadSortPrefsForHead(stored, headHasDirectReplies);
-    const sorted = sortNoteTreeWithStreamPrefs([root], prefs);
+    const sorted = sortNoteTreeWithStreamPrefsMap([root], byRoot);
     return sorted[0] ?? root;
   });
 }

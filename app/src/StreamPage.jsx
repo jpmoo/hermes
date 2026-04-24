@@ -41,7 +41,7 @@ import { HoverInsightProvider } from './HoverInsightContext';
 import { setLastStreamSearchFromParams } from './streamNavMemory';
 import { filterTreeByVisibleNoteTypes, filterRootsByVisibleNoteTypes } from './noteTypeFilter';
 import {
-  sortNoteTreeWithStreamPrefs,
+  sortNoteTreeWithStreamPrefsMap,
   normalizeStreamThreadSortPrefs,
   resolveStreamThreadSortPrefsForHead,
   sortStarredPinned,
@@ -770,7 +770,7 @@ export default function StreamPage() {
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [moveNoteTarget, setMoveNoteTarget] = useState(null);
   const [noteHistory, setNoteHistory] = useState([]);
-  /** Per thread root: stream reply sort prefs (persisted in user settings). */
+  /** Persisted `streamThreadSort` map: keys = stream head note id (thread root or drilled focus). */
   const [streamThreadSortByRoot, setStreamThreadSortByRoot] = useState({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyBtnRef = useRef(null);
@@ -990,20 +990,26 @@ export default function StreamPage() {
     return findNode(treeFull, targetId);
   }, [treeFull, threadRootId, focusForSortHead]);
 
+  /** Settings key for the current stream head (URL thread root, or focused note when drilled). */
+  const streamSortPrefsHeadId = useMemo(() => {
+    if (!threadRootId) return null;
+    const fh = focusId ?? focusParam;
+    if (fh && !noteIdEq(fh, threadRootId)) return String(fh).trim().toLowerCase();
+    return threadRootId.trim().toLowerCase();
+  }, [threadRootId, focusId, focusParam]);
+
   const threadSortPrefs = useMemo(() => {
-    if (!threadRootId) return normalizeStreamThreadSortPrefs(undefined);
-    const rid = threadRootId.trim().toLowerCase();
-    const stored = streamThreadSortByRoot[rid];
+    if (!streamSortPrefsHeadId) return normalizeStreamThreadSortPrefs(undefined);
+    const stored = streamThreadSortByRoot[streamSortPrefsHeadId];
     const headHasDirectReplies = Boolean(headNodeForStreamSort?.children?.length);
     return resolveStreamThreadSortPrefsForHead(stored, headHasDirectReplies);
-  }, [streamThreadSortByRoot, threadRootId, headNodeForStreamSort]);
+  }, [streamThreadSortByRoot, streamSortPrefsHeadId, headNodeForStreamSort]);
 
   const onThreadSortChange = useCallback(
     (next) => {
-      if (!threadRootId) return;
-      const rid = threadRootId.trim().toLowerCase();
+      if (!threadRootId || !streamSortPrefsHeadId) return;
       setStreamThreadSortByRoot((prev) => {
-        const merged = { ...prev, [rid]: next };
+        const merged = { ...prev, [streamSortPrefsHeadId]: next };
         if (streamSortSaveTimer.current) clearTimeout(streamSortSaveTimer.current);
         streamSortSaveTimer.current = setTimeout(() => {
           streamSortSaveTimer.current = null;
@@ -1012,7 +1018,7 @@ export default function StreamPage() {
         return merged;
       });
     },
-    [threadRootId]
+    [threadRootId, streamSortPrefsHeadId]
   );
 
   const handleStreamManualReorder = useCallback(
@@ -1045,11 +1051,11 @@ export default function StreamPage() {
   const threadReady = Boolean(threadRootId && !loadingThread && thread.length > 0);
   const tree = useMemo(
     () =>
-      sortNoteTreeWithStreamPrefs(
+      sortNoteTreeWithStreamPrefsMap(
         filterTreeByVisibleNoteTypes(treeFull, visibleNoteTypes),
-        threadSortPrefs
+        streamThreadSortByRoot
       ),
-    [treeFull, visibleNoteTypes, threadSortPrefs]
+    [treeFull, visibleNoteTypes, streamThreadSortByRoot]
   );
   const filteredRoots = useMemo(() => {
     const filtered = filterRootsByVisibleNoteTypes(roots, visibleNoteTypes);
