@@ -9,9 +9,9 @@ export async function attachBlobListToNotes(notes, userId) {
   const ids = [...new Set(notes.map((n) => n.id))];
   try {
     const ar = await pool.query(
-      `SELECT id, note_id, filename, mime_type, byte_size
+      `SELECT id, note_id, filename, mime_type, byte_size, sort_index
        FROM note_file_blobs WHERE note_id = ANY($1::uuid[]) AND user_id = $2
-       ORDER BY created_at ASC`,
+       ORDER BY sort_index ASC, created_at ASC, id ASC`,
       [ids, userId]
     );
     const by = {};
@@ -22,6 +22,7 @@ export async function attachBlobListToNotes(notes, userId) {
         filename: row.filename,
         mime_type: row.mime_type,
         byte_size: Number(row.byte_size),
+        sort_index: row.sort_index != null ? Number(row.sort_index) : 0,
       });
     }
     for (const n of notes) {

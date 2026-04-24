@@ -11,6 +11,7 @@ import {
   removeNoteTag,
   deleteNoteFile,
   uploadNoteFiles,
+  patchNoteAttachmentOrder,
   getNoteThreadRoot,
   createSpaztickTaskFromNote,
 } from './api';
@@ -439,6 +440,14 @@ export default function NoteCard({
     }
   };
 
+  const handleReorderAttachments = useCallback(
+    async (orderedBlobIds) => {
+      await patchNoteAttachmentOrder(note.id, orderedBlobIds);
+      onNoteUpdate?.();
+    },
+    [note.id, onNoteUpdate]
+  );
+
   const handleEditAddFiles = async (e) => {
     e.stopPropagation();
     const files = Array.from(e.target.files || []);
@@ -463,7 +472,7 @@ export default function NoteCard({
     const el = raw instanceof Element ? raw : raw?.parentElement;
     return Boolean(
       el?.closest(
-        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments, .note-card-profile-avatar-btn, .note-card-stream-thread-sort, .stream-thread-sort, .note-card-move-btn'
+        'button, input, textarea, select, a[href], [role="button"], [contenteditable="true"], .note-card-tag-dropdown, .note-rich-task-spaztick-btn, .note-attachments-row, .note-attachment-tile, .note-card-profile-avatar-btn, .note-card-stream-thread-sort, .stream-thread-sort, .note-card-move-btn'
       )
     );
   }, []);
@@ -606,6 +615,7 @@ export default function NoteCard({
       <NoteAttachments
         attachments={note.attachments}
         onDeleted={handleDeleteAttachment}
+        onReorderAttachments={handleReorderAttachments}
         excludeAttachmentIds={
           profileImageAttachment ? [profileImageAttachment.id] : undefined
         }
@@ -685,7 +695,11 @@ export default function NoteCard({
             />
             <div className="note-card-edit-attachments">
               {note.attachments?.length > 0 ? (
-                <NoteAttachments attachments={note.attachments} onDeleted={handleDeleteAttachment} />
+                <NoteAttachments
+                  attachments={note.attachments}
+                  onDeleted={handleDeleteAttachment}
+                  onReorderAttachments={handleReorderAttachments}
+                />
               ) : null}
             </div>
             <div className="note-card-edit-actions">

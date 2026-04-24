@@ -1,96 +1,174 @@
-.note-attachments {
+/* Horizontal strip: scroll without visible scrollbar */
+.note-attachments-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15rem 0 0.2rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.note-attachments-row::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.note-attachment-tile {
+  flex: 0 0 auto;
+  width: 5.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.35rem;
+  align-items: center;
+  gap: 0.28rem;
 }
 
-.note-attachment-item {
+.note-attachment-thumb-frame {
   position: relative;
-  display: inline-block;
-  max-width: 100%;
+  width: 4.75rem;
+  height: 4.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.note-attachment-img-btn {
+.note-attachment-reorder-cluster {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+.note-attachment-reorder-btn {
+  width: 1.2rem;
+  height: 1.2rem;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  line-height: 1;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.note-attachment-reorder-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.note-attachment-reorder-btn:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.note-attachment-thumb-hit {
+  position: absolute;
+  inset: 0;
   display: block;
-  max-width: min(100%, 420px);
+  width: 100%;
+  height: 100%;
   padding: 0;
   margin: 0;
   border: none;
-  /* Opaque light canvas so transparent PNGs (e.g. tablet ink) stay readable in dark theme */
-  background: #fff;
+  background: transparent;
   cursor: zoom-in;
-  border-radius: 8px;
   line-height: 0;
 }
 
-.note-attachment-img-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.note-attachment-img {
-  max-width: min(100%, 420px);
-  max-height: 100px;
-  width: auto;
-  height: auto;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  display: block;
-  background: #fff;
-}
-
-.note-attachment-file--preview {
+.note-attachment-thumb-hit--file {
   cursor: pointer;
-}
-
-.note-attachment-file {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.6rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--accent);
-  font-size: 0.875rem;
-  cursor: pointer;
+  justify-content: center;
+  /* Gray tile (same footprint as image thumb); not theme “card white” */
+  background: color-mix(in srgb, var(--border) 78%, var(--text-muted) 22%);
 }
 
-.note-attachment-icon {
-  width: 1.05em;
-  height: 1.05em;
+.note-attachment-file-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48%;
+  height: 48%;
+  max-width: 2.35rem;
+  max-height: 2.35rem;
+  pointer-events: none;
+}
+
+.note-attachment-file-placeholder__svg {
+  width: 100%;
+  height: 100%;
   flex-shrink: 0;
-}
-
-.note-attachment-filename {
-  text-align: left;
-  word-break: break-all;
-}
-
-.note-attachment-size {
   color: var(--text-muted);
-  font-size: 0.75rem;
+  opacity: 0.38;
+}
+
+.note-attachment-thumb-hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.note-attachment-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .note-attachment-remove {
   position: absolute;
-  top: 0.25rem;
-  right: 0.25rem;
-  width: 1.5rem;
-  height: 1.5rem;
+  top: 3px;
+  right: 3px;
+  z-index: 3;
+  width: 1.35rem;
+  height: 1.35rem;
   padding: 0;
   border: none;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.58);
   color: #fff;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 1.05rem;
   line-height: 1;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.note-attachment-item:not(:hover) .note-attachment-remove {
-  opacity: 0.5;
+.note-attachment-remove:hover {
+  background: rgba(180, 40, 40, 0.92);
+}
+
+.note-attachment-tile-caption {
+  width: 100%;
+  max-width: 5.25rem;
+  font-size: 0.65rem;
+  line-height: 1.15;
+  color: var(--text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Full-screen preview (images + PDF) */
@@ -180,7 +258,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Match paper / opaque image backgrounds — not theme surface color */
   background: #fff;
   padding: 0.5rem;
   box-sizing: border-box;

@@ -142,8 +142,8 @@ router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res)
         proposeTagsForNote(note.id, note.content, userId).catch(() => {});
 
         const ins = await pool.query(
-          `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
-           VALUES ($1, $2, $3, $4, $5, $6)
+          `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data, sort_index)
+           VALUES ($1, $2, $3, $4, $5, $6, 0)
            RETURNING id, filename, mime_type, byte_size`,
           [note.id, userId, filename, mime, buf.length, buf]
         );
@@ -233,6 +233,12 @@ router.post(
         logOcr('attachments_skip_ocr', { noteId, source: 'ingest', reason: 'note_already_has_content' });
       }
 
+      const maxSort = await pool.query(
+        `SELECT COALESCE(MAX(sort_index), -1)::int AS m FROM note_file_blobs WHERE note_id = $1::uuid AND user_id = $2`,
+        [noteId, userId]
+      );
+      let nextSort = (maxSort.rows[0]?.m ?? -1) + 1;
+
       const inserted = [];
       const ocrPieces = [];
       const ocrStats = [];
@@ -241,11 +247,12 @@ router.post(
         if (!buf?.length) continue;
         const filename = f.originalname?.slice(0, 512) || 'file';
         const mime = f.mimetype || 'application/octet-stream';
+        const si = nextSort++;
         const ins = await pool.query(
-          `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
-           VALUES ($1, $2, $3, $4, $5, $6)
+          `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data, sort_index)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING id, filename, mime_type, byte_size`,
-          [noteId, userId, filename, mime, buf.length, buf]
+          [noteId, userId, filename, mime, buf.length, buf, si]
         );
         inserted.push(ins.rows[0]);
         if (runOcr) {

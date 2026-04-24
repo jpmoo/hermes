@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS note_file_blobs (
   mime_type  TEXT NOT NULL DEFAULT 'application/octet-stream',
   byte_size  BIGINT NOT NULL,
   data       BYTEA NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  sort_index INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_note_file_blobs_note ON note_file_blobs(note_id);

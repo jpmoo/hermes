@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getToken } from './api';
 import { isImageMime, noteFileUrl } from './attachmentUtils';
+import { NavIconAttach } from './icons/NavIcons';
 import './NoteAttachments.css';
 
 function isPdfMime(m, filename) {
@@ -71,25 +72,11 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
   );
 }
 
-/** Paperclip / attach (assets/attach.svg), themed via currentColor */
-function AttachmentIcon(props) {
+function NonImageAttachmentPlaceholder() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="note-attachment-icon"
-      aria-hidden
-      focusable={false}
-      {...props}
-    >
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M5.25 9C5.25 5.27208 8.27208 2.25 12 2.25C15.7279 2.25 18.75 5.27208 18.75 9V16C18.75 16.4142 18.4142 16.75 18 16.75C17.5858 16.75 17.25 16.4142 17.25 16V9C17.25 6.1005 14.8995 3.75 12 3.75C9.10051 3.75 6.75 6.10051 6.75 9V17C6.75 18.7949 8.20507 20.25 10 20.25C11.7949 20.25 13.25 18.7949 13.25 17V10C13.25 9.30964 12.6904 8.75 12 8.75C11.3096 8.75 10.75 9.30964 10.75 10V16C10.75 16.4142 10.4142 16.75 10 16.75C9.58579 16.75 9.25 16.4142 9.25 16V10C9.25 8.48122 10.4812 7.25 12 7.25C13.5188 7.25 14.75 8.48122 14.75 10V17C14.75 19.6234 12.6234 21.75 10 21.75C7.37665 21.75 5.25 19.6234 5.25 17V9Z"
-        fill="currentColor"
-      />
-    </svg>
+    <span className="note-attachment-file-placeholder" aria-hidden>
+      <NavIconAttach className="note-attachment-file-placeholder__svg" width="100%" height="100%" />
+    </span>
   );
 }
 
@@ -179,7 +166,7 @@ export function PersonProfileAvatar({ att }) {
   );
 }
 
-function AttachmentItem({ att, onDeleted }) {
+function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorderBusy }) {
   const [imgSrc, setImgSrc] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewKind, setPreviewKind] = useState(null);
@@ -188,6 +175,8 @@ function AttachmentItem({ att, onDeleted }) {
 
   const isImage = isImageMime(att.mime_type, att.filename);
   const isPdf = isPdfMime(att.mime_type, att.filename);
+  const showReorder = Boolean(onReorderPersist) && total > 1;
+  const name = att.filename || 'File';
 
   useEffect(() => {
     if (!isImage) return undefined;
@@ -273,10 +262,46 @@ function AttachmentItem({ att, onDeleted }) {
     }
   };
 
+  const onMoveLeft = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (index <= 0 || !onReorderPersist || reorderBusy) return;
+    setReorderBusy(true);
+    try {
+      await onReorderPersist(index, index - 1);
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || 'Could not reorder');
+    } finally {
+      setReorderBusy(false);
+    }
+  };
+
+  const onMoveRight = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (index >= total - 1 || !onReorderPersist || reorderBusy) return;
+    setReorderBusy(true);
+    try {
+      await onReorderPersist(index, index + 1);
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || 'Could not reorder');
+    } finally {
+      setReorderBusy(false);
+    }
+  };
+
   const previewUrl = previewKind === 'image' ? imgSrc : previewKind === 'pdf' ? pdfPreviewUrl : null;
 
+  const openNonImage = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    download(e);
+  };
+
   return (
-    <div className="note-attachment-item">
+    <div className="note-attachment-tile">
       {previewOpen && previewUrl && previewKind ? (
         <AttachmentPreviewModal
           att={att}
@@ -286,61 +311,88 @@ function AttachmentItem({ att, onDeleted }) {
           onDownload={(e) => download(e)}
         />
       ) : null}
-      {isImage && imgSrc ? (
-        <button
-          type="button"
-          className="note-attachment-img-btn"
-          onClick={openPreview}
-          aria-label={`Preview ${att.filename || 'image'}`}
-        >
-          <img src={imgSrc} alt={att.filename} className="note-attachment-img" />
-        </button>
-      ) : isPdf ? (
-        <button
-          type="button"
-          className="note-attachment-file note-attachment-file--preview"
-          onClick={openPreview}
-          disabled={pdfLoading}
-        >
-          <AttachmentIcon />
-          <span className="note-attachment-filename">{att.filename}</span>
-          <span className="note-attachment-size">
-            ({Math.round((att.byte_size || 0) / 1024)} KB){pdfLoading ? ' …' : ''}
-          </span>
-        </button>
-      ) : (
-        <button type="button" className="note-attachment-file" onClick={download}>
-          <AttachmentIcon />
-          <span className="note-attachment-filename">{att.filename}</span>
-          <span className="note-attachment-size">({Math.round((att.byte_size || 0) / 1024)} KB)</span>
-        </button>
-      )}
-      {onDeleted && (
-        <button
-          type="button"
-          className="note-attachment-remove"
-          onClick={(e) => {
-            e.stopPropagation();
-            const name = att.filename || 'this file';
-            if (
-              !window.confirm(
-                `Remove “${name}” from this note?\n\nThe file will be permanently deleted from the server.`
-              )
-            ) {
-              return;
-            }
-            onDeleted(att);
-          }}
-          aria-label={`Remove ${att.filename}`}
-        >
-          ×
-        </button>
-      )}
+      <div className="note-attachment-thumb-frame">
+        {showReorder ? (
+          <div className="note-attachment-reorder-cluster">
+            <button
+              type="button"
+              className="note-attachment-reorder-btn"
+              disabled={index === 0 || reorderBusy}
+              onClick={onMoveLeft}
+              aria-label="Move attachment left"
+              title="Move left"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="note-attachment-reorder-btn"
+              disabled={index >= total - 1 || reorderBusy}
+              onClick={onMoveRight}
+              aria-label="Move attachment right"
+              title="Move right"
+            >
+              ›
+            </button>
+          </div>
+        ) : null}
+        {isImage && imgSrc ? (
+          <button
+            type="button"
+            className="note-attachment-thumb-hit"
+            onClick={openPreview}
+            aria-label={`Preview ${name}`}
+          >
+            <img src={imgSrc} alt="" className="note-attachment-thumb-img" />
+          </button>
+        ) : isPdf ? (
+          <button
+            type="button"
+            className="note-attachment-thumb-hit note-attachment-thumb-hit--file"
+            onClick={openPreview}
+            disabled={pdfLoading}
+            aria-label={`Preview PDF ${name}`}
+          >
+            <NonImageAttachmentPlaceholder />
+          </button>
+        ) : (
+          <button type="button" className="note-attachment-thumb-hit note-attachment-thumb-hit--file" onClick={openNonImage}>
+            <NonImageAttachmentPlaceholder />
+          </button>
+        )}
+        {onDeleted ? (
+          <button
+            type="button"
+            className="note-attachment-remove"
+            onClick={(e) => {
+              e.stopPropagation();
+              const nm = att.filename || 'this file';
+              if (
+                !window.confirm(
+                  `Remove “${nm}” from this note?\n\nThe file will be permanently deleted from the server.`
+                )
+              ) {
+                return;
+              }
+              onDeleted(att);
+            }}
+            aria-label={`Remove ${name}`}
+            title="Remove file"
+          >
+            ×
+          </button>
+        ) : null}
+      </div>
+      <div className="note-attachment-tile-caption" title={name}>
+        {name}
+      </div>
     </div>
   );
 }
 
-export default function NoteAttachments({ attachments, onDeleted, excludeAttachmentIds }) {
+export default function NoteAttachments({ attachments, onDeleted, excludeAttachmentIds, onReorderAttachments }) {
+  const [reorderBusy, setReorderBusy] = useState(false);
+
   if (!attachments?.length) return null;
   const exclude =
     excludeAttachmentIds != null && excludeAttachmentIds.length > 0
@@ -350,10 +402,30 @@ export default function NoteAttachments({ attachments, onDeleted, excludeAttachm
     ? attachments.filter((a) => a?.id != null && !exclude.has(String(a.id)))
     : attachments;
   if (!list.length) return null;
+
+  const persistSwap = useCallback(
+    async (i, j) => {
+      if (!onReorderAttachments || i === j) return;
+      const ids = list.map((a) => String(a.id));
+      const next = [...ids];
+      [next[i], next[j]] = [next[j], next[i]];
+      await onReorderAttachments(next);
+    },
+    [list, onReorderAttachments]
+  );
+
   return (
-    <div className="note-attachments">
-      {list.map((a) => (
-        <AttachmentItem key={a.id} att={a} onDeleted={onDeleted} />
+    <div className="note-attachments-row">
+      {list.map((a, i) => (
+        <AttachmentItem
+          key={a.id}
+          att={a}
+          index={i}
+          total={list.length}
+          onDeleted={onDeleted}
+          onReorderPersist={onReorderAttachments ? persistSwap : null}
+          reorderBusy={reorderBusy}
+        />
       ))}
     </div>
   );

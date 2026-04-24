@@ -328,6 +328,18 @@ export async function removeNoteTag(noteId, tagId) {
   if (!r.ok) throw new Error('Failed to remove tag');
 }
 
+export async function patchNoteAttachmentOrder(noteId, orderedBlobIds) {
+  const r = await fetch(`${API}/notes/${encodeURIComponent(noteId)}/attachments-order`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify({ ordered_blob_ids: orderedBlobIds }),
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to reorder attachments');
+  }
+}
+
 export async function uploadNoteFiles(noteId, files) {
   if (!files?.length) return [];
   const fd = new FormData();

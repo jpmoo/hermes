@@ -162,6 +162,12 @@ router.post('/:id/attachments', (req, res, next) => {
       logOcr('attachments_skip_ocr', { noteId, reason: 'note_already_has_content' });
     }
 
+    const maxSort = await pool.query(
+      `SELECT COALESCE(MAX(sort_index), -1)::int AS m FROM note_file_blobs WHERE note_id = $1::uuid AND user_id = $2`,
+      [noteId, userId]
+    );
+    let nextSort = (maxSort.rows[0]?.m ?? -1) + 1;
+
     const inserted = [];
     const ocrPieces = [];
     const ocrStats = [];
@@ -170,11 +176,12 @@ router.post('/:id/attachments', (req, res, next) => {
       if (!buf?.length) continue;
       const filename = f.originalname?.slice(0, 512) || 'file';
       const mime = f.mimetype || 'application/octet-stream';
+      const si = nextSort++;
       const ins = await pool.query(
-        `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data, sort_index)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, filename, mime_type, byte_size`,
-        [noteId, userId, filename, mime, buf.length, buf]
+        [noteId, userId, filename, mime, buf.length, buf, si]
       );
       inserted.push(ins.rows[0]);
       if (runOcr) {
@@ -210,6 +217,51 @@ router.post('/:id/attachments', (req, res, next) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+/** Set display order of attachments on a note (`ordered_blob_ids` = full permutation of blob ids). */
+router.patch('/:id/attachments-order', async (req, res) => {
+  const noteId = req.params.id;
+  const userId = req.userId;
+  const raw = req.body?.ordered_blob_ids;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return res.status(400).json({ error: 'ordered_blob_ids (non-empty array) required' });
+  }
+  const ordered = raw.map((x) => String(x).trim()).filter(Boolean);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const cur = await client.query(
+      `SELECT id::text FROM note_file_blobs WHERE note_id = $1::uuid AND user_id = $2`,
+      [noteId, userId]
+    );
+    const existing = new Set(cur.rows.map((r) => r.id));
+    if (ordered.length !== existing.size) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'ordered_blob_ids must list every attachment on this note exactly once' });
+    }
+    for (const id of ordered) {
+      if (!existing.has(id)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Unknown blob id for this note' });
+      }
+    }
+    for (let i = 0; i < ordered.length; i++) {
+      await client.query(
+        `UPDATE note_file_blobs SET sort_index = $1::int
+         WHERE id = $2::uuid AND note_id = $3::uuid AND user_id = $4`,
+        [i, ordered[i], noteId, userId]
+      );
+    }
+    await client.query('COMMIT');
+    res.status(204).send();
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update attachment order' });
+  } finally {
+    client.release();
   }
 });
 
