@@ -675,11 +675,11 @@
   scroll-margin-bottom: 1rem;
 }
 
-/* Manual sort: handle in the reply gutter; card flexes beside it */
+/* Manual sort: compact handle in gutter; card flexes beside it */
 .stream-page-note-li__row {
   display: flex;
-  align-items: stretch;
-  gap: 0.35rem;
+  align-items: flex-start;
+  gap: 0.3rem;
 }
 
 .stream-page-note-li__card {
@@ -689,18 +689,18 @@
 
 .stream-page-manual-sort-handle {
   flex-shrink: 0;
-  width: 0.95rem;
-  align-self: stretch;
-  min-height: 2.25rem;
-  margin-top: 0.12rem;
-  border-radius: 6px;
+  width: 0.65rem;
+  height: 0.85rem;
+  min-height: 0;
+  margin-top: 0.38rem;
+  border-radius: 4px;
   cursor: grab;
   color: var(--text-muted);
   opacity: 0.5;
-  background-image: radial-gradient(currentColor 1px, transparent 1.6px);
-  background-size: 3px 5px;
-  background-position: 50% 40%;
-  background-repeat: space repeat;
+  background-image: radial-gradient(currentColor 0.85px, transparent 1.35px);
+  background-size: 2.5px 4px;
+  background-position: 50% 50%;
+  background-repeat: repeat-y;
 }
 
 .stream-page-manual-sort-handle:hover {
@@ -710,6 +710,39 @@
 
 .stream-page-manual-sort-handle:active {
   cursor: grabbing;
+}
+
+/* Drop targets while dragging a reply (manual sort) */
+.stream-page-replies > li.stream-page-drop-slot {
+  list-style: none;
+  margin: 0;
+  padding: 0.12rem 0;
+  min-height: 0.55rem;
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  scroll-margin-top: 0;
+  scroll-margin-bottom: 0;
+}
+
+.stream-page-drop-slot-line {
+  width: 100%;
+  height: 1px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  opacity: 0.55;
+  pointer-events: none;
+  transition:
+    height 0.06s ease,
+    opacity 0.06s ease,
+    background 0.06s ease;
+}
+
+.stream-page-drop-slot--active .stream-page-drop-slot-line {
+  height: 3px;
+  opacity: 1;
+  background: var(--accent);
 }
 
 .stream-page-replies {

@@ -1,4 +1,12 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  Fragment,
+} from 'react';
 import { flushSync } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
@@ -84,16 +92,15 @@ function noteIdEq(a, b) {
   return String(a) === String(b);
 }
 
-/** Reorder UUID/id list: move `draggedId` to the slot of `dropTargetId` (insert-before semantics). */
-function reorderSiblingIds(ids, draggedId, dropTargetId) {
-  const from = ids.indexOf(draggedId);
-  const to = ids.indexOf(dropTargetId);
-  if (from < 0 || to < 0 || from === to) return null;
-  const next = [...ids];
-  const [item] = next.splice(from, 1);
-  let insertAt = to;
-  if (from < to) insertAt -= 1;
-  next.splice(insertAt, 0, item);
+/** Reorder id list: insert `draggedId` at visual slot index `slot` (0 = before first, length = after last). */
+function reorderIdsForDropSlot(ids, draggedId, slot) {
+  const sid = String(draggedId).trim();
+  const dragged = ids.find((id) => String(id) === sid);
+  if (!dragged) return null;
+  const rest = ids.filter((id) => String(id) !== sid);
+  const s = Math.max(0, Math.min(Number(slot) || 0, rest.length));
+  const next = [...rest];
+  next.splice(s, 0, dragged);
   return next;
 }
 
@@ -433,13 +440,160 @@ function StreamList({
   /** Thread reply list: show drag handles and persist order (manual sort mode). */
   streamManualSortActive = false,
   onStreamManualReorder = null,
+  /** Stream thread scrollport (`.stream-page-scroll-main`); used for edge auto-scroll while dragging replies. */
+  streamScrollElRef = null,
 }) {
   const showManualHandles =
     streamManualSortActive && depth > 0 && typeof onStreamManualReorder === 'function';
 
+  const [manualDragId, setManualDragId] = useState(null);
+  const [manualDropSlot, setManualDropSlot] = useState(null);
+  const manualDragClientYRef = useRef(null);
+
+  useEffect(() => {
+    if (!manualDragId) return undefined;
+    const clear = () => {
+      setManualDragId(null);
+      setManualDropSlot(null);
+    };
+    window.addEventListener('dragend', clear);
+    return () => window.removeEventListener('dragend', clear);
+  }, [manualDragId]);
+
+  useEffect(() => {
+    if (!showManualHandles || manualDragId == null) return undefined;
+    const scrollEl = streamScrollElRef?.current;
+    if (!scrollEl || scrollEl.scrollHeight <= scrollEl.clientHeight + 1) return undefined;
+
+    const EDGE_PX = 80;
+    const MAX_STEP = 28;
+
+    const onDragOver = (e) => {
+      manualDragClientYRef.current = e.clientY;
+    };
+    document.addEventListener('dragover', onDragOver, { capture: true });
+
+    let rafId = 0;
+    let stopped = false;
+    const tick = () => {
+      if (stopped) return;
+      const el = streamScrollElRef?.current;
+      const y = manualDragClientYRef.current;
+      if (el != null && y != null) {
+        const r = el.getBoundingClientRect();
+        let delta = 0;
+        if (y < r.top + EDGE_PX) {
+          const t = Math.min(1, Math.max(0, (r.top + EDGE_PX - y) / EDGE_PX));
+          delta = -MAX_STEP * t;
+        } else if (y > r.bottom - EDGE_PX) {
+          const t = Math.min(1, Math.max(0, (y - (r.bottom - EDGE_PX)) / EDGE_PX));
+          delta = MAX_STEP * t;
+        }
+        if (delta !== 0) {
+          el.scrollTop = Math.min(
+            el.scrollHeight - el.clientHeight,
+            Math.max(0, el.scrollTop + delta)
+          );
+        }
+      }
+      rafId = window.requestAnimationFrame(tick);
+    };
+    rafId = window.requestAnimationFrame(tick);
+
+    return () => {
+      stopped = true;
+      document.removeEventListener('dragover', onDragOver, true);
+      window.cancelAnimationFrame(rafId);
+      manualDragClientYRef.current = null;
+    };
+  }, [showManualHandles, manualDragId, streamScrollElRef]);
+
+  const showDropLines = showManualHandles && manualDragId != null;
+
+  const renderNoteRow = (n, parentTagsForInherit) => (
+    <div className="stream-page-note-li__row">
+      {showManualHandles ? (
+        <span
+          className="stream-page-manual-sort-handle"
+          draggable
+          onDragStart={(e) => {
+            e.stopPropagation();
+            const id = String(n.id);
+            e.dataTransfer.setData('text/plain', id);
+            e.dataTransfer.effectAllowed = 'move';
+            setManualDragId(id);
+            setManualDropSlot(null);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          role="button"
+          tabIndex={0}
+          aria-label="Drag to reorder reply"
+          title="Drag to reorder"
+        />
+      ) : null}
+      <div className="stream-page-note-li__card">
+        <NoteCard
+          note={n}
+          depth={depth}
+          hideStar={depth === 0}
+          hideDelete={
+            streamFocusHideDeleteId != null &&
+            depth === 0 &&
+            noteIdEq(n.id, streamFocusHideDeleteId)
+          }
+          streamThreadSortSlot={
+            streamHeadSortSlot &&
+            streamHeadSortTargetId != null &&
+            depth === 0 &&
+            noteIdEq(n.id, streamHeadSortTargetId)
+              ? streamHeadSortSlot
+              : null
+          }
+          hasReplies={(n.children?.length ?? 0) > 0}
+          hoverInsightEnabled
+          drillOnSingleClick
+          parentTagsForInherit={parentTagsForInherit}
+          onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
+          onStarredChange={onStarredChange}
+          onNoteUpdate={onNoteUpdate}
+          onNoteDelete={onNoteDelete}
+          onMoveNote={onMoveNote}
+        />
+      </div>
+    </div>
+  );
+
+  const renderDropSlot = (slotIndex) => (
+    <li
+      key={`stream-drop-slot-${slotIndex}`}
+      role="presentation"
+      className={`stream-page-drop-slot${manualDropSlot === slotIndex ? ' stream-page-drop-slot--active' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        setManualDropSlot(slotIndex);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const draggedId = e.dataTransfer.getData('text/plain')?.trim();
+        if (!draggedId || !onStreamManualReorder) return;
+        const ids = nodes.map((x) => x.id);
+        const next = reorderIdsForDropSlot(ids, draggedId, slotIndex);
+        if (next) onStreamManualReorder(next);
+        setManualDragId(null);
+        setManualDropSlot(null);
+      }}
+    >
+      <div className="stream-page-drop-slot-line" aria-hidden />
+    </li>
+  );
+
   return (
     <>
-      {nodes.map((n) => {
+      {nodes.map((n, i) => {
         const levelDropMs = exitToRoot ? undefined : levelDropDelays?.get(n.id);
         const replyMs =
           exitToRoot ? undefined : !levelDropMs && depth > 0 ? staggerDelays?.get(n.id) : undefined;
@@ -458,109 +612,45 @@ function StreamList({
               ? threadById?.get(n.parent_id)?.tags ?? []
               : [];
         return (
-          <li
-            key={n.id}
-            data-stream-note={n.id}
-            className={animClass}
-            style={
-              !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined
-            }
-            onDragOver={
-              showManualHandles
-                ? (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                  }
-                : undefined
-            }
-            onDrop={
-              showManualHandles
-                ? (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const draggedId = e.dataTransfer.getData('text/plain')?.trim();
-                    if (!draggedId) return;
-                    const ids = nodes.map((x) => x.id);
-                    const next = reorderSiblingIds(ids, draggedId, n.id);
-                    if (next) onStreamManualReorder(next);
-                  }
-                : undefined
-            }
-          >
-            <div className="stream-page-note-li__row">
-              {showManualHandles ? (
-                <span
-                  className="stream-page-manual-sort-handle"
-                  draggable
-                  onDragStart={(e) => {
-                    e.stopPropagation();
-                    e.dataTransfer.setData('text/plain', String(n.id));
-                    e.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Drag to reorder reply"
-                  title="Drag to reorder"
-                />
-              ) : null}
-              <div className="stream-page-note-li__card">
-                <NoteCard
-                  note={n}
-                  depth={depth}
-                  hideStar={depth === 0}
-                  hideDelete={
-                    streamFocusHideDeleteId != null &&
-                    depth === 0 &&
-                    noteIdEq(n.id, streamFocusHideDeleteId)
-                  }
-                  streamThreadSortSlot={
-                    streamHeadSortSlot &&
-                    streamHeadSortTargetId != null &&
-                    depth === 0 &&
-                    noteIdEq(n.id, streamHeadSortTargetId)
-                      ? streamHeadSortSlot
-                      : null
-                  }
-                  hasReplies={(n.children?.length ?? 0) > 0}
-                  hoverInsightEnabled
-                  drillOnSingleClick
-                  parentTagsForInherit={parentTagsForInherit}
-                  onOpenThread={(ev) => onFocusNote(n.id, ev, depth)}
-                  onStarredChange={onStarredChange}
-                  onNoteUpdate={onNoteUpdate}
-                  onNoteDelete={onNoteDelete}
-                  onMoveNote={onMoveNote}
-                />
-              </div>
-            </div>
-            {n.children?.length > 0 && depth === 0 && (
-              <ul className="stream-page-replies">
-                <StreamList
-                  nodes={n.children}
-                  depth={depth + 1}
-                  parentTags={n.tags || []}
-                  threadById={threadById}
-                  onFocusNote={onFocusNote}
-                  onStarredChange={onStarredChange}
-                  onNoteUpdate={onNoteUpdate}
-                  onNoteDelete={onNoteDelete}
-                  staggerDelays={staggerDelays}
-                  levelDropDelays={levelDropDelays}
-                  exitToRoot={exitToRoot}
-                  streamFocusHideDeleteId={streamFocusHideDeleteId}
-                  streamHeadSortTargetId={streamHeadSortTargetId}
-                  streamHeadSortSlot={streamHeadSortSlot}
-                  onMoveNote={onMoveNote}
-                  streamManualSortActive={streamManualSortActive}
-                  onStreamManualReorder={onStreamManualReorder}
-                />
-              </ul>
-            )}
-          </li>
+          <Fragment key={n.id}>
+            {showDropLines ? renderDropSlot(i) : null}
+            <li
+              data-stream-note={n.id}
+              className={animClass}
+              style={
+                !exitToRoot && delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined
+              }
+            >
+              {renderNoteRow(n, parentTagsForInherit)}
+              {n.children?.length > 0 && depth === 0 && (
+                <ul className="stream-page-replies">
+                  <StreamList
+                    nodes={n.children}
+                    depth={depth + 1}
+                    parentTags={n.tags || []}
+                    threadById={threadById}
+                    onFocusNote={onFocusNote}
+                    onStarredChange={onStarredChange}
+                    onNoteUpdate={onNoteUpdate}
+                    onNoteDelete={onNoteDelete}
+                    staggerDelays={staggerDelays}
+                    levelDropDelays={levelDropDelays}
+                    exitToRoot={exitToRoot}
+                    streamFocusHideDeleteId={streamFocusHideDeleteId}
+                    streamHeadSortTargetId={streamHeadSortTargetId}
+                    streamHeadSortSlot={streamHeadSortSlot}
+                    onMoveNote={onMoveNote}
+                    streamManualSortActive={streamManualSortActive}
+                    onStreamManualReorder={onStreamManualReorder}
+                    streamScrollElRef={streamScrollElRef}
+                  />
+                </ul>
+              )}
+            </li>
+          </Fragment>
         );
       })}
+      {showDropLines ? renderDropSlot(nodes.length) : null}
     </>
   );
 }
@@ -2033,6 +2123,7 @@ export default function StreamPage() {
                       onMoveNote={handleOpenMoveNote}
                       streamManualSortActive={threadSortPrefs.sortMode === 'manual'}
                       onStreamManualReorder={handleStreamManualReorder}
+                      streamScrollElRef={streamScrollRef}
                     />
                   </ul>
                 </div>
