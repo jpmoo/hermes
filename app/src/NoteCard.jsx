@@ -12,6 +12,7 @@ import {
   deleteNoteFile,
   uploadNoteFiles,
   patchNoteAttachmentOrder,
+  patchNoteBannerAttachment,
   getNoteThreadRoot,
   createSpaztickTaskFromNote,
 } from './api';
@@ -41,7 +42,7 @@ import {
   NoteCardIconSpaztick,
 } from './icons/NoteCardActionIcons';
 import { effectiveDescendantCount } from './noteDescendantCount';
-import { firstImageAttachment } from './attachmentUtils';
+import { bannerImageAttachment, firstImageAttachment, noteFileUrl } from './attachmentUtils';
 import './NoteCard.css';
 
 function normBlobId(x) {
@@ -128,6 +129,8 @@ export default function NoteCard({
   const [inheritLoading, setInheritLoading] = useState(false);
   const [spaztickBusy, setSpaztickBusy] = useState(false);
   const [mergeBusy, setMergeBusy] = useState(false);
+  const [bannerBusy, setBannerBusy] = useState(false);
+  const [bannerImgSrc, setBannerImgSrc] = useState(null);
   /** While editing: pending blob order (null = same as server list). Persisted only on Save. */
   const [editAttachmentOrderIds, setEditAttachmentOrderIds] = useState(null);
 
@@ -147,6 +150,13 @@ export default function NoteCard({
     return firstImageAttachment(note);
   }, [editing, note.note_type, note.attachments]);
 
+  const cardBannerAttachment = useMemo(() => {
+    if (editing) return null;
+    const t = note.note_type || 'note';
+    if (t !== 'note' && t !== 'event') return null;
+    return bannerImageAttachment(note);
+  }, [editing, note.note_type, note.attachments]);
+
   useEffect(() => {
     setEditContent(note.content || '');
   }, [note.id, note.content]);
@@ -154,6 +164,31 @@ export default function NoteCard({
   useEffect(() => {
     setRenderedContent(note.content || '');
   }, [note.id, note.content]);
+
+  useEffect(() => {
+    if (!cardBannerAttachment?.id) {
+      setBannerImgSrc(null);
+      return undefined;
+    }
+    let objectUrl;
+    let cancelled = false;
+    const t = localStorage.getItem('hermes_token');
+    fetch(noteFileUrl(cardBannerAttachment.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((blob) => {
+        if (cancelled || !blob) return;
+        objectUrl = URL.createObjectURL(blob);
+        setBannerImgSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setBannerImgSrc(null);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setBannerImgSrc(null);
+    };
+  }, [cardBannerAttachment?.id]);
 
   useEffect(() => {
     renderedContentRef.current = renderedContent || '';
@@ -501,6 +536,23 @@ export default function NoteCard({
     setEditAttachmentOrderIds(orderedBlobIds);
   }, []);
 
+  const handleEditAttachmentBannerToggle = useCallback(
+    async (att, checked) => {
+      if (!att?.id || bannerBusy) return;
+      setBannerBusy(true);
+      try {
+        await patchNoteBannerAttachment(note.id, checked ? att.id : null);
+        onNoteUpdate?.();
+      } catch (err) {
+        console.error(err);
+        window.alert(err?.message || 'Could not update banner image');
+      } finally {
+        setBannerBusy(false);
+      }
+    },
+    [note.id, onNoteUpdate, bannerBusy]
+  );
+
   const handleEditAddFiles = async (e) => {
     e.stopPropagation();
     const files = Array.from(e.target.files || []);
@@ -650,6 +702,11 @@ export default function NoteCard({
 
   const readOnlyNoteColumn = (
     <>
+      {cardBannerAttachment && bannerImgSrc ? (
+        <div className="note-card-banner-wrap">
+          <img src={bannerImgSrc} alt="" className="note-card-banner-img" />
+        </div>
+      ) : null}
       <div className="note-card-content">
         {renderedContent?.trim() ? (
           <NoteRichText
@@ -750,6 +807,9 @@ export default function NoteCard({
                   attachments={editFormAttachments}
                   onDeleted={handleDeleteAttachment}
                   onReorderAttachments={handleEditAttachmentReorderDraft}
+                  showBannerToggle={editNoteType === 'note' || editNoteType === 'event'}
+                  onToggleBanner={handleEditAttachmentBannerToggle}
+                  bannerBusy={bannerBusy}
                 />
               ) : null}
             </div>

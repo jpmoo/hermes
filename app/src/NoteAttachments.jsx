@@ -166,7 +166,18 @@ export function PersonProfileAvatar({ att }) {
   );
 }
 
-function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorderBusy, setReorderBusy }) {
+function AttachmentItem({
+  att,
+  index,
+  total,
+  onDeleted,
+  onReorderPersist,
+  reorderBusy,
+  setReorderBusy,
+  showBannerToggle,
+  onToggleBanner,
+  bannerBusy,
+}) {
   const [imgSrc, setImgSrc] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewKind, setPreviewKind] = useState(null);
@@ -293,6 +304,7 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
     e.stopPropagation();
     download(e);
   };
+  const bannerChecked = att.is_banner === true;
 
   return (
     <div className="note-attachment-tile">
@@ -382,11 +394,34 @@ function AttachmentItem({ att, index, total, onDeleted, onReorderPersist, reorde
       <div className="note-attachment-tile-caption" title={name}>
         {name}
       </div>
+      {showBannerToggle ? (
+        <label className="note-attachment-banner-toggle" title="Render this image as the card header banner">
+          <input
+            type="checkbox"
+            checked={bannerChecked}
+            disabled={bannerBusy}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleBanner?.(att, e.target.checked);
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <span>Banner</span>
+        </label>
+      ) : null}
     </div>
   );
 }
 
-export default function NoteAttachments({ attachments, onDeleted, excludeAttachmentIds, onReorderAttachments }) {
+export default function NoteAttachments({
+  attachments,
+  onDeleted,
+  excludeAttachmentIds,
+  onReorderAttachments,
+  showBannerToggle = false,
+  onToggleBanner = null,
+  bannerBusy = false,
+}) {
   const [reorderBusy, setReorderBusy] = useState(false);
 
   if (!attachments?.length) return null;
@@ -433,6 +468,9 @@ export default function NoteAttachments({ attachments, onDeleted, excludeAttachm
           onReorderPersist={onReorderAttachments ? persistSwap : null}
           reorderBusy={reorderBusy}
           setReorderBusy={setReorderBusy}
+          showBannerToggle={showBannerToggle && isImageMime(a.mime_type, a.filename)}
+          onToggleBanner={onToggleBanner}
+          bannerBusy={bannerBusy}
         />
       ))}
     </div>

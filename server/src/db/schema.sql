@@ -60,11 +60,15 @@ CREATE TABLE IF NOT EXISTS note_file_blobs (
   byte_size  BIGINT NOT NULL,
   data       BYTEA NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
-  sort_index INTEGER NOT NULL DEFAULT 0
+  sort_index INTEGER NOT NULL DEFAULT 0,
+  is_banner  BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE INDEX IF NOT EXISTS idx_note_file_blobs_note ON note_file_blobs(note_id);
 CREATE INDEX IF NOT EXISTS idx_note_file_blobs_user ON note_file_blobs(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_note_file_blobs_one_banner_per_note
+  ON note_file_blobs (note_id)
+  WHERE is_banner = true;
 
 -- Optional account background image (Stream default / Canvas)
 CREATE TABLE IF NOT EXISTS user_background_blobs (

@@ -21,7 +21,7 @@ import { mergeIntoAboveSiblingIdFromSortedChildren, mergeNoteIntoSiblingAbove } 
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
-import { userBackgroundFileUrl, firstImageAttachment, noteFileUrl } from './attachmentUtils';
+import { userBackgroundFileUrl, bannerImageAttachment, noteFileUrl } from './attachmentUtils';
 import {
   getThread,
   getRoots,
@@ -717,7 +717,7 @@ export default function CanvasPage() {
     );
   }, [threadRootId, canvasStreamHeadHideDeleteId, threadById, thread]);
 
-  const threadBgImageAtt = useMemo(() => firstImageAttachment(threadBgHeadNote), [threadBgHeadNote]);
+  const threadBgImageAtt = useMemo(() => bannerImageAttachment(threadBgHeadNote), [threadBgHeadNote]);
 
   const showCanvasNoteAttachmentBg = Boolean(
     threadRootId && streamThreadImageBgEnabled && threadBgImageAtt?.id

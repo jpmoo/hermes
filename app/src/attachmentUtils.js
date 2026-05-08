@@ -34,3 +34,13 @@ export function firstImageAttachment(note) {
   }
   return null;
 }
+
+export function bannerImageAttachment(note) {
+  const list = note?.attachments;
+  if (!Array.isArray(list)) return null;
+  for (const a of list) {
+    if (!a || a.id == null || a.is_banner !== true) continue;
+    if (isImageMime(a.mime_type, a.filename)) return a;
+  }
+  return firstImageAttachment(note);
+}

@@ -41,7 +41,7 @@ router.patch('/:id/assign-note', async (req, res) => {
   }
   try {
     const r = await pool.query(
-      `UPDATE note_file_blobs f SET note_id = $1::uuid
+      `UPDATE note_file_blobs f SET note_id = $1::uuid, is_banner = false
        FROM notes src, notes dst
        WHERE f.id = $2::uuid AND f.user_id = $3
          AND src.id = f.note_id AND src.user_id = $3

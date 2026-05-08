@@ -341,6 +341,20 @@ export async function patchNoteAttachmentOrder(noteId, orderedBlobIds) {
   }
 }
 
+export async function patchNoteBannerAttachment(noteId, attachmentId) {
+  const r = await fetch(`${API}/notes/${encodeURIComponent(noteId)}/banner-attachment`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify({
+      attachment_id: attachmentId == null ? null : String(attachmentId),
+    }),
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to update banner attachment');
+  }
+}
+
 export async function uploadNoteFiles(noteId, files) {
   if (!files?.length) return [];
   const fd = new FormData();

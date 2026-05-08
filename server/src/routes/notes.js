@@ -266,6 +266,69 @@ router.patch('/:id/attachments-order', async (req, res) => {
   }
 });
 
+/** Set or clear a note banner attachment (`attachment_id` nullable). Exactly one banner per note. */
+router.patch('/:id/banner-attachment', async (req, res) => {
+  const noteId = req.params.id;
+  const userId = req.userId;
+  const rawAttachmentId = req.body?.attachment_id;
+  const hasAttachmentId = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'attachment_id');
+  if (!hasAttachmentId) {
+    return res.status(400).json({ error: 'attachment_id is required (uuid or null)' });
+  }
+  const attachmentId = rawAttachmentId == null || rawAttachmentId === '' ? null : String(rawAttachmentId).trim();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const own = await client.query('SELECT id FROM notes WHERE id = $1::uuid AND user_id = $2', [noteId, userId]);
+    if (own.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Note not found' });
+    }
+    if (attachmentId == null) {
+      await client.query(
+        `UPDATE note_file_blobs
+         SET is_banner = false
+         WHERE note_id = $1::uuid AND user_id = $2`,
+        [noteId, userId]
+      );
+      await client.query('COMMIT');
+      return res.status(204).send();
+    }
+    const target = await client.query(
+      `SELECT id, mime_type, filename
+       FROM note_file_blobs
+       WHERE id = $1::uuid AND note_id = $2::uuid AND user_id = $3`,
+      [attachmentId, noteId, userId]
+    );
+    if (target.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Attachment not found on this note' });
+    }
+    const t = target.rows[0];
+    const isImage =
+      (typeof t.mime_type === 'string' && t.mime_type.startsWith('image/')) ||
+      (typeof t.filename === 'string' && /\.(jpe?g|png|gif|webp|avif|bmp|svg|heic)$/i.test(t.filename));
+    if (!isImage) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Banner attachment must be an image' });
+    }
+    await client.query(
+      `UPDATE note_file_blobs
+       SET is_banner = (id = $3::uuid)
+       WHERE note_id = $1::uuid AND user_id = $2`,
+      [noteId, userId, attachmentId]
+    );
+    await client.query('COMMIT');
+    return res.status(204).send();
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update banner attachment' });
+  } finally {
+    client.release();
+  }
+});
+
 // Root feed: root threads only; optional starred filter. Order ASC by edit time (events use start time), matching in-thread message order (oldest first, newest at bottom).
 router.get('/roots', async (req, res) => {
   try {

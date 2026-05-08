@@ -171,6 +171,20 @@
   word-break: break-word;
 }
 
+.note-attachment-banner-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.1rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.note-attachment-banner-toggle input {
+  margin: 0;
+}
+
 /* Full-screen preview (images + PDF) */
 .note-attachment-preview-backdrop {
   position: fixed;

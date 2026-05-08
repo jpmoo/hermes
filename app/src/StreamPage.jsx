@@ -50,7 +50,7 @@ import {
 import StreamThreadSortControl from './StreamThreadSortControl';
 import { useNoteTypeFilter } from './NoteTypeFilterContext';
 import { useNoteTypeColors } from './NoteTypeColorContext';
-import { firstImageAttachment, userBackgroundFileUrl, noteFileUrl } from './attachmentUtils';
+import { bannerImageAttachment, userBackgroundFileUrl, noteFileUrl } from './attachmentUtils';
 import StreamThreadImageBackground from './StreamThreadImageBackground';
 import { useMediaQuery } from './useMediaQuery';
 import { HERMES_COMPACT_VIEWPORT_QUERY } from './canvasLayoutApi';
@@ -1539,7 +1539,7 @@ export default function StreamPage() {
     );
   }, [threadRootId, streamHeadHideDeleteId, threadById, thread]);
 
-  const threadBgImageAtt = useMemo(() => firstImageAttachment(threadBgHeadNote), [threadBgHeadNote]);
+  const threadBgImageAtt = useMemo(() => bannerImageAttachment(threadBgHeadNote), [threadBgHeadNote]);
 
   const showStreamNoteAttachmentBg = Boolean(
     threadRootId && streamThreadImageBgEnabled && threadBgImageAtt?.id
