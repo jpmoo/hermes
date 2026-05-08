@@ -729,9 +729,10 @@ export default function NoteCard({
       {eventRangeLabel ? <p className="note-card-event-range">{eventRangeLabel}</p> : null}
       <NoteAttachments
         attachments={note.attachments}
-        excludeAttachmentIds={
-          profileImageAttachment ? [profileImageAttachment.id] : undefined
-        }
+        excludeAttachmentIds={[
+          ...(profileImageAttachment ? [profileImageAttachment.id] : []),
+          ...(cardBannerAttachment ? [cardBannerAttachment.id] : []),
+        ]}
       />
       {tags.length > 0 && (
         <div className="note-card-tags">
