@@ -314,9 +314,15 @@ router.patch('/:id/banner-attachment', async (req, res) => {
     }
     await client.query(
       `UPDATE note_file_blobs
-       SET is_banner = (id = $3::uuid)
+       SET is_banner = false
        WHERE note_id = $1::uuid AND user_id = $2`,
-      [noteId, userId, attachmentId]
+      [noteId, userId]
+    );
+    await client.query(
+      `UPDATE note_file_blobs
+       SET is_banner = true
+       WHERE id = $1::uuid AND note_id = $2::uuid AND user_id = $3`,
+      [attachmentId, noteId, userId]
     );
     await client.query('COMMIT');
     return res.status(204).send();

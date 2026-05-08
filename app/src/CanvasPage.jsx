@@ -128,6 +128,7 @@ function flattenCanvasNotes(displayTree) {
 
 const DEFAULT_CARD_W = 340;
 const DEFAULT_CARD_H = 220;
+const DEFAULT_CARD_H_WITH_BANNER = 320;
 const DEFAULT_CARD_GAP_Y = 36;
 const DEFAULT_CARD_START_X = 48;
 const DEFAULT_CARD_START_Y = 48;
@@ -146,12 +147,17 @@ function canvasLeadNoteId(displayTree, focusId, threadRootId) {
 }
 
 /** Vertical timeline: older notes higher, newer lower. */
-function defaultRectForRank(rank) {
+function defaultCardHeightForNote(note) {
+  return bannerImageAttachment(note) ? DEFAULT_CARD_H_WITH_BANNER : DEFAULT_CARD_H;
+}
+
+function defaultRectForRank(rank, note = null) {
+  const h = defaultCardHeightForNote(note);
   return {
     x: DEFAULT_CARD_START_X,
-    y: DEFAULT_CARD_START_Y + rank * (DEFAULT_CARD_H + DEFAULT_CARD_GAP_Y),
+    y: DEFAULT_CARD_START_Y + rank * (h + DEFAULT_CARD_GAP_Y),
     w: DEFAULT_CARD_W,
-    h: DEFAULT_CARD_H,
+    h,
   };
 }
 
@@ -194,7 +200,7 @@ function rectOverlapsAny(rect, rects, gap) {
  * from DEFAULT_CARD_START_* — the old order picked the fixed corner when it didn’t overlap anything,
  * so new notes appeared off-screen.
  */
-function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects) {
+function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects, note = null) {
   const w = DEFAULT_CARD_W;
   const h = DEFAULT_CARD_H;
   const gap = NEW_CARD_GAP;
@@ -226,7 +232,7 @@ function rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects) 
     }
   }
 
-  candidates.push(defaultRectForRank(rank));
+  candidates.push(defaultRectForRank(rank, note));
 
   let maxBottom = DEFAULT_CARD_START_Y;
   let maxRight = DEFAULT_CARD_START_X;
@@ -885,11 +891,12 @@ export default function CanvasPage() {
       canvasNotes.forEach((n) => {
         const id = String(n.id);
         if (saved[id] && typeof saved[id].x === 'number') {
+          const minBannerH = bannerImageAttachment(n) ? DEFAULT_CARD_H_WITH_BANNER : 0;
           next[id] = {
             x: saved[id].x,
             y: saved[id].y,
             w: saved[id].w,
-            h: saved[id].h,
+            h: Math.max(saved[id].h, minBannerH),
           };
         }
       });
@@ -906,7 +913,7 @@ export default function CanvasPage() {
         const id = String(n.id);
         if (next[id]) return;
         if (savedIsEmpty) {
-          next[id] = defaultRectForRank(rankById.get(id) ?? 0);
+          next[id] = defaultRectForRank(rankById.get(id) ?? 0, n);
         }
       });
 
@@ -945,7 +952,7 @@ export default function CanvasPage() {
           const anchorRect = leadId ? next[leadId] ?? prev[leadId] : null;
           next[id] = rectForNewNoteNearAnchor(anchorRect, existingRects, scale, tx, ty, vw, vh);
         } else {
-          next[id] = rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects);
+          next[id] = rectForNewNoteAvoidOverlap(scale, tx, ty, vw, vh, rank, existingRects, n);
         }
       });
 
@@ -2215,7 +2222,7 @@ export default function CanvasPage() {
                 {sequenceNotesForCanvas.map((n) => {
                   const id = String(n.id);
                   const r =
-                    cardRects[id] || defaultRectForRank(layoutRankById.get(id) ?? 0);
+                    cardRects[id] || defaultRectForRank(layoutRankById.get(id) ?? 0, n);
                   const topIds = new Set(displayTree.map((x) => String(x.id)));
                   const depth = topIds.has(id) ? 0 : 1;
                   const parentTagsForInherit =

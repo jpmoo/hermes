@@ -237,19 +237,18 @@
 }
 
 .note-card-banner-wrap {
-  width: calc(100% + 2.5rem);
-  margin: -1rem -1.25rem 0.2rem;
-  border-radius: 10px 10px 0 0;
+  width: 100%;
+  margin: 0 0 0.2rem;
+  border-radius: 8px;
   overflow: hidden;
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
   background: var(--bg);
-  max-height: 15rem;
+  height: clamp(9rem, 25vh, 15rem);
 }
 
 .note-card-banner-img {
   width: 100%;
   height: 100%;
-  max-height: 15rem;
   object-fit: cover;
   object-position: center;
   display: block;

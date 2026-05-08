@@ -129,10 +129,11 @@ export default function NoteCard({
   const [inheritLoading, setInheritLoading] = useState(false);
   const [spaztickBusy, setSpaztickBusy] = useState(false);
   const [mergeBusy, setMergeBusy] = useState(false);
-  const [bannerBusy, setBannerBusy] = useState(false);
   const [bannerImgSrc, setBannerImgSrc] = useState(null);
   /** While editing: pending blob order (null = same as server list). Persisted only on Save. */
   const [editAttachmentOrderIds, setEditAttachmentOrderIds] = useState(null);
+  /** While editing: selected banner attachment id (null = no banner). */
+  const [editBannerAttachmentId, setEditBannerAttachmentId] = useState(null);
 
   const tags = note.tags || [];
   const eventRangeLabel = formatEventRange(note);
@@ -149,6 +150,15 @@ export default function NoteCard({
     if (t !== 'person' && t !== 'organization') return null;
     return firstImageAttachment(note);
   }, [editing, note.note_type, note.attachments]);
+
+  const persistedBannerAttachmentId = useMemo(() => {
+    const list = note.attachments || [];
+    for (const a of list) {
+      if (!a?.id) continue;
+      if (a.is_banner === true) return a.id;
+    }
+    return null;
+  }, [note.attachments]);
 
   const cardBannerAttachment = useMemo(() => {
     if (editing) return null;
@@ -287,7 +297,11 @@ export default function NoteCard({
       if (attachmentOrderNeedsPersist(editAttachmentOrderIds, note.attachments)) {
         await patchNoteAttachmentOrder(note.id, editAttachmentOrderIds);
       }
+      if (String(editBannerAttachmentId ?? '') !== String(persistedBannerAttachmentId ?? '')) {
+        await patchNoteBannerAttachment(note.id, editBannerAttachmentId);
+      }
       setEditAttachmentOrderIds(null);
+      setEditBannerAttachmentId(persistedBannerAttachmentId);
       setEditing(false);
       onNoteUpdate?.();
     } catch (err) {
@@ -302,6 +316,7 @@ export default function NoteCard({
     setEditContent(note.content || '');
     resetEditMetaFromNote();
     setEditAttachmentOrderIds(null);
+    setEditBannerAttachmentId(persistedBannerAttachmentId);
     setEditing(false);
   };
 
@@ -319,6 +334,7 @@ export default function NoteCard({
     setEditContent(note.content || '');
     resetEditMetaFromNote();
     setEditAttachmentOrderIds(null);
+    setEditBannerAttachmentId(persistedBannerAttachmentId);
     setEditing(true);
   };
 
@@ -536,22 +552,10 @@ export default function NoteCard({
     setEditAttachmentOrderIds(orderedBlobIds);
   }, []);
 
-  const handleEditAttachmentBannerToggle = useCallback(
-    async (att, checked) => {
-      if (!att?.id || bannerBusy) return;
-      setBannerBusy(true);
-      try {
-        await patchNoteBannerAttachment(note.id, checked ? att.id : null);
-        onNoteUpdate?.();
-      } catch (err) {
-        console.error(err);
-        window.alert(err?.message || 'Could not update banner image');
-      } finally {
-        setBannerBusy(false);
-      }
-    },
-    [note.id, onNoteUpdate, bannerBusy]
-  );
+  const handleEditAttachmentBannerToggle = useCallback((att, checked) => {
+    if (!att?.id) return;
+    setEditBannerAttachmentId(checked ? att.id : null);
+  }, []);
 
   const handleEditAddFiles = async (e) => {
     e.stopPropagation();
@@ -645,6 +649,7 @@ export default function NoteCard({
     'note-card--has-type-icon',
     editing ? 'note-card--editing' : '',
     profileImageAttachment ? 'note-card--has-profile-avatar' : '',
+    cardBannerAttachment ? 'note-card--has-banner' : '',
     hoverInsightEnabled && insightActive && !isInsightSelected ? 'note-card--insight-dimmed' : '',
     hoverInsightEnabled && isInsightSelected ? 'note-card--insight-selected' : '',
   ]
@@ -809,7 +814,8 @@ export default function NoteCard({
                   onReorderAttachments={handleEditAttachmentReorderDraft}
                   showBannerToggle={editNoteType === 'note' || editNoteType === 'event'}
                   onToggleBanner={handleEditAttachmentBannerToggle}
-                  bannerBusy={bannerBusy}
+                  bannerBusy={false}
+                  bannerAttachmentId={editBannerAttachmentId}
                 />
               ) : null}
             </div>

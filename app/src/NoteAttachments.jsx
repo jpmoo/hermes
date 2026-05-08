@@ -177,6 +177,7 @@ function AttachmentItem({
   showBannerToggle,
   onToggleBanner,
   bannerBusy,
+  selectedBannerAttachmentId,
 }) {
   const [imgSrc, setImgSrc] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -304,7 +305,10 @@ function AttachmentItem({
     e.stopPropagation();
     download(e);
   };
-  const bannerChecked = att.is_banner === true;
+  const bannerChecked =
+    selectedBannerAttachmentId != null
+      ? String(selectedBannerAttachmentId) === String(att.id)
+      : att.is_banner === true;
 
   return (
     <div className="note-attachment-tile">
@@ -421,6 +425,7 @@ export default function NoteAttachments({
   showBannerToggle = false,
   onToggleBanner = null,
   bannerBusy = false,
+  bannerAttachmentId = undefined,
 }) {
   const [reorderBusy, setReorderBusy] = useState(false);
 
@@ -471,6 +476,7 @@ export default function NoteAttachments({
           showBannerToggle={showBannerToggle && isImageMime(a.mime_type, a.filename)}
           onToggleBanner={onToggleBanner}
           bannerBusy={bannerBusy}
+          selectedBannerAttachmentId={bannerAttachmentId}
         />
       ))}
     </div>
