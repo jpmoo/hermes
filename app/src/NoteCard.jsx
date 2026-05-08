@@ -816,6 +816,7 @@ export default function NoteCard({
                   onToggleBanner={handleEditAttachmentBannerToggle}
                   bannerBusy={false}
                   bannerAttachmentId={editBannerAttachmentId}
+                  bannerSelectionControlled
                 />
               ) : null}
             </div>

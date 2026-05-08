@@ -178,6 +178,7 @@ function AttachmentItem({
   onToggleBanner,
   bannerBusy,
   selectedBannerAttachmentId,
+  bannerSelectionControlled,
 }) {
   const [imgSrc, setImgSrc] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -306,7 +307,7 @@ function AttachmentItem({
     download(e);
   };
   const bannerChecked =
-    selectedBannerAttachmentId != null
+    bannerSelectionControlled
       ? String(selectedBannerAttachmentId) === String(att.id)
       : att.is_banner === true;
 
@@ -426,6 +427,7 @@ export default function NoteAttachments({
   onToggleBanner = null,
   bannerBusy = false,
   bannerAttachmentId = undefined,
+  bannerSelectionControlled = false,
 }) {
   const [reorderBusy, setReorderBusy] = useState(false);
 
@@ -477,6 +479,7 @@ export default function NoteAttachments({
           onToggleBanner={onToggleBanner}
           bannerBusy={bannerBusy}
           selectedBannerAttachmentId={bannerAttachmentId}
+          bannerSelectionControlled={bannerSelectionControlled}
         />
       ))}
     </div>
