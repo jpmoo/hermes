@@ -617,10 +617,13 @@ export default function CanvasPage() {
     CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS
   );
   const [draftAutoFocusAlign, setDraftAutoFocusAlign] = useState(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
+  /** 0 = single column (vertical) or single row (horizontal); ≥1 wraps after that many child notes. */
+  const [draftAutoArrangementWrapAfter, setDraftAutoArrangementWrapAfter] = useState(0);
   const [canvasArrangement, setCanvasArrangement] = useState(CANVAS_ARRANGEMENT.MANUAL);
   const [connectorMode, setConnectorMode] = useState(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
   const [manualNewNoteAnchor, setManualNewNoteAnchor] = useState(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
   const [autoFocusAlign, setAutoFocusAlign] = useState(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
+  const [autoArrangementWrapAfter, setAutoArrangementWrapAfter] = useState(0);
   const [starredDockExpanded, setStarredDockExpanded] = useState(false);
   /** Fixed px position; null = use CSS default placement */
   const [starredDockPos, setStarredDockPos] = useState(null);
@@ -652,12 +655,14 @@ export default function CanvasPage() {
   const connectorModeRef = useRef(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
   const manualNewNoteAnchorRef = useRef(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
   const autoFocusAlignRef = useRef(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
+  const autoArrangementWrapAfterRef = useRef(0);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
   canvasArrangementRef.current = canvasArrangement;
   connectorModeRef.current = connectorMode;
   manualNewNoteAnchorRef.current = manualNewNoteAnchor;
   autoFocusAlignRef.current = autoFocusAlign;
+  autoArrangementWrapAfterRef.current = autoArrangementWrapAfter;
 
   const linesVisible = connectorMode !== CANVAS_CONNECTOR_MODE.NONE;
 
@@ -1168,14 +1173,25 @@ export default function CanvasPage() {
     /** Wide corridor only for hub spokes; chain / no lines keep focus beside the stack. */
     const focusPeerSpacing =
       connectorMode === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN ? 'wide' : 'compact';
-    const snapOpts = { minHeightForNoteId: layoutMinHeightForNoteId, focusPeerSpacing };
+    const snapOpts = {
+      minHeightForNoteId: layoutMinHeightForNoteId,
+      focusPeerSpacing,
+      wrapAfter: autoArrangementWrapAfterRef.current,
+    };
     const computed =
       canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL
         ? computeCanvasVerticalArrangementRects(ordered, getSize, align, snapOpts)
         : computeCanvasHorizontalArrangementRects(ordered, getSize, align, snapOpts);
     setCardRects((prev) => ({ ...prev, ...computed }));
     scheduleSaveRef.current();
-  }, [canvasArrangement, connectorMode, autoFocusAlign, sequenceLayoutKey, layoutMinHeightForNoteId]);
+  }, [
+    canvasArrangement,
+    connectorMode,
+    autoFocusAlign,
+    autoArrangementWrapAfter,
+    sequenceLayoutKey,
+    layoutMinHeightForNoteId,
+  ]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -1192,6 +1208,7 @@ export default function CanvasPage() {
     setConnectorMode(p.connectorMode);
     setManualNewNoteAnchor(p.manualNewNoteAnchor);
     setAutoFocusAlign(p.autoFocusAlign);
+    setAutoArrangementWrapAfter(p.autoArrangementWrapAfter ?? 0);
   }, [layoutStorageKey, fk, canvasLayouts]);
 
   useEffect(() => {
@@ -1202,6 +1219,7 @@ export default function CanvasPage() {
     setDraftConnector(p.connectorMode);
     setDraftManualNewNoteAnchor(p.manualNewNoteAnchor);
     setDraftAutoFocusAlign(p.autoFocusAlign);
+    setDraftAutoArrangementWrapAfter(p.autoArrangementWrapAfter ?? 0);
   }, [sequenceMenuOpen, layoutStorageKey, fk, canvasLayouts]);
 
   useEffect(() => {
@@ -1257,6 +1275,7 @@ export default function CanvasPage() {
     partial.connectorMode = connectorModeRef.current;
     partial.manualNewNoteAnchor = manualNewNoteAnchorRef.current;
     partial.autoFocusAlign = autoFocusAlignRef.current;
+    partial.autoArrangementWrapAfter = autoArrangementWrapAfterRef.current;
     const patchLayouts = mergeCanvasLayoutPatch(canvasLayoutsRef.current, tid, focusKey, partial);
     try {
       await patchUserSettings({ canvasLayouts: patchLayouts });
@@ -1707,6 +1726,7 @@ export default function CanvasPage() {
     const snapOpts = {
       minHeightForNoteId: layoutMinHeightForNoteId,
       focusPeerSpacing: draftConnector === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN ? 'wide' : 'compact',
+      wrapAfter: draftAutoArrangementWrapAfter,
     };
     let nextCards = { ...cardRectsRef.current };
     if (draftArrangement === CANVAS_ARRANGEMENT.VERTICAL) {
@@ -1722,12 +1742,14 @@ export default function CanvasPage() {
     connectorModeRef.current = draftConnector;
     manualNewNoteAnchorRef.current = draftManualNewNoteAnchor;
     autoFocusAlignRef.current = draftAutoFocusAlign;
+    autoArrangementWrapAfterRef.current = draftAutoArrangementWrapAfter;
 
     setCardRects(nextCards);
     setCanvasArrangement(draftArrangement);
     setConnectorMode(draftConnector);
     setManualNewNoteAnchor(draftManualNewNoteAnchor);
     setAutoFocusAlign(draftAutoFocusAlign);
+    setAutoArrangementWrapAfter(draftAutoArrangementWrapAfter);
     setSequenceMenuOpen(false);
     pendingFitAllRef.current = true;
 
@@ -1751,6 +1773,7 @@ export default function CanvasPage() {
       connectorMode: draftConnector,
       manualNewNoteAnchor: draftManualNewNoteAnchor,
       autoFocusAlign: draftAutoFocusAlign,
+      autoArrangementWrapAfter: draftAutoArrangementWrapAfter,
     };
     if (mobile) {
       partial.viewMobile = pos;
@@ -1772,7 +1795,14 @@ export default function CanvasPage() {
     } catch (e) {
       console.error(e);
     }
-  }, [draftArrangement, draftConnector, draftManualNewNoteAnchor, draftAutoFocusAlign, layoutMinHeightForNoteId]);
+  }, [
+    draftArrangement,
+    draftConnector,
+    draftManualNewNoteAnchor,
+    draftAutoFocusAlign,
+    draftAutoArrangementWrapAfter,
+    layoutMinHeightForNoteId,
+  ]);
 
   const resetCanvasLayout = useCallback(async () => {
     if (
@@ -1796,6 +1826,7 @@ export default function CanvasPage() {
       connectorMode: CANVAS_CONNECTOR_MODE.THREAD_CHAIN,
       manualNewNoteAnchor: CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS,
       autoFocusAlign: CANVAS_AUTO_FOCUS_ALIGN.CENTER,
+      autoArrangementWrapAfter: 0,
     };
     const patchLayouts = replaceCanvasLayoutFocusBlock(
       canvasLayoutsRef.current,
@@ -1812,10 +1843,12 @@ export default function CanvasPage() {
       setConnectorMode(CANVAS_CONNECTOR_MODE.THREAD_CHAIN);
       setManualNewNoteAnchor(CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS);
       setAutoFocusAlign(CANVAS_AUTO_FOCUS_ALIGN.CENTER);
+      setAutoArrangementWrapAfter(0);
       canvasArrangementRef.current = CANVAS_ARRANGEMENT.MANUAL;
       connectorModeRef.current = CANVAS_CONNECTOR_MODE.THREAD_CHAIN;
       manualNewNoteAnchorRef.current = CANVAS_MANUAL_NEW_NOTE_ANCHOR.FOCUS;
       autoFocusAlignRef.current = CANVAS_AUTO_FOCUS_ALIGN.CENTER;
+      autoArrangementWrapAfterRef.current = 0;
       setStarredDockPos(null);
     } catch (e) {
       console.error(e);
@@ -2327,10 +2360,12 @@ export default function CanvasPage() {
                 linesActive={linesVisible}
                 manualNewNoteAnchor={draftManualNewNoteAnchor}
                 autoFocusAlign={draftAutoFocusAlign}
+                autoArrangementWrapAfter={draftAutoArrangementWrapAfter}
                 onArrangementChange={setDraftArrangement}
                 onConnectorModeChange={setDraftConnector}
                 onManualNewNoteAnchorChange={setDraftManualNewNoteAnchor}
                 onAutoFocusAlignChange={setDraftAutoFocusAlign}
+                onAutoArrangementWrapAfterChange={setDraftAutoArrangementWrapAfter}
                 onApply={applyCanvasSequence}
               >
                 <NavIconSequenceLines className="stream-page-nav-icon" />

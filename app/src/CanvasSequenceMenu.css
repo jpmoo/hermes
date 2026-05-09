@@ -77,6 +77,44 @@
   outline-offset: 2px;
 }
 
+.canvas-sequence-menu__wrap-field {
+  margin-top: 0.45rem;
+}
+
+.canvas-sequence-menu__wrap-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  line-height: 1.3;
+}
+
+.canvas-sequence-menu__wrap-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.canvas-sequence-menu__wrap-input {
+  width: 4.25rem;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.canvas-sequence-menu__wrap-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  flex: 1;
+  min-width: 8rem;
+}
+
 /* Open state: match other toolbar icon buttons (accent border, not extra outline ring) */
 .canvas-toolbar .canvas-sequence-menu .canvas-sequence-menu__trigger.canvas-icon-btn--open {
   outline: none;

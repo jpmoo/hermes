@@ -86,7 +86,26 @@ export function resolveCanvasBlockPrefs(block) {
     fa === CANVAS_AUTO_FOCUS_ALIGN.END
       ? fa
       : CANVAS_AUTO_FOCUS_ALIGN.CENTER;
-  return { canvasArrangement, connectorMode, manualNewNoteAnchor, autoFocusAlign };
+  let autoArrangementWrapAfter = 0;
+  const wa = block?.autoArrangementWrapAfter;
+  if (typeof wa === 'number' && Number.isFinite(wa)) {
+    const n = Math.floor(wa);
+    if (n >= 1 && n <= 500) autoArrangementWrapAfter = n;
+  } else if (typeof wa === 'string' && /^\d+$/.test(wa.trim())) {
+    const n = parseInt(wa.trim(), 10);
+    if (n >= 1 && n <= 500) autoArrangementWrapAfter = n;
+  }
+  return { canvasArrangement, connectorMode, manualNewNoteAnchor, autoFocusAlign, autoArrangementWrapAfter };
+}
+
+/** 0 = unlimited (single column / single row). Otherwise max children per column (vertical) or per row (horizontal). */
+export function normalizeAutoArrangementWrapAfter(raw) {
+  if (raw == null || raw === '') return 0;
+  const n = typeof raw === 'number' ? raw : parseInt(String(raw).trim(), 10);
+  if (!Number.isFinite(n)) return 0;
+  const f = Math.floor(n);
+  if (f < 1) return 0;
+  return Math.min(f, 500);
 }
 
 const LAYOUT_DEFAULT_W = 340;
@@ -123,11 +142,25 @@ function resolveFocusToRowGap(opts) {
     : LAYOUT_FOCUS_TO_ROW_GAP;
 }
 
+function cardRectDimsForLayout(note, getSize, minHFloor) {
+  let w = LAYOUT_DEFAULT_W;
+  let h = LAYOUT_DEFAULT_H;
+  const ex = getSize(String(note.id));
+  const floor = minHFloor(String(note.id));
+  if (ex && Number.isFinite(ex.w) && Number.isFinite(ex.h)) {
+    w = ex.w;
+    h = Math.max(ex.h, floor);
+  } else {
+    h = Math.max(h, floor);
+  }
+  return { w, h };
+}
+
 /**
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize existing card sizes
  * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
- * @param {{ minHeightForNoteId?: (id: string) => number, focusPeerSpacing?: 'wide' | 'compact' }} [opts]
+ * @param {{ minHeightForNoteId?: (id: string) => number, focusPeerSpacing?: 'wide' | 'compact', wrapAfter?: number }} [opts]
  * @returns {Record<string, { x: number, y: number, w: number, h: number }>}
  */
 export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getSize, focusAlign, opts) {
@@ -135,6 +168,7 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
   const focusToColumnGap = resolveFocusToColumnGap(opts);
   const minHFloor =
     typeof opts?.minHeightForNoteId === 'function' ? opts.minHeightForNoteId : () => 0;
+  const wrapAfter = normalizeAutoArrangementWrapAfter(opts?.wrapAfter);
   const align =
     focusAlign === CANVAS_AUTO_FOCUS_ALIGN.START || focusAlign === CANVAS_AUTO_FOCUS_ALIGN.END
       ? focusAlign
@@ -152,31 +186,48 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
     leadH = Math.max(leadH, leadFloor);
   }
   const rects = {};
-  let y = LAYOUT_START_Y;
-  children.forEach((n) => {
-    let w = LAYOUT_DEFAULT_W;
-    let h = LAYOUT_DEFAULT_H;
-    const ex = getSize(String(n.id));
-    const floor = minHFloor(String(n.id));
-    if (ex && Number.isFinite(ex.w) && Number.isFinite(ex.h)) {
-      w = ex.w;
-      h = Math.max(ex.h, floor);
-    } else {
-      h = Math.max(h, floor);
+  const baseX = LAYOUT_START_X + leadW + focusToColumnGap;
+
+  if (!children.length) {
+    rects[String(lead.id)] = { x: LAYOUT_START_X, y: LAYOUT_START_Y, w: leadW, h: leadH };
+    return rects;
+  }
+
+  const chunks = [];
+  if (wrapAfter <= 0) {
+    chunks.push(children);
+  } else {
+    for (let i = 0; i < children.length; i += wrapAfter) {
+      chunks.push(children.slice(i, i + wrapAfter));
     }
-    rects[String(n.id)] = { x: LAYOUT_START_X + leadW + focusToColumnGap, y, w, h };
-    y += h + LAYOUT_VERTICAL_GAP;
-  });
-  const totalH = children.length ? y - LAYOUT_START_Y - LAYOUT_VERTICAL_GAP : 0;
+  }
+
+  const columnHeights = [];
+  let xCol = baseX;
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    let y = LAYOUT_START_Y;
+    let colMaxW = 0;
+    for (const n of chunk) {
+      const { w, h } = cardRectDimsForLayout(n, getSize, minHFloor);
+      rects[String(n.id)] = { x: xCol, y, w, h };
+      colMaxW = Math.max(colMaxW, w);
+      y += h + LAYOUT_VERTICAL_GAP;
+    }
+    const colH = chunk.length ? y - LAYOUT_START_Y - LAYOUT_VERTICAL_GAP : 0;
+    columnHeights.push(colH);
+    xCol += colMaxW;
+    if (ci < chunks.length - 1) xCol += LAYOUT_COL_GAP;
+  }
+
+  const totalH = columnHeights.length ? Math.max(...columnHeights) : 0;
   let leadY = LAYOUT_START_Y;
-  if (children.length) {
-    if (align === CANVAS_AUTO_FOCUS_ALIGN.START) {
-      leadY = LAYOUT_START_Y;
-    } else if (align === CANVAS_AUTO_FOCUS_ALIGN.END) {
-      leadY = LAYOUT_START_Y + totalH - leadH;
-    } else {
-      leadY = LAYOUT_START_Y + totalH / 2 - leadH / 2;
-    }
+  if (align === CANVAS_AUTO_FOCUS_ALIGN.START) {
+    leadY = LAYOUT_START_Y;
+  } else if (align === CANVAS_AUTO_FOCUS_ALIGN.END) {
+    leadY = LAYOUT_START_Y + totalH - leadH;
+  } else {
+    leadY = LAYOUT_START_Y + totalH / 2 - leadH / 2;
   }
   rects[String(lead.id)] = { x: LAYOUT_START_X, y: leadY, w: leadW, h: leadH };
   return rects;
@@ -186,13 +237,14 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize
  * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
- * @param {{ minHeightForNoteId?: (id: string) => number, focusPeerSpacing?: 'wide' | 'compact' }} [opts]
+ * @param {{ minHeightForNoteId?: (id: string) => number, focusPeerSpacing?: 'wide' | 'compact', wrapAfter?: number }} [opts]
  */
 export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, getSize, focusAlign, opts) {
   if (!sequenceOrderedNotes?.length) return {};
   const focusToRowGap = resolveFocusToRowGap(opts);
   const minHFloor =
     typeof opts?.minHeightForNoteId === 'function' ? opts.minHeightForNoteId : () => 0;
+  const wrapAfter = normalizeAutoArrangementWrapAfter(opts?.wrapAfter);
   const align =
     focusAlign === CANVAS_AUTO_FOCUS_ALIGN.START || focusAlign === CANVAS_AUTO_FOCUS_ALIGN.END
       ? focusAlign
@@ -210,31 +262,48 @@ export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, ge
     leadH = Math.max(leadH, leadFloor);
   }
   const rects = {};
-  let x = LAYOUT_START_X;
-  children.forEach((n) => {
-    let w = LAYOUT_DEFAULT_W;
-    let h = LAYOUT_DEFAULT_H;
-    const ex = getSize(String(n.id));
-    const floor = minHFloor(String(n.id));
-    if (ex && Number.isFinite(ex.w) && Number.isFinite(ex.h)) {
-      w = ex.w;
-      h = Math.max(ex.h, floor);
-    } else {
-      h = Math.max(h, floor);
+  const rowBaseY = LAYOUT_START_Y + leadH + focusToRowGap;
+
+  if (!children.length) {
+    rects[String(lead.id)] = { x: LAYOUT_START_X, y: LAYOUT_START_Y, w: leadW, h: leadH };
+    return rects;
+  }
+
+  const chunks = [];
+  if (wrapAfter <= 0) {
+    chunks.push(children);
+  } else {
+    for (let i = 0; i < children.length; i += wrapAfter) {
+      chunks.push(children.slice(i, i + wrapAfter));
     }
-    rects[String(n.id)] = { x, y: LAYOUT_START_Y + leadH + focusToRowGap, w, h };
-    x += w + LAYOUT_ROW_GAP;
-  });
-  const rowWidth = children.length ? x - LAYOUT_START_X - LAYOUT_ROW_GAP : 0;
+  }
+
+  const rowWidths = [];
+  let yRow = rowBaseY;
+  for (let ri = 0; ri < chunks.length; ri++) {
+    const chunk = chunks[ri];
+    let x = LAYOUT_START_X;
+    let rowMaxH = 0;
+    for (const n of chunk) {
+      const { w, h } = cardRectDimsForLayout(n, getSize, minHFloor);
+      rects[String(n.id)] = { x, y: yRow, w, h };
+      rowMaxH = Math.max(rowMaxH, h);
+      x += w + LAYOUT_ROW_GAP;
+    }
+    const rowW = chunk.length ? x - LAYOUT_START_X - LAYOUT_ROW_GAP : 0;
+    rowWidths.push(rowW);
+    yRow += rowMaxH;
+    if (ri < chunks.length - 1) yRow += LAYOUT_VERTICAL_GAP;
+  }
+
+  const maxRowWidth = rowWidths.length ? Math.max(...rowWidths) : 0;
   let leadX = LAYOUT_START_X;
-  if (children.length) {
-    if (align === CANVAS_AUTO_FOCUS_ALIGN.START) {
-      leadX = LAYOUT_START_X;
-    } else if (align === CANVAS_AUTO_FOCUS_ALIGN.END) {
-      leadX = LAYOUT_START_X + rowWidth - leadW;
-    } else {
-      leadX = LAYOUT_START_X + rowWidth / 2 - leadW / 2;
-    }
+  if (align === CANVAS_AUTO_FOCUS_ALIGN.START) {
+    leadX = LAYOUT_START_X;
+  } else if (align === CANVAS_AUTO_FOCUS_ALIGN.END) {
+    leadX = LAYOUT_START_X + maxRowWidth - leadW;
+  } else {
+    leadX = LAYOUT_START_X + maxRowWidth / 2 - leadW / 2;
   }
   rects[String(lead.id)] = { x: leadX, y: LAYOUT_START_Y, w: leadW, h: leadH };
   return rects;

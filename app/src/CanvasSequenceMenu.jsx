@@ -5,6 +5,7 @@ import {
   CANVAS_AUTO_FOCUS_ALIGN,
   CANVAS_CONNECTOR_MODE,
   CANVAS_MANUAL_NEW_NOTE_ANCHOR,
+  normalizeAutoArrangementWrapAfter,
 } from './canvasLayoutApi';
 import './CanvasSequenceMenu.css';
 
@@ -66,6 +67,8 @@ const LINE_OPTIONS = [
  *   onManualNewNoteAnchorChange: (v: string) => void,
  *   autoFocusAlign: string,
  *   onAutoFocusAlignChange: (v: string) => void,
+ *   autoArrangementWrapAfter: number,
+ *   onAutoArrangementWrapAfterChange: (v: number) => void,
  *   onApply: () => void,
  *   children: React.ReactNode,
  * }} props
@@ -83,6 +86,8 @@ export default function CanvasSequenceMenu({
   onManualNewNoteAnchorChange,
   autoFocusAlign,
   onAutoFocusAlignChange,
+  autoArrangementWrapAfter,
+  onAutoArrangementWrapAfterChange,
   onApply,
   children,
 }) {
@@ -213,6 +218,36 @@ export default function CanvasSequenceMenu({
                   {o.label}
                 </label>
               ))}
+              <div className="canvas-sequence-menu__wrap-field">
+                <label className="canvas-sequence-menu__wrap-label" htmlFor="canvas-arr-wrap-after">
+                  {arrangement === CANVAS_ARRANGEMENT.VERTICAL
+                    ? 'Notes per column, then more columns to the right'
+                    : 'Notes per row, then more rows below'}
+                </label>
+                <div className="canvas-sequence-menu__wrap-row">
+                  <input
+                    id="canvas-arr-wrap-after"
+                    type="number"
+                    min={0}
+                    max={500}
+                    step={1}
+                    className="canvas-sequence-menu__wrap-input"
+                    value={autoArrangementWrapAfter === 0 ? '' : autoArrangementWrapAfter}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '' || raw === '-') {
+                        onAutoArrangementWrapAfterChange(0);
+                        return;
+                      }
+                      onAutoArrangementWrapAfterChange(normalizeAutoArrangementWrapAfter(raw));
+                    }}
+                  />
+                  <span className="canvas-sequence-menu__wrap-hint">
+                    Leave empty or 0 for a single column / single row.
+                  </span>
+                </div>
+              </div>
             </>
           )}
         </div>
