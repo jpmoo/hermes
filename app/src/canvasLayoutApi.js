@@ -103,15 +103,36 @@ const LAYOUT_FOCUS_TO_COLUMN_GAP = LAYOUT_COL_GAP * 5 * 1.5;
 /** Vertical space between focus card and reply row (horizontal arrangement). 5× base lead/row gap, +50%. */
 const LAYOUT_FOCUS_TO_ROW_GAP = LAYOUT_LEAD_CHILD_GAP * 5 * 1.5;
 
+/** Tighter spacing when no hub spokes are drawn (no lines or chain links — no corridor needed). */
+const LAYOUT_FOCUS_TO_COLUMN_GAP_COMPACT = LAYOUT_COL_GAP * 2;
+const LAYOUT_FOCUS_TO_ROW_GAP_COMPACT = LAYOUT_LEAD_CHILD_GAP * 2;
+
+/**
+ * Hub lines (`focus_to_children`) use a wide corridor; chain/no lines situate the focus closer to the stack.
+ * @param {{ focusPeerSpacing?: 'wide' | 'compact' }} [opts]
+ */
+function resolveFocusToColumnGap(opts) {
+  return opts?.focusPeerSpacing === 'compact'
+    ? LAYOUT_FOCUS_TO_COLUMN_GAP_COMPACT
+    : LAYOUT_FOCUS_TO_COLUMN_GAP;
+}
+
+function resolveFocusToRowGap(opts) {
+  return opts?.focusPeerSpacing === 'compact'
+    ? LAYOUT_FOCUS_TO_ROW_GAP_COMPACT
+    : LAYOUT_FOCUS_TO_ROW_GAP;
+}
+
 /**
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize existing card sizes
  * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
- * @param {{ minHeightForNoteId?: (id: string) => number }} [opts] e.g. banner minimum height when measured rects lag
+ * @param {{ minHeightForNoteId?: (id: string) => number, focusPeerSpacing?: 'wide' | 'compact' }} [opts]
  * @returns {Record<string, { x: number, y: number, w: number, h: number }>}
  */
 export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getSize, focusAlign, opts) {
   if (!sequenceOrderedNotes?.length) return {};
+  const focusToColumnGap = resolveFocusToColumnGap(opts);
   const minHFloor =
     typeof opts?.minHeightForNoteId === 'function' ? opts.minHeightForNoteId : () => 0;
   const align =
@@ -143,7 +164,7 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
     } else {
       h = Math.max(h, floor);
     }
-    rects[String(n.id)] = { x: LAYOUT_START_X + leadW + LAYOUT_FOCUS_TO_COLUMN_GAP, y, w, h };
+    rects[String(n.id)] = { x: LAYOUT_START_X + leadW + focusToColumnGap, y, w, h };
     y += h + LAYOUT_VERTICAL_GAP;
   });
   const totalH = children.length ? y - LAYOUT_START_Y - LAYOUT_VERTICAL_GAP : 0;
@@ -165,10 +186,11 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize
  * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
- * @param {{ minHeightForNoteId?: (id: string) => number }} [opts]
+ * @param {{ minHeightForNoteId?: (id: string) => number, focusPeerSpacing?: 'wide' | 'compact' }} [opts]
  */
 export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, getSize, focusAlign, opts) {
   if (!sequenceOrderedNotes?.length) return {};
+  const focusToRowGap = resolveFocusToRowGap(opts);
   const minHFloor =
     typeof opts?.minHeightForNoteId === 'function' ? opts.minHeightForNoteId : () => 0;
   const align =
@@ -200,7 +222,7 @@ export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, ge
     } else {
       h = Math.max(h, floor);
     }
-    rects[String(n.id)] = { x, y: LAYOUT_START_Y + leadH + LAYOUT_FOCUS_TO_ROW_GAP, w, h };
+    rects[String(n.id)] = { x, y: LAYOUT_START_Y + leadH + focusToRowGap, w, h };
     x += w + LAYOUT_ROW_GAP;
   });
   const rowWidth = children.length ? x - LAYOUT_START_X - LAYOUT_ROW_GAP : 0;

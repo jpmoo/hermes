@@ -1132,9 +1132,6 @@ export default function CanvasPage() {
     ) {
       return;
     }
-    if (connectorMode === CANVAS_CONNECTOR_MODE.NONE) {
-      return;
-    }
     const ordered = sequenceOrderedNotesRef.current;
     if (!ordered.length) return;
     const getSize = (id) => {
@@ -1142,7 +1139,10 @@ export default function CanvasPage() {
       return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
     };
     const align = autoFocusAlignRef.current;
-    const snapOpts = { minHeightForNoteId: layoutMinHeightForNoteId };
+    /** Wide corridor only for hub spokes; chain / no lines keep focus beside the stack. */
+    const focusPeerSpacing =
+      connectorMode === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN ? 'wide' : 'compact';
+    const snapOpts = { minHeightForNoteId: layoutMinHeightForNoteId, focusPeerSpacing };
     const computed =
       canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL
         ? computeCanvasVerticalArrangementRects(ordered, getSize, align, snapOpts)
@@ -1676,7 +1676,10 @@ export default function CanvasPage() {
       const r = cardRectsRef.current[id];
       return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
     };
-    const snapOpts = { minHeightForNoteId: layoutMinHeightForNoteId };
+    const snapOpts = {
+      minHeightForNoteId: layoutMinHeightForNoteId,
+      focusPeerSpacing: draftConnector === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN ? 'wide' : 'compact',
+    };
     let nextCards = { ...cardRectsRef.current };
     if (draftArrangement === CANVAS_ARRANGEMENT.VERTICAL) {
       const computed = computeCanvasVerticalArrangementRects(ordered, getSize, draftAutoFocusAlign, snapOpts);
