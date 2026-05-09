@@ -2423,13 +2423,14 @@ export default function CanvasPage() {
           const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
           const dx = wp.x - mx;
           const dy = wp.y - my;
+          /* Handle is at curve midpoint t=½: B(½)=M + bendT·t̂ + bendN·n̂ (not at control Q=M+2(…)). */
           const nextT = Math.min(
             MANUAL_EDGE_BEND_LIMIT,
-            Math.max(-MANUAL_EDGE_BEND_LIMIT, (dx * tx + dy * ty) / 2)
+            Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * tx + dy * ty)
           );
           const nextN = Math.min(
             MANUAL_EDGE_BEND_LIMIT,
-            Math.max(-MANUAL_EDGE_BEND_LIMIT, (dx * nx + dy * ny) / 2)
+            Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * nx + dy * ny)
           );
           if (Math.abs(nextT - bendT) < 1e-4 && Math.abs(nextN - bendN) < 1e-4) {
             bendT = nextT;
