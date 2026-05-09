@@ -363,7 +363,9 @@ function isCanvasDragInteractiveTarget(target) {
 
 /**
  * Nested scrollports (long note body, textarea, etc.): let the browser handle wheel/trackpad so we do not
- * steal the gesture for canvas pan. When at scroll limits, the next wheel can still pan the canvas.
+ * steal the gesture for canvas pan.
+ * Canvas note scroll body (`.canvas-card-body .note-card-body-main`): never chain to canvas pan at edges —
+ * cursor stays over that region; overscroll-behavior:contain keeps the gesture local.
  */
 function wheelEventShouldScrollNestedTarget(target, rootViewport, deltaX, deltaY) {
   if (!(target instanceof Node) || !rootViewport?.contains(target)) return false;
@@ -381,15 +383,31 @@ function wheelEventShouldScrollNestedTarget(target, rootViewport, deltaX, deltaY
       (oy === 'auto' || oy === 'scroll' || oy === 'overlay') && node.scrollHeight > node.clientHeight + 1;
     const canX =
       (ox === 'auto' || ox === 'scroll' || ox === 'overlay') && node.scrollWidth > node.clientWidth + 1;
+    const canvasNoteScrollBody =
+      typeof node.closest === 'function'
+        ? node.closest('.canvas-card-body .note-card-body-main')
+        : null;
     if (canY && Math.abs(deltaY) > 0.5) {
       const atTop = node.scrollTop <= 0;
       const atBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 1;
-      if ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom)) return true;
+      if (
+        canvasNoteScrollBody != null ||
+        (deltaY < 0 && !atTop) ||
+        (deltaY > 0 && !atBottom)
+      ) {
+        return true;
+      }
     }
     if (canX && Math.abs(deltaX) > 0.5) {
       const atLeft = node.scrollLeft <= 0;
       const atRight = node.scrollLeft + node.clientWidth >= node.scrollWidth - 1;
-      if ((deltaX < 0 && !atLeft) || (deltaX > 0 && !atRight)) return true;
+      if (
+        canvasNoteScrollBody != null ||
+        (deltaX < 0 && !atLeft) ||
+        (deltaX > 0 && !atRight)
+      ) {
+        return true;
+      }
     }
     node = node.parentElement;
   }
@@ -401,8 +419,10 @@ const SAVE_DEBOUNCE_MS = 200;
 const MIN_W = 280;
 const MIN_H = 120;
 
-/** World-space px — snap dragged cards to edges/centers of other notes. */
-const SNAP_GUIDE_PX = 8;
+/** Screen px — converted to world using canvas zoom so snap distance feels consistent. */
+const SNAP_GUIDE_SCREEN_PX = 8;
+/** Minimum snap threshold in world px (avoid tiny thresholds when zoomed in). */
+const SNAP_GUIDE_WORLD_MIN = 3;
 
 function uniqSnapLines(values, eps = 0.5) {
   const out = [];
@@ -418,10 +438,12 @@ function uniqSnapLines(values, eps = 0.5) {
  * @param {number} pos left or top of dragged rect
  * @param {number} size width or height
  * @param {{ x: number, y: number, w: number, h: number }[]} others
+ * @param {number} thresholdWorld snap tolerance in canvas world px (from screen px / zoom)
  */
-function snapCanvasAxis(axis, pos, size, others) {
+function snapCanvasAxis(axis, pos, size, others, thresholdWorld) {
+  const th = Math.max(thresholdWorld, SNAP_GUIDE_WORLD_MIN);
   let best = pos;
-  let bestD = SNAP_GUIDE_PX + 1;
+  let bestD = th + 1;
   /** @type {number | null} */
   let guide = null;
   /** @type {{ x: number, y: number, w: number, h: number } | null} */
@@ -448,7 +470,7 @@ function snapCanvasAxis(axis, pos, size, others) {
           ];
     for (const c of candidates) {
       const d = Math.abs(pos - c.pos);
-      if (d <= SNAP_GUIDE_PX && d < bestD) {
+      if (d <= th && d < bestD) {
         bestD = d;
         best = c.pos;
         guide = c.guide;
@@ -457,16 +479,16 @@ function snapCanvasAxis(axis, pos, size, others) {
     }
   }
   /** @type {number[]} */
-  const vx = [];
+  let vx = [];
   /** @type {number[]} */
-  const hy = [];
-  if (guide != null && axis === 'x') {
-    vx.push(guide);
-    if (winning) hy.push(winning.y + winning.h / 2);
-  }
-  if (guide != null && axis === 'y') {
-    hy.push(guide);
-    if (winning) vx.push(winning.x + winning.w / 2);
+  let hy = [];
+  if (guide != null && winning) {
+    if (axis === 'x') vx.push(guide);
+    else hy.push(guide);
+    vx.push(winning.x + winning.w / 2);
+    hy.push(winning.y + winning.h / 2);
+    vx = uniqSnapLines(vx);
+    hy = uniqSnapLines(hy);
   }
   return { pos: best, vx, hy };
 }
@@ -478,13 +500,14 @@ function snapCanvasAxis(axis, pos, size, others) {
  * @param {number} dh height delta
  * @param {{ x: number, y: number, w: number, h: number }[]} others
  */
-function snapResizeBottomRight(base, dw, dh, others, minW, minH) {
+function snapResizeBottomRight(base, dw, dh, others, minW, minH, thresholdWorld) {
+  const th = Math.max(thresholdWorld, SNAP_GUIDE_WORLD_MIN);
   const rawW = Math.max(minW, base.w + dw);
   const rawH = Math.max(minH, base.h + dh);
   const rightEdge = base.x + rawW;
   const bottomEdge = base.y + rawH;
   let bestRx = rightEdge;
-  let bestRd = SNAP_GUIDE_PX + 1;
+  let bestRd = th + 1;
   /** @type {number | null} */
   let gx = null;
   /** @type {{ x: number, y: number, w: number, h: number } | null} */
@@ -493,7 +516,7 @@ function snapResizeBottomRight(base, dw, dh, others, minW, minH) {
     if (!o || typeof o.x !== 'number') continue;
     for (const t of [o.x, o.x + o.w, o.x + o.w / 2]) {
       const d = Math.abs(rightEdge - t);
-      if (d <= SNAP_GUIDE_PX && d < bestRd) {
+      if (d <= th && d < bestRd) {
         bestRd = d;
         bestRx = t;
         gx = t;
@@ -502,7 +525,7 @@ function snapResizeBottomRight(base, dw, dh, others, minW, minH) {
     }
   }
   let bestBy = bottomEdge;
-  let bestBd = SNAP_GUIDE_PX + 1;
+  let bestBd = th + 1;
   /** @type {number | null} */
   let gy = null;
   /** @type {{ x: number, y: number, w: number, h: number } | null} */
@@ -511,7 +534,7 @@ function snapResizeBottomRight(base, dw, dh, others, minW, minH) {
     if (!o || typeof o.x !== 'number') continue;
     for (const t of [o.y, o.y + o.h, o.y + o.h / 2]) {
       const d = Math.abs(bottomEdge - t);
-      if (d <= SNAP_GUIDE_PX && d < bestBd) {
+      if (d <= th && d < bestBd) {
         bestBd = d;
         bestBy = t;
         gy = t;
@@ -521,16 +544,18 @@ function snapResizeBottomRight(base, dw, dh, others, minW, minH) {
   }
   const w = Math.max(minW, bestRx - base.x);
   const h = Math.max(minH, bestBy - base.y);
-  /** Perpendicular center guides: crosshair through the reference card for each snapped axis. */
-  const vx = [];
-  const hy = [];
-  if (gx != null) {
+  /** Snap line plus full center cross on each reference card that contributed a snap. */
+  let vx = [];
+  let hy = [];
+  if (gx != null && winOx) {
     vx.push(gx);
-    if (winOx) hy.push(winOx.y + winOx.h / 2);
+    vx.push(winOx.x + winOx.w / 2);
+    hy.push(winOx.y + winOx.h / 2);
   }
-  if (gy != null) {
+  if (gy != null && winOy) {
     hy.push(gy);
-    if (winOy) vx.push(winOy.x + winOy.w / 2);
+    vx.push(winOy.x + winOy.w / 2);
+    hy.push(winOy.y + winOy.h / 2);
   }
   return {
     w,
@@ -1909,6 +1934,10 @@ export default function CanvasPage() {
         const dy = (ev.clientY - oy) / sc;
         const rawX = base.x + dx;
         const rawY = base.y + dy;
+        const snapTh = Math.max(
+          SNAP_GUIDE_SCREEN_PX / Math.max(scaleRef.current, 1e-6),
+          SNAP_GUIDE_WORLD_MIN
+        );
         const others = Object.entries(cardRectsRef.current)
           .filter(([oid]) => oid !== id)
           .map(([, r]) => r)
@@ -1920,8 +1949,8 @@ export default function CanvasPage() {
               typeof r.w === 'number' &&
               typeof r.h === 'number'
           );
-        const sx = snapCanvasAxis('x', rawX, base.w, others);
-        const sy = snapCanvasAxis('y', rawY, base.h, others);
+        const sx = snapCanvasAxis('x', rawX, base.w, others, snapTh);
+        const sy = snapCanvasAxis('y', rawY, base.h, others, snapTh);
         setSnapGuides({
           vx: uniqSnapLines([...sx.vx, ...sy.vx]),
           hy: uniqSnapLines([...sx.hy, ...sy.hy]),
@@ -1988,7 +2017,8 @@ export default function CanvasPage() {
         const sc = Math.max(scaleRef.current, 1e-6);
         const dx = (ev.clientX - ox) / sc;
         const dy = (ev.clientY - oy) / sc;
-        const snapped = snapResizeBottomRight(base, dx, dy, othersOf(), MIN_W, MIN_H);
+        const snapTh = Math.max(SNAP_GUIDE_SCREEN_PX / sc, SNAP_GUIDE_WORLD_MIN);
+        const snapped = snapResizeBottomRight(base, dx, dy, othersOf(), MIN_W, MIN_H, snapTh);
         setSnapGuides(snapped.guides);
         setCardRects((prev) => ({
           ...prev,

@@ -546,6 +546,7 @@
 .canvas-snap-guides-line {
   stroke: var(--accent, #3b82f6);
   stroke-width: 1px;
+  stroke-dasharray: 4 6;
   opacity: 0.9;
 }
 
