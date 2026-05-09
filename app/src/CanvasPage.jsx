@@ -383,9 +383,24 @@ function quadCurveMidpoint(p0, qc, p2) {
   };
 }
 
+function quadBezierPoint(p0, qc, p2, t) {
+  const u = 1 - t;
+  const a = u * u;
+  const b = 2 * u * t;
+  const c = t * t;
+  return {
+    x: a * p0.x + b * qc.x + c * p2.x,
+    y: a * p0.y + b * qc.y + c * p2.y,
+  };
+}
+
+/** Curve samples used to pick which card edge the wire “approaches” from — avoids biasing both sides toward t=½. */
+const MANUAL_EDGE_NEAR_FROM_T = 0.25;
+const MANUAL_EDGE_NEAR_TO_T = 0.75;
+
 /**
- * Manual arrows: attach each card at the side nearest the curve midpoint (t=½ on the quadratic), which
- * moves as the bend changes — not the side that faces the other card’s center.
+ * Manual arrows: each endpoint uses the note side whose midpoint is closest to the curve near that end
+ * (not center-to-center facing). Source uses a point near the start of the quadratic, target near the end.
  */
 function manualConnectorChord(ra, rb, bendT, bendN) {
   const cax = ra.x + ra.w / 2;
@@ -397,19 +412,37 @@ function manualConnectorChord(ra, rb, bendT, bendN) {
   const bt = Number.isFinite(bendT) ? bendT : 0;
   const bn = Number.isFinite(bendN) ? bendN : 0;
 
-  let p0;
-  let p2;
+  let p0 = sideMidpoint(ra, closestSideToPoint(ra, mid));
+  let p2 = sideMidpoint(rb, closestSideToPoint(rb, mid));
 
-  for (let i = 0; i < 12; i++) {
-    const sideA = closestSideToPoint(ra, mid);
-    const sideB = closestSideToPoint(rb, mid);
-    p0 = sideMidpoint(ra, sideA);
-    p2 = sideMidpoint(rb, sideB);
+  let prevSideA;
+  let prevSideB;
+
+  for (let i = 0; i < 16; i++) {
     const q = quadControlFromChordBends(p0, p2, bt, bn);
-    const midNext = quadCurveMidpoint(p0, q, p2);
+    const nearFrom = quadBezierPoint(p0, q, p2, MANUAL_EDGE_NEAR_FROM_T);
+    const nearTo = quadBezierPoint(p0, q, p2, MANUAL_EDGE_NEAR_TO_T);
+    const sideA = closestSideToPoint(ra, nearFrom);
+    const sideB = closestSideToPoint(rb, nearTo);
+
+    const nextP0 = sideMidpoint(ra, sideA);
+    const nextP2 = sideMidpoint(rb, sideB);
+    const qn = quadControlFromChordBends(nextP0, nextP2, bt, bn);
+    const midNext = quadCurveMidpoint(nextP0, qn, nextP2);
+
     const shift = Math.hypot(midNext.x - mid.x, midNext.y - mid.y);
     mid = midNext;
-    if (shift < 0.15) break;
+    p0 = nextP0;
+    p2 = nextP2;
+
+    const stable =
+      i > 0 &&
+      sideA === prevSideA &&
+      sideB === prevSideB &&
+      shift < 0.25;
+    prevSideA = sideA;
+    prevSideB = sideB;
+    if (stable) break;
   }
 
   return { x1: p0.x, y1: p0.y, x2: p2.x, y2: p2.y };
