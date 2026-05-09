@@ -571,7 +571,8 @@
   box-shadow: none;
   background: transparent;
   cursor: grab;
-  touch-action: none;
+  /* Let nested .note-card-body-main use pan-y; touch-action:none here blocked scroll + confused canvas pan. */
+  touch-action: auto;
 }
 
 .canvas-card-frame:active {

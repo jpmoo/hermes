@@ -46,6 +46,7 @@ import {
   buildCalendarEventDetailNoteContent,
 } from './noteEventUtils';
 import { syncTagsFromContent, syncConnectionsFromContent } from './noteBodySync';
+import { pointerEventTargetElement } from './pointerEventUtils';
 import {
   CANVAS_MOBILE_MEDIA_QUERY,
   CANVAS_ARRANGEMENT,
@@ -1397,7 +1398,8 @@ export default function CanvasPage() {
       if (!viewportRef.current) return;
       const root = viewportRef.current;
       if (!(e.ctrlKey || e.metaKey)) {
-        if (wheelEventShouldScrollNestedTarget(e.target, root, e.deltaX, e.deltaY)) {
+        const wheelEl = pointerEventTargetElement(e) ?? e.target;
+        if (wheelEventShouldScrollNestedTarget(wheelEl, root, e.deltaX, e.deltaY)) {
           return;
         }
       }
@@ -1458,7 +1460,8 @@ export default function CanvasPage() {
   const onViewportPointerDown = useCallback(
     (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (e.target.closest('.canvas-card-frame')) return;
+      const hit = pointerEventTargetElement(e);
+      if (hit?.closest('.canvas-card-frame')) return;
       const el = viewportRef.current;
       if (!el) return;
       try {
