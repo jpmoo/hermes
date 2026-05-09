@@ -721,3 +721,93 @@
 .canvas-card-resize:hover {
   opacity: 0.85;
 }
+
+/* Manual layout: user-drawn arrows + connection handles */
+.canvas-manual-connectors-visible,
+.canvas-manual-connectors-hit,
+.canvas-manual-link-rubber {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4000px;
+  height: 4000px;
+  overflow: visible;
+}
+
+.canvas-manual-connectors-visible {
+  pointer-events: none;
+  z-index: 0;
+  color: var(--accent, #3b82f6);
+  opacity: 0.9;
+}
+
+.canvas-manual-connector-line {
+  stroke: currentColor;
+  fill: none;
+}
+
+.canvas-manual-connectors-hit {
+  z-index: 0;
+}
+
+.canvas-manual-connector-hit {
+  stroke: transparent;
+  fill: none;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.canvas-manual-link-rubber {
+  pointer-events: none;
+  z-index: 8;
+  color: var(--accent, #3b82f6);
+}
+
+.canvas-manual-link-rubber-line {
+  stroke: currentColor;
+  stroke-dasharray: 6 6;
+  opacity: 0.85;
+}
+
+.canvas-card-link-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  margin: 0;
+  border: 2px solid var(--accent, #3b82f6);
+  border-radius: 50%;
+  background: var(--bg, #1a1a1a);
+  cursor: crosshair;
+  z-index: 6;
+  box-sizing: border-box;
+  opacity: 0.85;
+}
+
+.canvas-card-link-handle:hover {
+  opacity: 1;
+}
+
+.canvas-card-link-handle--top {
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.canvas-card-link-handle--right {
+  right: 0;
+  top: 50%;
+  transform: translate(50%, -50%);
+}
+
+.canvas-card-link-handle--bottom {
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 50%);
+}
+
+.canvas-card-link-handle--left {
+  left: 0;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}

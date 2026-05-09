@@ -477,6 +477,34 @@ function sanitizeCanvasConnectorMode(input) {
   return 'thread_chain';
 }
 
+function sanitizeCanvasLinkSide(input) {
+  if (input === 'top' || input === 'right' || input === 'bottom' || input === 'left') return input;
+  return null;
+}
+
+/** Manual directed arrows between cards (manual canvas layout only); stored per focus block. */
+function sanitizeManualConnections(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const item of input) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const fromId = typeof item.fromId === 'string' ? item.fromId.trim() : '';
+    const toId = typeof item.toId === 'string' ? item.toId.trim() : '';
+    if (!fromId || !toId || fromId.length > 96 || toId.length > 96) continue;
+    if (fromId === toId) continue;
+    const fromSide = sanitizeCanvasLinkSide(item.fromSide);
+    const toSide = sanitizeCanvasLinkSide(item.toSide);
+    if (!fromSide || !toSide) continue;
+    const key = `${fromId}:${fromSide}->${toId}:${toSide}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ fromId, toId, fromSide, toSide });
+    if (out.length >= 120) break;
+  }
+  return out;
+}
+
 /** Canvas layouts in settings_json: per-thread, per-focus view(s) + card rects. Legacy key `campusLayouts` is read once and migrated to `canvasLayouts`. */
 function sanitizeCanvasLayouts(input) {
   if (input == null || typeof input !== 'object' || Array.isArray(input)) return {};
@@ -529,6 +557,7 @@ function sanitizeCanvasLayouts(input) {
       const manualNewNoteAnchor = sanitizeManualNewNoteAnchor(block.manualNewNoteAnchor);
       const autoFocusAlign = sanitizeAutoFocusAlign(block.autoFocusAlign);
       const autoArrangementWrapAfter = sanitizeAutoArrangementWrapAfter(block.autoArrangementWrapAfter);
+      const manualConnections = sanitizeManualConnections(block.manualConnections);
       const blockOut = {
         view,
         viewMobile,
@@ -537,6 +566,7 @@ function sanitizeCanvasLayouts(input) {
         connectorMode,
         manualNewNoteAnchor,
         autoFocusAlign,
+        manualConnections,
       };
       if (autoArrangementWrapAfter !== undefined) {
         blockOut.autoArrangementWrapAfter = autoArrangementWrapAfter;

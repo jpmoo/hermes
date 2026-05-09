@@ -95,7 +95,49 @@ export function resolveCanvasBlockPrefs(block) {
     const n = parseInt(wa.trim(), 10);
     if (n >= 1 && n <= 500) autoArrangementWrapAfter = n;
   }
-  return { canvasArrangement, connectorMode, manualNewNoteAnchor, autoFocusAlign, autoArrangementWrapAfter };
+  const manualConnections = normalizeManualConnections(block?.manualConnections);
+  return {
+    canvasArrangement,
+    connectorMode,
+    manualNewNoteAnchor,
+    autoFocusAlign,
+    autoArrangementWrapAfter,
+    manualConnections,
+  };
+}
+
+/** Directed arrow between two cards in manual layout (`from` side → `to` side). */
+export function normalizeManualConnections(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const fromId = String(item.fromId ?? item.from ?? '').trim();
+    const toId = String(item.toId ?? item.to ?? '').trim();
+    const fromSide = normalizeCanvasLinkSide(item.fromSide);
+    const toSide = normalizeCanvasLinkSide(item.toSide);
+    if (!fromId || !toId || fromId === toId || !fromSide || !toSide) continue;
+    if (fromId.length > 96 || toId.length > 96) continue;
+    const key = `${fromId}:${fromSide}->${toId}:${toSide}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ fromId, toId, fromSide, toSide });
+    if (out.length >= 120) break;
+  }
+  return out;
+}
+
+export function normalizeCanvasLinkSide(s) {
+  if (s === 'top' || s === 'right' || s === 'bottom' || s === 'left') return s;
+  return null;
+}
+
+/** Drop edges whose endpoints are not both in `visibleNoteIds` (Set or iterable of strings). */
+export function filterManualConnectionsForVisibleNotes(edges, visibleNoteIds) {
+  if (!edges?.length) return [];
+  const set = visibleNoteIds instanceof Set ? visibleNoteIds : new Set(Array.from(visibleNoteIds, String));
+  return edges.filter((e) => set.has(String(e.fromId)) && set.has(String(e.toId)));
 }
 
 /** 0 = unlimited (single column / single row). Otherwise max children per column (vertical) or per row (horizontal). */
