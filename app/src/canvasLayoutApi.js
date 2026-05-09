@@ -107,10 +107,13 @@ const LAYOUT_FOCUS_TO_ROW_GAP = LAYOUT_LEAD_CHILD_GAP * 5 * 1.5;
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize existing card sizes
  * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
+ * @param {{ minHeightForNoteId?: (id: string) => number }} [opts] e.g. banner minimum height when measured rects lag
  * @returns {Record<string, { x: number, y: number, w: number, h: number }>}
  */
-export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getSize, focusAlign) {
+export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getSize, focusAlign, opts) {
   if (!sequenceOrderedNotes?.length) return {};
+  const minHFloor =
+    typeof opts?.minHeightForNoteId === 'function' ? opts.minHeightForNoteId : () => 0;
   const align =
     focusAlign === CANVAS_AUTO_FOCUS_ALIGN.START || focusAlign === CANVAS_AUTO_FOCUS_ALIGN.END
       ? focusAlign
@@ -120,9 +123,12 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
   let leadW = LAYOUT_DEFAULT_W;
   let leadH = LAYOUT_DEFAULT_H;
   const ls = getSize(String(lead.id));
+  const leadFloor = minHFloor(String(lead.id));
   if (ls && Number.isFinite(ls.w) && Number.isFinite(ls.h)) {
     leadW = ls.w;
-    leadH = ls.h;
+    leadH = Math.max(ls.h, leadFloor);
+  } else {
+    leadH = Math.max(leadH, leadFloor);
   }
   const rects = {};
   let y = LAYOUT_START_Y;
@@ -130,9 +136,12 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
     let w = LAYOUT_DEFAULT_W;
     let h = LAYOUT_DEFAULT_H;
     const ex = getSize(String(n.id));
+    const floor = minHFloor(String(n.id));
     if (ex && Number.isFinite(ex.w) && Number.isFinite(ex.h)) {
       w = ex.w;
-      h = ex.h;
+      h = Math.max(ex.h, floor);
+    } else {
+      h = Math.max(h, floor);
     }
     rects[String(n.id)] = { x: LAYOUT_START_X + leadW + LAYOUT_FOCUS_TO_COLUMN_GAP, y, w, h };
     y += h + LAYOUT_VERTICAL_GAP;
@@ -156,9 +165,12 @@ export function computeCanvasVerticalArrangementRects(sequenceOrderedNotes, getS
  * @param {{ id: string }[]} sequenceOrderedNotes lead first, then stream order
  * @param {(id: string) => { w: number, h: number } | null} getSize
  * @param {string} [focusAlign] {@link CANVAS_AUTO_FOCUS_ALIGN}
+ * @param {{ minHeightForNoteId?: (id: string) => number }} [opts]
  */
-export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, getSize, focusAlign) {
+export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, getSize, focusAlign, opts) {
   if (!sequenceOrderedNotes?.length) return {};
+  const minHFloor =
+    typeof opts?.minHeightForNoteId === 'function' ? opts.minHeightForNoteId : () => 0;
   const align =
     focusAlign === CANVAS_AUTO_FOCUS_ALIGN.START || focusAlign === CANVAS_AUTO_FOCUS_ALIGN.END
       ? focusAlign
@@ -168,23 +180,27 @@ export function computeCanvasHorizontalArrangementRects(sequenceOrderedNotes, ge
   let leadW = LAYOUT_DEFAULT_W;
   let leadH = LAYOUT_DEFAULT_H;
   const ls = getSize(String(lead.id));
+  const leadFloor = minHFloor(String(lead.id));
   if (ls && Number.isFinite(ls.w) && Number.isFinite(ls.h)) {
     leadW = ls.w;
-    leadH = ls.h;
+    leadH = Math.max(ls.h, leadFloor);
+  } else {
+    leadH = Math.max(leadH, leadFloor);
   }
   const rects = {};
   let x = LAYOUT_START_X;
-  let maxChildH = 0;
   children.forEach((n) => {
     let w = LAYOUT_DEFAULT_W;
     let h = LAYOUT_DEFAULT_H;
     const ex = getSize(String(n.id));
+    const floor = minHFloor(String(n.id));
     if (ex && Number.isFinite(ex.w) && Number.isFinite(ex.h)) {
       w = ex.w;
-      h = ex.h;
+      h = Math.max(ex.h, floor);
+    } else {
+      h = Math.max(h, floor);
     }
     rects[String(n.id)] = { x, y: LAYOUT_START_Y + leadH + LAYOUT_FOCUS_TO_ROW_GAP, w, h };
-    maxChildH = Math.max(maxChildH, h);
     x += w + LAYOUT_ROW_GAP;
   });
   const rowWidth = children.length ? x - LAYOUT_START_X - LAYOUT_ROW_GAP : 0;

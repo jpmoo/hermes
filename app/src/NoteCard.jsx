@@ -301,7 +301,7 @@ export default function NoteCard({
         await patchNoteBannerAttachment(note.id, editBannerAttachmentId);
       }
       setEditAttachmentOrderIds(null);
-      setEditBannerAttachmentId(persistedBannerAttachmentId);
+      setEditBannerAttachmentId(editBannerAttachmentId);
       setEditing(false);
       onNoteUpdate?.();
     } catch (err) {

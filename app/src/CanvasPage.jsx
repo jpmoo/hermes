@@ -400,6 +400,46 @@ const SAVE_DEBOUNCE_MS = 200;
 const MIN_W = 280;
 const MIN_H = 120;
 
+/** World-space px — snap dragged cards to edges/centers of other notes. */
+const SNAP_GUIDE_PX = 8;
+
+/**
+ * @param {'x' | 'y'} axis
+ * @param {number} pos left or top of dragged rect
+ * @param {number} size width or height
+ * @param {{ x: number, y: number, w: number, h: number }[]} others
+ */
+function snapCanvasAxis(axis, pos, size, others) {
+  let best = pos;
+  let bestD = SNAP_GUIDE_PX + 1;
+  /** @type {number | null} */
+  let guide = null;
+  for (const o of others) {
+    if (!o || typeof o.x !== 'number') continue;
+    const candidates =
+      axis === 'x'
+        ? [
+            { pos: o.x, guide: o.x },
+            { pos: o.x + o.w - size, guide: o.x + o.w },
+            { pos: o.x + o.w / 2 - size / 2, guide: o.x + o.w / 2 },
+          ]
+        : [
+            { pos: o.y, guide: o.y },
+            { pos: o.y + o.h - size, guide: o.y + o.h },
+            { pos: o.y + o.h / 2 - size / 2, guide: o.y + o.h / 2 },
+          ];
+    for (const c of candidates) {
+      const d = Math.abs(pos - c.pos);
+      if (d <= SNAP_GUIDE_PX && d < bestD) {
+        bestD = d;
+        best = c.pos;
+        guide = c.guide;
+      }
+    }
+  }
+  return { pos: best, guide };
+}
+
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;
 /** Each +/- applies a 5% multiplicative step (×1.05 / ÷1.05). */
@@ -476,6 +516,8 @@ export default function CanvasPage() {
   const [zoomPercentStr, setZoomPercentStr] = useState('100');
   const [zoomFieldFocused, setZoomFieldFocused] = useState(false);
   const [cardRects, setCardRects] = useState({});
+  /** Alignment guides (canvas world coords) while dragging a card. */
+  const [snapGuides, setSnapGuides] = useState({ vx: [], hy: [] });
 
   const cardRectsRef = useRef(cardRects);
   const canvasLayoutsRef = useRef(canvasLayouts);
@@ -703,6 +745,13 @@ export default function CanvasPage() {
   const sequenceOrderedNotesRef = useRef(sequenceOrderedNotes);
   sequenceOrderedNotesRef.current = sequenceOrderedNotes;
   const threadById = useMemo(() => new Map(thread.map((n) => [n.id, n])), [thread]);
+  const threadByIdRef = useRef(threadById);
+  threadByIdRef.current = threadById;
+
+  const layoutMinHeightForNoteId = useCallback((nid) => {
+    const n = threadByIdRef.current.get(nid);
+    return n && bannerImageAttachment(n) ? DEFAULT_CARD_H_WITH_BANNER : 0;
+  }, []);
 
   /** Same “focused thread head” rule as Stream (`streamHeadHideDeleteId`) for thread image background. */
   const canvasStreamHeadHideDeleteId = useMemo(() => {
@@ -992,13 +1041,14 @@ export default function CanvasPage() {
       return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
     };
     const align = autoFocusAlignRef.current;
+    const snapOpts = { minHeightForNoteId: layoutMinHeightForNoteId };
     const computed =
       canvasArrangement === CANVAS_ARRANGEMENT.VERTICAL
-        ? computeCanvasVerticalArrangementRects(ordered, getSize, align)
-        : computeCanvasHorizontalArrangementRects(ordered, getSize, align);
+        ? computeCanvasVerticalArrangementRects(ordered, getSize, align, snapOpts)
+        : computeCanvasHorizontalArrangementRects(ordered, getSize, align, snapOpts);
     setCardRects((prev) => ({ ...prev, ...computed }));
     scheduleSaveRef.current();
-  }, [canvasArrangement, connectorMode, autoFocusAlign, sequenceLayoutKey]);
+  }, [canvasArrangement, connectorMode, autoFocusAlign, sequenceLayoutKey, layoutMinHeightForNoteId]);
 
   useEffect(() => {
     const block = canvasLayouts[String(layoutStorageKey)]?.[fk];
@@ -1525,12 +1575,13 @@ export default function CanvasPage() {
       const r = cardRectsRef.current[id];
       return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
     };
+    const snapOpts = { minHeightForNoteId: layoutMinHeightForNoteId };
     let nextCards = { ...cardRectsRef.current };
     if (draftArrangement === CANVAS_ARRANGEMENT.VERTICAL) {
-      const computed = computeCanvasVerticalArrangementRects(ordered, getSize, draftAutoFocusAlign);
+      const computed = computeCanvasVerticalArrangementRects(ordered, getSize, draftAutoFocusAlign, snapOpts);
       nextCards = { ...nextCards, ...computed };
     } else if (draftArrangement === CANVAS_ARRANGEMENT.HORIZONTAL) {
-      const computed = computeCanvasHorizontalArrangementRects(ordered, getSize, draftAutoFocusAlign);
+      const computed = computeCanvasHorizontalArrangementRects(ordered, getSize, draftAutoFocusAlign, snapOpts);
       nextCards = { ...nextCards, ...computed };
     }
 
@@ -1589,7 +1640,7 @@ export default function CanvasPage() {
     } catch (e) {
       console.error(e);
     }
-  }, [draftArrangement, draftConnector, draftManualNewNoteAnchor, draftAutoFocusAlign]);
+  }, [draftArrangement, draftConnector, draftManualNewNoteAnchor, draftAutoFocusAlign, layoutMinHeightForNoteId]);
 
   const resetCanvasLayout = useCallback(async () => {
     if (
@@ -1734,6 +1785,7 @@ export default function CanvasPage() {
       const frameEl = e.currentTarget;
       const DRAG_THRESHOLD_PX = 5;
       let dragging = false;
+      setSnapGuides({ vx: [], hy: [] });
 
       const move = (ev) => {
         if (!dragging) {
@@ -1745,12 +1797,31 @@ export default function CanvasPage() {
             /* ignore */
           }
         }
-        const sc = scaleRef.current;
+        const sc = Math.max(scaleRef.current, 1e-6);
         const dx = (ev.clientX - ox) / sc;
         const dy = (ev.clientY - oy) / sc;
+        const rawX = base.x + dx;
+        const rawY = base.y + dy;
+        const others = Object.entries(cardRectsRef.current)
+          .filter(([oid]) => oid !== id)
+          .map(([, r]) => r)
+          .filter(
+            (r) =>
+              r &&
+              typeof r.x === 'number' &&
+              typeof r.y === 'number' &&
+              typeof r.w === 'number' &&
+              typeof r.h === 'number'
+          );
+        const sx = snapCanvasAxis('x', rawX, base.w, others);
+        const sy = snapCanvasAxis('y', rawY, base.h, others);
+        setSnapGuides({
+          vx: sx.guide != null ? [sx.guide] : [],
+          hy: sy.guide != null ? [sy.guide] : [],
+        });
         setCardRects((prev) => ({
           ...prev,
-          [id]: { ...base, x: base.x + dx, y: base.y + dy },
+          [id]: { ...base, x: sx.pos, y: sy.pos },
         }));
       };
 
@@ -1758,6 +1829,7 @@ export default function CanvasPage() {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
+        setSnapGuides({ vx: [], hy: [] });
         try {
           if (dragging && frameEl.releasePointerCapture) {
             frameEl.releasePointerCapture(ev.pointerId);
@@ -1793,7 +1865,7 @@ export default function CanvasPage() {
       const oy = e.clientY;
       const base = { ...start };
       const move = (ev) => {
-        const sc = scaleRef.current;
+        const sc = Math.max(scaleRef.current, 1e-6);
         const dx = (ev.clientX - ox) / sc;
         const dy = (ev.clientY - oy) / sc;
         setCardRects((prev) => ({
@@ -2283,6 +2355,30 @@ export default function CanvasPage() {
                     </div>
                   );
                 })}
+                {(snapGuides.vx.length > 0 || snapGuides.hy.length > 0) && (
+                  <svg className="canvas-snap-guides" aria-hidden>
+                    {snapGuides.vx.map((xv, i) => (
+                      <line
+                        key={`snap-v-${i}`}
+                        x1={xv}
+                        y1={-50000}
+                        x2={xv}
+                        y2={50000}
+                        className="canvas-snap-guides-line"
+                      />
+                    ))}
+                    {snapGuides.hy.map((yh, i) => (
+                      <line
+                        key={`snap-h-${i}`}
+                        x1={-50000}
+                        y1={yh}
+                        x2={50000}
+                        y2={yh}
+                        className="canvas-snap-guides-line"
+                      />
+                    ))}
+                  </svg>
+                )}
               </div>
             </div>
             <aside
