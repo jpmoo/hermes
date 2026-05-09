@@ -477,32 +477,29 @@ function sanitizeCanvasConnectorMode(input) {
   return 'thread_chain';
 }
 
-function sanitizeCanvasLinkSide(input) {
-  if (input === 'top' || input === 'right' || input === 'bottom' || input === 'left') return input;
-  return null;
-}
-
 /** Manual directed arrows between cards (manual canvas layout only); stored per focus block. */
 function sanitizeManualConnections(input) {
   if (!Array.isArray(input)) return [];
-  const out = [];
-  const seen = new Set();
+  const MANUAL_EDGE_BEND_LIMIT = 6000;
+  const map = new Map();
   for (const item of input) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
     const fromId = typeof item.fromId === 'string' ? item.fromId.trim() : '';
     const toId = typeof item.toId === 'string' ? item.toId.trim() : '';
     if (!fromId || !toId || fromId.length > 96 || toId.length > 96) continue;
     if (fromId === toId) continue;
-    const fromSide = sanitizeCanvasLinkSide(item.fromSide);
-    const toSide = sanitizeCanvasLinkSide(item.toSide);
-    if (!fromSide || !toSide) continue;
-    const key = `${fromId}:${fromSide}->${toId}:${toSide}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ fromId, toId, fromSide, toSide });
-    if (out.length >= 120) break;
+    let bend = 0;
+    if (item.bend != null && item.bend !== '') {
+      const b = typeof item.bend === 'number' ? item.bend : parseFloat(String(item.bend));
+      if (Number.isFinite(b)) {
+        bend = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, b));
+      }
+    }
+    const key = `${fromId}->${toId}`;
+    map.set(key, { fromId, toId, bend });
+    if (map.size >= 120) break;
   }
-  return out;
+  return Array.from(map.values());
 }
 
 /** Canvas layouts in settings_json: per-thread, per-focus view(s) + card rects. Legacy key `campusLayouts` is read once and migrated to `canvasLayouts`. */

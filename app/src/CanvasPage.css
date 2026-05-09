@@ -757,6 +757,34 @@
   pointer-events: stroke;
 }
 
+.canvas-manual-bend-handles {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4000px;
+  height: 4000px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.canvas-manual-bend-handle {
+  pointer-events: all;
+  fill: var(--accent, #3b82f6);
+  opacity: 0.22;
+  stroke: var(--bg, #1a1a1a);
+  stroke-width: 1px;
+  cursor: grab;
+}
+
+.canvas-manual-bend-handle:hover {
+  opacity: 0.65;
+}
+
+.canvas-manual-bend-handle:active {
+  cursor: grabbing;
+}
+
 .canvas-manual-link-rubber {
   pointer-events: none;
   z-index: 8;
@@ -765,12 +793,52 @@
 
 .canvas-manual-link-rubber-line {
   stroke: currentColor;
-  stroke-dasharray: 6 6;
+  stroke-dasharray: 5 8;
   opacity: 0.85;
 }
 
-.canvas-card-link-handle {
+.canvas-card-link-handle-zone {
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+  pointer-events: auto;
+}
+
+.canvas-card-link-handle-zone--top {
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 28px;
+}
+
+.canvas-card-link-handle-zone--right {
+  right: 0;
+  top: 50%;
+  transform: translate(50%, -50%);
+  width: 28px;
+  height: 36px;
+}
+
+.canvas-card-link-handle-zone--bottom {
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  width: 36px;
+  height: 28px;
+}
+
+.canvas-card-link-handle-zone--left {
+  left: 0;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 36px;
+}
+
+.canvas-card-link-handle {
   width: 14px;
   height: 14px;
   padding: 0;
@@ -779,35 +847,16 @@
   border-radius: 50%;
   background: var(--bg, #1a1a1a);
   cursor: crosshair;
-  z-index: 6;
   box-sizing: border-box;
-  opacity: 0.85;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.canvas-card-link-handle-zone:hover .canvas-card-link-handle {
+  opacity: 0.9;
 }
 
 .canvas-card-link-handle:hover {
   opacity: 1;
-}
-
-.canvas-card-link-handle--top {
-  top: 0;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.canvas-card-link-handle--right {
-  right: 0;
-  top: 50%;
-  transform: translate(50%, -50%);
-}
-
-.canvas-card-link-handle--bottom {
-  bottom: 0;
-  left: 50%;
-  transform: translate(-50%, 50%);
-}
-
-.canvas-card-link-handle--left {
-  left: 0;
-  top: 50%;
-  transform: translate(-50%, -50%);
 }

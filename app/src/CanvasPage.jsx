@@ -58,6 +58,8 @@ import {
   computeCanvasHorizontalArrangementRects,
   computeCanvasVerticalArrangementRects,
   filterManualConnectionsForVisibleNotes,
+  MANUAL_EDGE_BEND_LIMIT,
+  manualConnectionKey,
   mergeCanvasLayoutPatch,
   normalizeManualConnections,
   replaceCanvasLayoutFocusBlock,
@@ -330,8 +332,33 @@ function connectorFocusToChildVertical(a, b) {
   return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
 }
 
-function manualConnectionKey(e) {
-  return `${e.fromId}:${e.fromSide}->${e.toId}:${e.toSide}`;
+/** Quadratic control point so sagitta at t=½ equals `bend` along chord normal (see normalizeManualConnections). */
+function quadControlFromChordAndBend(p0, p2, bend) {
+  const vx = p2.x - p0.x;
+  const vy = p2.y - p0.y;
+  const len = Math.hypot(vx, vy);
+  const mx = (p0.x + p2.x) / 2;
+  const my = (p0.y + p2.y) / 2;
+  if (len < 1e-9) return { x: mx, y: my };
+  const nx = -vy / len;
+  const ny = vx / len;
+  const k = Number.isFinite(bend) ? bend : 0;
+  return { x: mx + nx * 2 * k, y: my + ny * 2 * k };
+}
+
+function quadCurveMidpoint(p0, qc, p2) {
+  return {
+    x: 0.25 * p0.x + 0.5 * qc.x + 0.25 * p2.x,
+    y: 0.25 * p0.y + 0.5 * qc.y + 0.25 * p2.y,
+  };
+}
+
+function chordNormalWorld(p0, p2) {
+  const vx = p2.x - p0.x;
+  const vy = p2.y - p0.y;
+  const len = Math.hypot(vx, vy);
+  if (len < 1e-9) return { nx: 1, ny: 0 };
+  return { nx: -vy / len, ny: vx / len };
 }
 
 function notePreview(content, max = 72) {
@@ -362,7 +389,9 @@ function isCanvasDragInteractiveTarget(target) {
         'label',
         '.canvas-sequence-menu',
         '.canvas-sequence-menu__panel',
+        '.canvas-card-link-handle-zone',
         '.canvas-card-link-handle',
+        '.canvas-manual-bend-handle',
       ].join(', ')
     )
   );
@@ -674,6 +703,7 @@ export default function CanvasPage() {
   const autoArrangementWrapAfterRef = useRef(0);
   const manualConnectionsRef = useRef([]);
   const manualLinkDragSessionRef = useRef(null);
+  const bendDragSessionRef = useRef(null);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
   canvasArrangementRef.current = canvasArrangement;
@@ -683,7 +713,15 @@ export default function CanvasPage() {
   autoArrangementWrapAfterRef.current = autoArrangementWrapAfter;
   manualConnectionsRef.current = manualConnections;
 
-  const linesVisible = connectorMode !== CANVAS_CONNECTOR_MODE.NONE;
+  /** Sort-order / hub lines — disabled in manual layout (only user-drawn arrows). */
+  const automaticSequenceLinesVisible =
+    canvasArrangement !== CANVAS_ARRANGEMENT.MANUAL &&
+    connectorMode !== CANVAS_CONNECTOR_MODE.NONE;
+  /** Toolbar icon: auto lines on vs manual arrows drawn. */
+  const sequenceMenuLinesActive =
+    canvasArrangement === CANVAS_ARRANGEMENT.MANUAL
+      ? manualConnections.length > 0
+      : automaticSequenceLinesVisible;
 
   const viewportRef = useRef(null);
   const viewportPointersRef = useRef(new Map());
@@ -1270,11 +1308,14 @@ export default function CanvasPage() {
     const cards = { ...cardRectsRef.current };
     const curRaw = canvasLayoutsRef.current[tid]?.[focusKey];
     const curBlock = curRaw && typeof curRaw === 'object' ? curRaw : {};
+    const showSeq =
+      canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL &&
+      connectorModeRef.current !== CANVAS_CONNECTOR_MODE.NONE;
     const pos = {
       scale: scaleRef.current,
       tx: txRef.current,
       ty: tyRef.current,
-      showSequenceLines: connectorModeRef.current !== CANVAS_CONNECTOR_MODE.NONE,
+      showSequenceLines: showSeq,
     };
     const mobile = isCanvasMobileViewportRef.current;
     const partial = { cards };
@@ -1755,9 +1796,14 @@ export default function CanvasPage() {
       const r = cardRectsRef.current[id];
       return r && typeof r.w === 'number' && typeof r.h === 'number' ? { w: r.w, h: r.h } : null;
     };
+    const effectiveConnector =
+      draftArrangement === CANVAS_ARRANGEMENT.MANUAL
+        ? CANVAS_CONNECTOR_MODE.NONE
+        : draftConnector;
     const snapOpts = {
       minHeightForNoteId: layoutMinHeightForNoteId,
-      focusPeerSpacing: draftConnector === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN ? 'wide' : 'compact',
+      focusPeerSpacing:
+        effectiveConnector === CANVAS_CONNECTOR_MODE.FOCUS_TO_CHILDREN ? 'wide' : 'compact',
       wrapAfter: draftAutoArrangementWrapAfter,
     };
     let nextCards = { ...cardRectsRef.current };
@@ -1771,14 +1817,14 @@ export default function CanvasPage() {
 
     cardRectsRef.current = nextCards;
     canvasArrangementRef.current = draftArrangement;
-    connectorModeRef.current = draftConnector;
+    connectorModeRef.current = effectiveConnector;
     manualNewNoteAnchorRef.current = draftManualNewNoteAnchor;
     autoFocusAlignRef.current = draftAutoFocusAlign;
     autoArrangementWrapAfterRef.current = draftAutoArrangementWrapAfter;
 
     setCardRects(nextCards);
     setCanvasArrangement(draftArrangement);
-    setConnectorMode(draftConnector);
+    setConnectorMode(effectiveConnector);
     setManualNewNoteAnchor(draftManualNewNoteAnchor);
     setAutoFocusAlign(draftAutoFocusAlign);
     setAutoArrangementWrapAfter(draftAutoArrangementWrapAfter);
@@ -1791,7 +1837,7 @@ export default function CanvasPage() {
     }
     const curRaw = canvasLayoutsRef.current[tid]?.[focusKey];
     const curBlock = curRaw && typeof curRaw === 'object' ? curRaw : {};
-    const linesOn = draftConnector !== CANVAS_CONNECTOR_MODE.NONE;
+    const linesOn = effectiveConnector !== CANVAS_CONNECTOR_MODE.NONE;
     const pos = {
       scale: scaleRef.current,
       tx: txRef.current,
@@ -1802,7 +1848,7 @@ export default function CanvasPage() {
     const partial = {
       cards: nextCards,
       canvasArrangement: draftArrangement,
-      connectorMode: draftConnector,
+      connectorMode: effectiveConnector,
       manualNewNoteAnchor: draftManualNewNoteAnchor,
       autoFocusAlign: draftAutoFocusAlign,
       autoArrangementWrapAfter: draftAutoArrangementWrapAfter,
@@ -2211,6 +2257,74 @@ export default function CanvasPage() {
     scheduleSaveRef.current();
   }, []);
 
+  const onManualConnectorHitPointerDown = useCallback(
+    (e, seg) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.stopPropagation();
+      const sx = e.clientX;
+      const sy = e.clientY;
+      const onUp = (ev) => {
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) return;
+        removeManualConnectionByKey(seg.key);
+      };
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [removeManualConnectionByKey]
+  );
+
+  const startBendDrag = useCallback(
+    (e, seg) => {
+      if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const w = viewportClientToWorld(e.clientX, e.clientY);
+      if (!w) return;
+      const ra = cardRectsRef.current[seg.fromId];
+      const rb = cardRectsRef.current[seg.toId];
+      if (!ra || !rb) return;
+      const chord = connectorBetweenRects(ra, rb);
+      const p0 = { x: chord.x1, y: chord.y1 };
+      const p2 = { x: chord.x2, y: chord.y2 };
+      const { nx, ny } = chordNormalWorld(p0, p2);
+      const startBend = Number.isFinite(seg.bend) ? seg.bend : 0;
+      bendDragSessionRef.current = {
+        key: seg.key,
+        anchorWorld: w,
+        startBend,
+        nx,
+        ny,
+      };
+      const onMove = (ev) => {
+        const s = bendDragSessionRef.current;
+        if (!s) return;
+        const wp = viewportClientToWorld(ev.clientX, ev.clientY);
+        if (!wp) return;
+        const dw = wp.x - s.anchorWorld.x;
+        const dh = wp.y - s.anchorWorld.y;
+        const delta = dw * s.nx + dh * s.ny;
+        let next = s.startBend + delta;
+        next = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, next));
+        setManualConnections((prev) =>
+          prev.map((ed) => (manualConnectionKey(ed) === s.key ? { ...ed, bend: next } : ed))
+        );
+      };
+      const onUp = () => {
+        bendDragSessionRef.current = null;
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        scheduleSaveRef.current();
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [viewportClientToWorld]
+  );
+
   const startManualLinkDrag = useCallback(
     (e, noteId, side) => {
       if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
@@ -2255,11 +2369,16 @@ export default function CanvasPage() {
         }
         if (!handleEl) return;
         const toId = handleEl.getAttribute('data-note-id');
-        const toSide = handleEl.getAttribute('data-side');
-        if (!toId || !toSide) return;
-        if (toId === s.fromId && toSide === s.fromSide) return;
-        const nextEdge = { fromId: s.fromId, toId, fromSide: s.fromSide, toSide };
-        setManualConnections((prev) => normalizeManualConnections([...prev, nextEdge]));
+        if (!toId) return;
+        if (toId === s.fromId) return;
+        const nextEdge = { fromId: s.fromId, toId, bend: 0 };
+        const k = manualConnectionKey(nextEdge);
+        setManualConnections((prev) =>
+          normalizeManualConnections([
+            ...prev.filter((e) => manualConnectionKey(e) !== k),
+            nextEdge,
+          ])
+        );
         scheduleSaveRef.current();
       };
       window.addEventListener('pointermove', onMove);
@@ -2270,6 +2389,7 @@ export default function CanvasPage() {
   );
 
   const connectorPoints = useMemo(() => {
+    if (canvasArrangement === CANVAS_ARRANGEMENT.MANUAL) return [];
     if (connectorMode === CANVAS_CONNECTOR_MODE.NONE) return [];
     const notes = sequenceNotesForCanvas;
     if (notes.length < 2) return [];
@@ -2301,6 +2421,13 @@ export default function CanvasPage() {
     return pts;
   }, [canvasArrangement, connectorMode, sequenceNotesForCanvas, cardRects]);
 
+  const onDraftArrangementChange = useCallback((v) => {
+    setDraftArrangement(v);
+    if (v === CANVAS_ARRANGEMENT.MANUAL || v === CANVAS_ARRANGEMENT.KEEP) {
+      setDraftConnector(CANVAS_CONNECTOR_MODE.NONE);
+    }
+  }, []);
+
   const manualLinkSegments = useMemo(() => {
     const ids = new Set(sequenceNotesForCanvas.map((n) => String(n.id)));
     const filtered = filterManualConnectionsForVisibleNotes(manualConnections, ids);
@@ -2309,15 +2436,24 @@ export default function CanvasPage() {
         const ra = cardRects[edge.fromId];
         const rb = cardRects[edge.toId];
         if (!ra || !rb) return null;
-        const p1 = sideMidpoint(ra, edge.fromSide);
-        const p2 = sideMidpoint(rb, edge.toSide);
+        const chord = connectorBetweenRects(ra, rb);
+        const p0 = { x: chord.x1, y: chord.y1 };
+        const p2 = { x: chord.x2, y: chord.y2 };
+        const bendRaw = Number.isFinite(edge.bend) ? edge.bend : 0;
+        const bend = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, bendRaw));
+        const q = quadControlFromChordAndBend(p0, p2, bend);
+        const mid = quadCurveMidpoint(p0, q, p2);
+        const pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
+        const key = manualConnectionKey(edge);
         return {
           ...edge,
-          key: manualConnectionKey(edge),
-          x1: p1.x,
-          y1: p1.y,
-          x2: p2.x,
-          y2: p2.y,
+          bend,
+          key,
+          pathD,
+          mid,
+          p0,
+          p2,
+          q,
         };
       })
       .filter(Boolean);
@@ -2493,11 +2629,11 @@ export default function CanvasPage() {
                 onClose={() => setSequenceMenuOpen(false)}
                 arrangement={draftArrangement}
                 connectorMode={draftConnector}
-                linesActive={linesVisible}
+                linesActive={sequenceMenuLinesActive}
                 manualNewNoteAnchor={draftManualNewNoteAnchor}
                 autoFocusAlign={draftAutoFocusAlign}
                 autoArrangementWrapAfter={draftAutoArrangementWrapAfter}
-                onArrangementChange={setDraftArrangement}
+                onArrangementChange={onDraftArrangementChange}
                 onConnectorModeChange={setDraftConnector}
                 onManualNewNoteAnchorChange={setDraftManualNewNoteAnchor}
                 onAutoFocusAlignChange={setDraftAutoFocusAlign}
@@ -2585,7 +2721,7 @@ export default function CanvasPage() {
                   transformOrigin: '0 0',
                 }}
               >
-                {linesVisible ? (
+                {automaticSequenceLinesVisible ? (
                   <svg className="canvas-connectors" aria-hidden>
                     <defs>
                       <marker
@@ -2636,14 +2772,13 @@ export default function CanvasPage() {
                       </marker>
                     </defs>
                     {manualLinkSegments.map((seg) => (
-                      <line
+                      <path
                         key={seg.key}
+                        d={seg.pathD}
                         className="canvas-manual-connector-line"
-                        x1={seg.x1}
-                        y1={seg.y1}
-                        x2={seg.x2}
-                        y2={seg.y2}
+                        fill="none"
                         strokeWidth={2}
+                        strokeDasharray="5 8"
                         markerEnd="url(#canvas-manual-arrow)"
                       />
                     ))}
@@ -2652,21 +2787,29 @@ export default function CanvasPage() {
                 {canvasArrangement === CANVAS_ARRANGEMENT.MANUAL && manualLinkSegments.length > 0 ? (
                   <svg className="canvas-manual-connectors-hit" role="presentation">
                     {manualLinkSegments.map((seg) => (
-                      <line
+                      <path
                         key={`hit-${seg.key}`}
+                        d={seg.pathD}
                         className="canvas-manual-connector-hit"
-                        x1={seg.x1}
-                        y1={seg.y1}
-                        x2={seg.x2}
-                        y2={seg.y2}
-                        strokeWidth={18}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={22}
                         pointerEvents="stroke"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onPointerUp={(e) => {
-                          if (e.pointerType === 'mouse' && e.button !== 0) return;
-                          e.stopPropagation();
-                          removeManualConnectionByKey(seg.key);
-                        }}
+                        onPointerDown={(e) => onManualConnectorHitPointerDown(e, seg)}
+                      />
+                    ))}
+                  </svg>
+                ) : null}
+                {canvasArrangement === CANVAS_ARRANGEMENT.MANUAL && manualLinkSegments.length > 0 ? (
+                  <svg className="canvas-manual-bend-handles" aria-hidden>
+                    {manualLinkSegments.map((seg) => (
+                      <circle
+                        key={`bend-${seg.key}`}
+                        className="canvas-manual-bend-handle"
+                        cx={seg.mid.x}
+                        cy={seg.mid.y}
+                        r={12}
+                        onPointerDown={(e) => startBendDrag(e, seg)}
                       />
                     ))}
                   </svg>
@@ -2726,17 +2869,21 @@ export default function CanvasPage() {
                       {canvasArrangement === CANVAS_ARRANGEMENT.MANUAL ? (
                         <>
                           {(['top', 'right', 'bottom', 'left']).map((side) => (
-                            <button
+                            <div
                               key={side}
-                              type="button"
-                              className={`canvas-card-link-handle canvas-card-link-handle--${side}`}
-                              data-canvas-link-handle="true"
-                              data-note-id={id}
-                              data-side={side}
-                              aria-label={`Draw arrow from ${side} side`}
-                              title="Drag to another note to connect"
-                              onPointerDown={(e) => startManualLinkDrag(e, n.id, side)}
-                            />
+                              className={`canvas-card-link-handle-zone canvas-card-link-handle-zone--${side}`}
+                            >
+                              <button
+                                type="button"
+                                className="canvas-card-link-handle"
+                                data-canvas-link-handle="true"
+                                data-note-id={id}
+                                data-side={side}
+                                aria-label={`Draw arrow from ${side} side`}
+                                title="Drag to another note to connect"
+                                onPointerDown={(e) => startManualLinkDrag(e, n.id, side)}
+                              />
+                            </div>
                           ))}
                         </>
                       ) : null}

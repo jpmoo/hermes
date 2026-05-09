@@ -106,26 +106,47 @@ export function resolveCanvasBlockPrefs(block) {
   };
 }
 
-/** Directed arrow between two cards in manual layout (`from` side → `to` side). */
+/** Max perpendicular bend (world px) for curved manual connectors. */
+export const MANUAL_EDGE_BEND_LIMIT = 6000;
+
+/**
+ * Stable key for a directed manual edge (endpoints only; sides come from geometry).
+ * Legacy rows with fromSide/toSide migrate to the same key.
+ */
+export function manualConnectionKey(edge) {
+  const fromId = String(edge?.fromId ?? '').trim();
+  const toId = String(edge?.toId ?? '').trim();
+  return `${fromId}->${toId}`;
+}
+
+function clampManualBend(v) {
+  if (!Number.isFinite(v)) return 0;
+  return Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, v));
+}
+
+/**
+ * Directed arrow between two notes. Endpoints follow card geometry (closest sides).
+ * `bend`: signed perpendicular sagitta at t=½ along the quadratic (world units); 0 = straight chord.
+ */
 export function normalizeManualConnections(raw) {
   if (!Array.isArray(raw)) return [];
-  const out = [];
-  const seen = new Set();
+  /** Last occurrence wins (merge duplicates). */
+  const map = new Map();
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const fromId = String(item.fromId ?? item.from ?? '').trim();
     const toId = String(item.toId ?? item.to ?? '').trim();
-    const fromSide = normalizeCanvasLinkSide(item.fromSide);
-    const toSide = normalizeCanvasLinkSide(item.toSide);
-    if (!fromId || !toId || fromId === toId || !fromSide || !toSide) continue;
-    if (fromId.length > 96 || toId.length > 96) continue;
-    const key = `${fromId}:${fromSide}->${toId}:${toSide}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ fromId, toId, fromSide, toSide });
-    if (out.length >= 120) break;
+    if (!fromId || !toId || fromId === toId || fromId.length > 96 || toId.length > 96) continue;
+    let bend = 0;
+    if (item.bend != null && item.bend !== '') {
+      const b = typeof item.bend === 'number' ? item.bend : parseFloat(String(item.bend));
+      if (Number.isFinite(b)) bend = clampManualBend(b);
+    }
+    const key = `${fromId}->${toId}`;
+    map.set(key, { fromId, toId, bend });
+    if (map.size >= 120) break;
   }
-  return out;
+  return Array.from(map.values());
 }
 
 export function normalizeCanvasLinkSide(s) {

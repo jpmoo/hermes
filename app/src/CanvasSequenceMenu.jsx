@@ -251,21 +251,23 @@ export default function CanvasSequenceMenu({
             </>
           )}
         </div>
-        <div className="canvas-sequence-menu__section">
-          <div className="canvas-sequence-menu__section-title">Line display</div>
-          {LINE_OPTIONS.map((o) => (
-            <label key={o.value} className="canvas-sequence-menu__radio">
-              <input
-                type="radio"
-                name="canvas-connector"
-                value={o.value}
-                checked={connectorMode === o.value}
-                onChange={() => onConnectorModeChange(o.value)}
-              />
-              {o.label}
-            </label>
-          ))}
-        </div>
+        {arrangement !== CANVAS_ARRANGEMENT.MANUAL && arrangement !== CANVAS_ARRANGEMENT.KEEP ? (
+          <div className="canvas-sequence-menu__section">
+            <div className="canvas-sequence-menu__section-title">Line display</div>
+            {LINE_OPTIONS.map((o) => (
+              <label key={o.value} className="canvas-sequence-menu__radio">
+                <input
+                  type="radio"
+                  name="canvas-connector"
+                  value={o.value}
+                  checked={connectorMode === o.value}
+                  onChange={() => onConnectorModeChange(o.value)}
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        ) : null}
         <button type="button" className="canvas-sequence-menu__apply" onClick={onApply}>
           Apply
         </button>
