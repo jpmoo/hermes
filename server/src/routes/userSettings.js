@@ -456,6 +456,22 @@ function sanitizeAutoFocusAlign(input) {
   return 'center';
 }
 
+/** 0 = no wrap; 1–500 = max cards per column (vertical) or row (horizontal). */
+function sanitizeAutoArrangementWrapAfter(input) {
+  if (input == null || input === '') return undefined;
+  let n;
+  if (typeof input === 'number' && Number.isFinite(input)) {
+    n = Math.floor(input);
+  } else if (typeof input === 'string' && /^\d+$/.test(input.trim())) {
+    n = parseInt(input.trim(), 10);
+  } else {
+    return undefined;
+  }
+  if (n === 0) return 0;
+  if (n >= 1 && n <= 500) return n;
+  return undefined;
+}
+
 function sanitizeCanvasConnectorMode(input) {
   if (input === 'thread_chain' || input === 'focus_to_children' || input === 'none') return input;
   return 'thread_chain';
@@ -512,6 +528,7 @@ function sanitizeCanvasLayouts(input) {
       const connectorMode = sanitizeCanvasConnectorMode(block.connectorMode);
       const manualNewNoteAnchor = sanitizeManualNewNoteAnchor(block.manualNewNoteAnchor);
       const autoFocusAlign = sanitizeAutoFocusAlign(block.autoFocusAlign);
+      const autoArrangementWrapAfter = sanitizeAutoArrangementWrapAfter(block.autoArrangementWrapAfter);
       const blockOut = {
         view,
         viewMobile,
@@ -521,6 +538,9 @@ function sanitizeCanvasLayouts(input) {
         manualNewNoteAnchor,
         autoFocusAlign,
       };
+      if (autoArrangementWrapAfter !== undefined) {
+        blockOut.autoArrangementWrapAfter = autoArrangementWrapAfter;
+      }
       if (starredDock) blockOut.starredDock = starredDock;
       out[tid][fk] = blockOut;
     }

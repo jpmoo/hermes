@@ -569,6 +569,11 @@ function snapResizeBottomRight(base, dw, dh, others, minW, minH, thresholdWorld)
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;
+/**
+ * When fitting cards into the viewport (first layout, reset, or zoom-to-card), do not zoom in past this —
+ * small stacks otherwise hit the old 2.5× cap and feel jarring when opening a thread for the first time.
+ */
+const FIT_CONTENT_VIEW_MAX_SCALE = 1.25;
 /** Each +/- applies a 5% multiplicative step (×1.05 / ÷1.05). */
 const ZOOM_STEP_FACTOR = 1.05;
 /** Trackpad ctrl/meta + wheel zoom sensitivity (higher = faster). */
@@ -1393,7 +1398,7 @@ export default function CanvasPage() {
     const pad = 40;
     const fitW = (vw - pad * 2) / bw;
     const fitH = (vh - pad * 2) / bh;
-    let nextScale = Math.min(fitW, fitH, 2.5, 4);
+    let nextScale = Math.min(fitW, fitH, FIT_CONTENT_VIEW_MAX_SCALE);
     if (!Number.isFinite(nextScale) || nextScale <= 0) nextScale = 1;
     nextScale = Math.max(0.2, nextScale);
     const cx = (minX + maxX) / 2;
@@ -1568,7 +1573,8 @@ export default function CanvasPage() {
   }, []);
 
   const applyFocus = useCallback(
-    (id) => {
+    async (id) => {
+      await persistCanvasLayoutNow();
       if (!threadRootId) {
         setFocusId(id);
         return;
@@ -1584,7 +1590,7 @@ export default function CanvasPage() {
         }
       });
     },
-    [threadRootId, setSearchParams]
+    [threadRootId, setSearchParams, persistCanvasLayoutNow]
   );
 
   const handleCalendarPick = useCallback(
@@ -1629,7 +1635,7 @@ export default function CanvasPage() {
         }
         if (threadRootId) {
           await refreshThread();
-          applyFocus(note.id);
+          await applyFocus(note.id);
         } else {
           const full = {
             ...note,
@@ -1638,6 +1644,7 @@ export default function CanvasPage() {
             connection_count: note.connection_count ?? 0,
             attachments: note.attachments || [],
           };
+          await persistCanvasLayoutNow();
           setThread((prev) => [full, ...prev.filter((x) => x.id !== full.id)]);
           setFocusId(null);
           setSearchParams({ thread: String(full.id) });
@@ -1656,13 +1663,15 @@ export default function CanvasPage() {
       refreshThread,
       applyFocus,
       setSearchParams,
+      persistCanvasLayoutNow,
     ]
   );
 
-  const upOneLevel = useCallback(() => {
+  const upOneLevel = useCallback(async () => {
     if (!threadRootId || !focusId || noteIdEq(focusId, actualRootId)) return;
     const p = parentInFilteredTree(tree, focusId);
     if (!p) {
+      await persistCanvasLayoutNow();
       flushSync(() => {
         setCanvasLayoutFkOverride(null);
         setSearchParams({ thread: threadRootId });
@@ -1671,41 +1680,45 @@ export default function CanvasPage() {
       return;
     }
     if (noteIdEq(p, actualRootId)) {
+      await persistCanvasLayoutNow();
       flushSync(() => {
         setCanvasLayoutFkOverride(null);
         setSearchParams({ thread: threadRootId });
         setFocusId(null);
       });
     } else {
-      applyFocus(p);
+      await applyFocus(p);
     }
-  }, [threadRootId, focusId, actualRootId, tree, setSearchParams, applyFocus]);
+  }, [threadRootId, focusId, actualRootId, tree, setSearchParams, applyFocus, persistCanvasLayoutNow]);
 
   /** Clear thread/focus but stay on Canvas (all threads view). */
-  const goToCanvasRoot = useCallback(() => {
+  const goToCanvasRoot = useCallback(async () => {
+    await persistCanvasLayoutNow();
     flushSync(() => {
       setCanvasLayoutFkOverride(undefined);
       setSearchParams({});
       setFocusId(null);
     });
-  }, [setSearchParams]);
+  }, [setSearchParams, persistCanvasLayoutNow]);
 
   const makeOpenThread = useCallback(
-    (noteId) => () => {
+    (noteId) => async () => {
       if (!threadRootId) {
+        await persistCanvasLayoutNow();
         setSearchParams({ thread: String(noteId) });
         return;
       }
-      applyFocus(noteId);
+      await applyFocus(noteId);
     },
-    [threadRootId, setSearchParams, applyFocus]
+    [threadRootId, setSearchParams, applyFocus, persistCanvasLayoutNow]
   );
 
   const onGoToNote = useCallback(
-    ({ noteId, threadRootId: root }) => {
+    async ({ noteId, threadRootId: root }) => {
+      await persistCanvasLayoutNow();
       setSearchParams({ thread: root, focus: noteId });
     },
-    [setSearchParams]
+    [setSearchParams, persistCanvasLayoutNow]
   );
 
   const applyCanvasSequence = useCallback(async () => {
@@ -1924,6 +1937,7 @@ export default function CanvasPage() {
       setPendingRootFiles([]);
       resetComposeMeta();
       if (canvasRootFileRef.current) canvasRootFileRef.current.value = '';
+      await persistCanvasLayoutNow();
       setThread((prev) => [full, ...prev.filter((x) => x.id !== full.id)]);
       setFocusId(null);
       setSearchParams({ thread: String(full.id) });
@@ -2095,7 +2109,7 @@ export default function CanvasPage() {
       const cy = r.y + r.h / 2;
       const fitW = (vw - pad * 2) / r.w;
       const fitH = (vh - pad * 2) / r.h;
-      let nextScale = Math.min(fitW, fitH, 2.5, 4);
+      let nextScale = Math.min(fitW, fitH, FIT_CONTENT_VIEW_MAX_SCALE);
       if (!Number.isFinite(nextScale) || nextScale <= 0) nextScale = 1;
       nextScale = Math.max(0.2, nextScale);
       setScale(nextScale);
@@ -2248,14 +2262,15 @@ export default function CanvasPage() {
   const summaryIds = useMemo(() => collectVisibleNoteIds(displayTree), [displayTree]);
 
   const openHistoryEntry = useCallback(
-    (it) => {
+    async (it) => {
       if (!it?.noteId) return;
       setHistoryOpen(false);
+      await persistCanvasLayoutNow();
       if (it.threadRootId) setSearchParams({ thread: it.threadRootId, focus: it.noteId });
       else setSearchParams({ thread: it.noteId });
       setFocusId(it.noteId);
     },
-    [setSearchParams]
+    [setSearchParams, persistCanvasLayoutNow]
   );
 
   const historyControl = (
