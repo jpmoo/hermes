@@ -2351,7 +2351,7 @@ export default function CanvasPage() {
           const chord = manualConnectorChord(ra, rb, bendT, bendN);
           const p0 = { x: chord.x1, y: chord.y1 };
           const p2 = { x: chord.x2, y: chord.y2 };
-          const { tx, ty, nx, ny } = chordBasisWorld(p0, p2);
+          const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
           const dx = wp.x - mx;
           const dy = wp.y - my;
           const nextT = Math.min(
