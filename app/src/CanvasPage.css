@@ -757,31 +757,33 @@
   pointer-events: stroke;
 }
 
-.canvas-manual-bend-handles {
+.canvas-manual-edge-interaction {
   position: absolute;
   left: 0;
   top: 0;
   width: 4000px;
   height: 4000px;
   overflow: visible;
-  pointer-events: none;
   z-index: 4;
 }
 
-.canvas-manual-bend-handle {
-  pointer-events: all;
+.canvas-manual-edge-group .canvas-manual-bend-handle {
+  pointer-events: none;
   fill: var(--accent, #3b82f6);
-  opacity: 0.22;
+  opacity: 0;
   stroke: var(--bg, #1a1a1a);
   stroke-width: 1px;
   cursor: grab;
+  transition: opacity 0.12s ease;
 }
 
-.canvas-manual-bend-handle:hover {
-  opacity: 0.65;
+.canvas-manual-edge-group:hover .canvas-manual-bend-handle,
+.canvas-manual-edge-group.canvas-manual-edge-group--dragging .canvas-manual-bend-handle {
+  opacity: 0.92;
+  pointer-events: all;
 }
 
-.canvas-manual-bend-handle:active {
+.canvas-manual-edge-group.canvas-manual-edge-group--dragging .canvas-manual-bend-handle:active {
   cursor: grabbing;
 }
 

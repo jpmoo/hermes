@@ -703,7 +703,8 @@ export default function CanvasPage() {
   const autoArrangementWrapAfterRef = useRef(0);
   const manualConnectionsRef = useRef([]);
   const manualLinkDragSessionRef = useRef(null);
-  const bendDragSessionRef = useRef(null);
+  /** Keep bend dot visible while dragging (group :hover can drop mid-drag). */
+  const [bendDragEdgeKey, setBendDragEdgeKey] = useState(null);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
   canvasArrangementRef.current = canvasArrangement;
@@ -2280,39 +2281,30 @@ export default function CanvasPage() {
       if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
       e.stopPropagation();
       e.preventDefault();
-      const w = viewportClientToWorld(e.clientX, e.clientY);
-      if (!w) return;
-      const ra = cardRectsRef.current[seg.fromId];
-      const rb = cardRectsRef.current[seg.toId];
-      if (!ra || !rb) return;
-      const chord = connectorBetweenRects(ra, rb);
-      const p0 = { x: chord.x1, y: chord.y1 };
-      const p2 = { x: chord.x2, y: chord.y2 };
-      const { nx, ny } = chordNormalWorld(p0, p2);
-      const startBend = Number.isFinite(seg.bend) ? seg.bend : 0;
-      bendDragSessionRef.current = {
-        key: seg.key,
-        anchorWorld: w,
-        startBend,
-        nx,
-        ny,
-      };
+      const key = seg.key;
+      const fromId = seg.fromId;
+      const toId = seg.toId;
+      setBendDragEdgeKey(key);
       const onMove = (ev) => {
-        const s = bendDragSessionRef.current;
-        if (!s) return;
+        const ra = cardRectsRef.current[fromId];
+        const rb = cardRectsRef.current[toId];
+        if (!ra || !rb) return;
+        const chord = connectorBetweenRects(ra, rb);
+        const p0 = { x: chord.x1, y: chord.y1 };
+        const p2 = { x: chord.x2, y: chord.y2 };
+        const { nx, ny } = chordNormalWorld(p0, p2);
+        const mx = (p0.x + p2.x) / 2;
+        const my = (p0.y + p2.y) / 2;
         const wp = viewportClientToWorld(ev.clientX, ev.clientY);
         if (!wp) return;
-        const dw = wp.x - s.anchorWorld.x;
-        const dh = wp.y - s.anchorWorld.y;
-        const delta = dw * s.nx + dh * s.ny;
-        let next = s.startBend + delta;
-        next = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, next));
+        let bend = (wp.x - mx) * nx + (wp.y - my) * ny;
+        bend = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, bend));
         setManualConnections((prev) =>
-          prev.map((ed) => (manualConnectionKey(ed) === s.key ? { ...ed, bend: next } : ed))
+          prev.map((ed) => (manualConnectionKey(ed) === key ? { ...ed, bend } : ed))
         );
       };
       const onUp = () => {
-        bendDragSessionRef.current = null;
+        setBendDragEdgeKey(null);
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
@@ -2785,32 +2777,31 @@ export default function CanvasPage() {
                   </svg>
                 ) : null}
                 {canvasArrangement === CANVAS_ARRANGEMENT.MANUAL && manualLinkSegments.length > 0 ? (
-                  <svg className="canvas-manual-connectors-hit" role="presentation">
+                  <svg className="canvas-manual-edge-interaction" role="presentation" aria-hidden>
                     {manualLinkSegments.map((seg) => (
-                      <path
-                        key={`hit-${seg.key}`}
-                        d={seg.pathD}
-                        className="canvas-manual-connector-hit"
-                        fill="none"
-                        stroke="transparent"
-                        strokeWidth={22}
-                        pointerEvents="stroke"
-                        onPointerDown={(e) => onManualConnectorHitPointerDown(e, seg)}
-                      />
-                    ))}
-                  </svg>
-                ) : null}
-                {canvasArrangement === CANVAS_ARRANGEMENT.MANUAL && manualLinkSegments.length > 0 ? (
-                  <svg className="canvas-manual-bend-handles" aria-hidden>
-                    {manualLinkSegments.map((seg) => (
-                      <circle
-                        key={`bend-${seg.key}`}
-                        className="canvas-manual-bend-handle"
-                        cx={seg.mid.x}
-                        cy={seg.mid.y}
-                        r={12}
-                        onPointerDown={(e) => startBendDrag(e, seg)}
-                      />
+                      <g
+                        key={seg.key}
+                        className={`canvas-manual-edge-group${
+                          bendDragEdgeKey === seg.key ? ' canvas-manual-edge-group--dragging' : ''
+                        }`}
+                      >
+                        <path
+                          d={seg.pathD}
+                          className="canvas-manual-connector-hit"
+                          fill="none"
+                          stroke="transparent"
+                          strokeWidth={22}
+                          pointerEvents="stroke"
+                          onPointerDown={(e) => onManualConnectorHitPointerDown(e, seg)}
+                        />
+                        <circle
+                          className="canvas-manual-bend-handle"
+                          cx={seg.mid.x}
+                          cy={seg.mid.y}
+                          r={12}
+                          onPointerDown={(e) => startBendDrag(e, seg)}
+                        />
+                      </g>
                     ))}
                   </svg>
                 ) : null}
