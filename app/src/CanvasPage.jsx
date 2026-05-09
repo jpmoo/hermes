@@ -403,6 +403,15 @@ const MIN_H = 120;
 /** World-space px — snap dragged cards to edges/centers of other notes. */
 const SNAP_GUIDE_PX = 8;
 
+function uniqSnapLines(values, eps = 0.5) {
+  const out = [];
+  for (const v of values) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    if (!out.some((u) => Math.abs(u - v) < eps)) out.push(v);
+  }
+  return out;
+}
+
 /**
  * @param {'x' | 'y'} axis
  * @param {number} pos left or top of dragged rect
@@ -414,19 +423,27 @@ function snapCanvasAxis(axis, pos, size, others) {
   let bestD = SNAP_GUIDE_PX + 1;
   /** @type {number | null} */
   let guide = null;
+  /** @type {{ x: number, y: number, w: number, h: number } | null} */
+  let winning = null;
   for (const o of others) {
     if (!o || typeof o.x !== 'number') continue;
+    const cx = o.x + o.w / 2;
+    const cy = o.y + o.h / 2;
     const candidates =
       axis === 'x'
         ? [
             { pos: o.x, guide: o.x },
             { pos: o.x + o.w - size, guide: o.x + o.w },
-            { pos: o.x + o.w / 2 - size / 2, guide: o.x + o.w / 2 },
+            { pos: cx - size / 2, guide: cx },
+            { pos: cx, guide: cx },
+            { pos: cx - size, guide: cx },
           ]
         : [
             { pos: o.y, guide: o.y },
             { pos: o.y + o.h - size, guide: o.y + o.h },
-            { pos: o.y + o.h / 2 - size / 2, guide: o.y + o.h / 2 },
+            { pos: cy - size / 2, guide: cy },
+            { pos: cy, guide: cy },
+            { pos: cy - size, guide: cy },
           ];
     for (const c of candidates) {
       const d = Math.abs(pos - c.pos);
@@ -434,10 +451,94 @@ function snapCanvasAxis(axis, pos, size, others) {
         bestD = d;
         best = c.pos;
         guide = c.guide;
+        winning = o;
       }
     }
   }
-  return { pos: best, guide };
+  /** @type {number[]} */
+  const vx = [];
+  /** @type {number[]} */
+  const hy = [];
+  if (guide != null && axis === 'x') {
+    vx.push(guide);
+    if (winning) hy.push(winning.y + winning.h / 2);
+  }
+  if (guide != null && axis === 'y') {
+    hy.push(guide);
+    if (winning) vx.push(winning.x + winning.w / 2);
+  }
+  return { pos: best, vx, hy };
+}
+
+/**
+ * Bottom-right resize: snap moving right/bottom edges to other rects’ left/right/center-x and top/bottom/center-y.
+ * @param {{ x: number, y: number, w: number, h: number }} base rect at resize start (fixed top-left)
+ * @param {number} dw width delta (world px)
+ * @param {number} dh height delta
+ * @param {{ x: number, y: number, w: number, h: number }[]} others
+ */
+function snapResizeBottomRight(base, dw, dh, others, minW, minH) {
+  const rawW = Math.max(minW, base.w + dw);
+  const rawH = Math.max(minH, base.h + dh);
+  const rightEdge = base.x + rawW;
+  const bottomEdge = base.y + rawH;
+  let bestRx = rightEdge;
+  let bestRd = SNAP_GUIDE_PX + 1;
+  /** @type {number | null} */
+  let gx = null;
+  /** @type {{ x: number, y: number, w: number, h: number } | null} */
+  let winOx = null;
+  for (const o of others) {
+    if (!o || typeof o.x !== 'number') continue;
+    for (const t of [o.x, o.x + o.w, o.x + o.w / 2]) {
+      const d = Math.abs(rightEdge - t);
+      if (d <= SNAP_GUIDE_PX && d < bestRd) {
+        bestRd = d;
+        bestRx = t;
+        gx = t;
+        winOx = o;
+      }
+    }
+  }
+  let bestBy = bottomEdge;
+  let bestBd = SNAP_GUIDE_PX + 1;
+  /** @type {number | null} */
+  let gy = null;
+  /** @type {{ x: number, y: number, w: number, h: number } | null} */
+  let winOy = null;
+  for (const o of others) {
+    if (!o || typeof o.x !== 'number') continue;
+    for (const t of [o.y, o.y + o.h, o.y + o.h / 2]) {
+      const d = Math.abs(bottomEdge - t);
+      if (d <= SNAP_GUIDE_PX && d < bestBd) {
+        bestBd = d;
+        bestBy = t;
+        gy = t;
+        winOy = o;
+      }
+    }
+  }
+  const w = Math.max(minW, bestRx - base.x);
+  const h = Math.max(minH, bestBy - base.y);
+  /** Perpendicular center guides: crosshair through the reference card for each snapped axis. */
+  const vx = [];
+  const hy = [];
+  if (gx != null) {
+    vx.push(gx);
+    if (winOx) hy.push(winOx.y + winOx.h / 2);
+  }
+  if (gy != null) {
+    hy.push(gy);
+    if (winOy) vx.push(winOy.x + winOy.w / 2);
+  }
+  return {
+    w,
+    h,
+    guides: {
+      vx: uniqSnapLines(vx),
+      hy: uniqSnapLines(hy),
+    },
+  };
 }
 
 const ZOOM_MIN = 0.2;
@@ -1816,8 +1917,8 @@ export default function CanvasPage() {
         const sx = snapCanvasAxis('x', rawX, base.w, others);
         const sy = snapCanvasAxis('y', rawY, base.h, others);
         setSnapGuides({
-          vx: sx.guide != null ? [sx.guide] : [],
-          hy: sy.guide != null ? [sy.guide] : [],
+          vx: uniqSnapLines([...sx.vx, ...sy.vx]),
+          hy: uniqSnapLines([...sx.hy, ...sy.hy]),
         });
         setCardRects((prev) => ({
           ...prev,
@@ -1864,26 +1965,46 @@ export default function CanvasPage() {
       const ox = e.clientX;
       const oy = e.clientY;
       const base = { ...start };
+      setSnapGuides({ vx: [], hy: [] });
+      const othersOf = () =>
+        Object.entries(cardRectsRef.current)
+          .filter(([oid]) => oid !== id)
+          .map(([, r]) => r)
+          .filter(
+            (r) =>
+              r &&
+              typeof r.x === 'number' &&
+              typeof r.y === 'number' &&
+              typeof r.w === 'number' &&
+              typeof r.h === 'number'
+          );
       const move = (ev) => {
         const sc = Math.max(scaleRef.current, 1e-6);
         const dx = (ev.clientX - ox) / sc;
         const dy = (ev.clientY - oy) / sc;
+        const snapped = snapResizeBottomRight(base, dx, dy, othersOf(), MIN_W, MIN_H);
+        setSnapGuides(snapped.guides);
         setCardRects((prev) => ({
           ...prev,
           [id]: {
             ...base,
-            w: Math.max(MIN_W, base.w + dx),
-            h: Math.max(MIN_H, base.h + dy),
+            x: base.x,
+            y: base.y,
+            w: snapped.w,
+            h: snapped.h,
           },
         }));
       };
       const up = () => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        setSnapGuides({ vx: [], hy: [] });
         scheduleSave();
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
     },
     [scheduleSave]
   );

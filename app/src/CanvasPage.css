@@ -637,7 +637,7 @@
   cursor: grabbing;
 }
 
-/* Fixed banner slot on canvas: every card uses the same header height; image scales down and centers. */
+/* Fixed banner slot on canvas: same header height; image fills slot (crop), centered. */
 .canvas-card-body .note-card-banner-wrap {
   flex-shrink: 0;
   height: 9rem;
@@ -649,7 +649,7 @@
 .canvas-card-body .note-card-banner-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   display: block;
 }
