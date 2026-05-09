@@ -488,15 +488,32 @@ function sanitizeManualConnections(input) {
     const toId = typeof item.toId === 'string' ? item.toId.trim() : '';
     if (!fromId || !toId || fromId.length > 96 || toId.length > 96) continue;
     if (fromId === toId) continue;
-    let bend = 0;
-    if (item.bend != null && item.bend !== '') {
-      const b = typeof item.bend === 'number' ? item.bend : parseFloat(String(item.bend));
+    const clampB = (v) =>
+      Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, v));
+    let bendT = 0;
+    let bendN = 0;
+    let hasT = false;
+    let hasN = false;
+    if (item.bendT != null && item.bendT !== '') {
+      const b = typeof item.bendT === 'number' ? item.bendT : parseFloat(String(item.bendT));
       if (Number.isFinite(b)) {
-        bend = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, b));
+        bendT = clampB(b);
+        hasT = true;
       }
     }
+    if (item.bendN != null && item.bendN !== '') {
+      const b = typeof item.bendN === 'number' ? item.bendN : parseFloat(String(item.bendN));
+      if (Number.isFinite(b)) {
+        bendN = clampB(b);
+        hasN = true;
+      }
+    }
+    if (!hasT && !hasN && item.bend != null && item.bend !== '') {
+      const b = typeof item.bend === 'number' ? item.bend : parseFloat(String(item.bend));
+      if (Number.isFinite(b)) bendN = clampB(b);
+    }
     const key = `${fromId}->${toId}`;
-    map.set(key, { fromId, toId, bend });
+    map.set(key, { fromId, toId, bendT, bendN, bend: bendN });
     if (map.size >= 120) break;
   }
   return Array.from(map.values());

@@ -62,6 +62,7 @@ import {
   manualConnectionKey,
   mergeCanvasLayoutPatch,
   normalizeManualConnections,
+  resolveManualEdgeBends,
   replaceCanvasLayoutFocusBlock,
   resolveCanvasBlockPrefs,
   resolveCanvasView,
@@ -332,18 +333,30 @@ function connectorFocusToChildVertical(a, b) {
   return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
 }
 
-/** Quadratic control point so sagitta at t=½ equals `bend` along chord normal (see normalizeManualConnections). */
-function quadControlFromChordAndBend(p0, p2, bend) {
+/** Unit tangent (chord direction) and left normal at chord midpoint; midpoint for control construction. */
+function chordBasisWorld(p0, p2) {
   const vx = p2.x - p0.x;
   const vy = p2.y - p0.y;
   const len = Math.hypot(vx, vy);
   const mx = (p0.x + p2.x) / 2;
   const my = (p0.y + p2.y) / 2;
-  if (len < 1e-9) return { x: mx, y: my };
+  if (len < 1e-9) return { mx, my, tx: 1, ty: 0, nx: 0, ny: 1 };
+  const tx = vx / len;
+  const ty = vy / len;
   const nx = -vy / len;
   const ny = vx / len;
-  const k = Number.isFinite(bend) ? bend : 0;
-  return { x: mx + nx * 2 * k, y: my + ny * 2 * k };
+  return { mx, my, tx, ty, nx, ny };
+}
+
+/** Quadratic control from chord-local bends (see resolveManualEdgeBends). Q = M + 2*(bendT*t + bendN*n). */
+function quadControlFromChordBends(p0, p2, bendT, bendN) {
+  const b = chordBasisWorld(p0, p2);
+  const bt = Number.isFinite(bendT) ? bendT : 0;
+  const bn = Number.isFinite(bendN) ? bendN : 0;
+  return {
+    x: b.mx + 2 * (b.tx * bt + b.nx * bn),
+    y: b.my + 2 * (b.ty * bt + b.ny * bn),
+  };
 }
 
 function quadCurveMidpoint(p0, qc, p2) {
@@ -351,14 +364,6 @@ function quadCurveMidpoint(p0, qc, p2) {
     x: 0.25 * p0.x + 0.5 * qc.x + 0.25 * p2.x,
     y: 0.25 * p0.y + 0.5 * qc.y + 0.25 * p2.y,
   };
-}
-
-function chordNormalWorld(p0, p2) {
-  const vx = p2.x - p0.x;
-  const vy = p2.y - p0.y;
-  const len = Math.hypot(vx, vy);
-  if (len < 1e-9) return { nx: 1, ny: 0 };
-  return { nx: -vy / len, ny: vx / len };
 }
 
 function notePreview(content, max = 72) {
@@ -2292,15 +2297,19 @@ export default function CanvasPage() {
         const chord = connectorBetweenRects(ra, rb);
         const p0 = { x: chord.x1, y: chord.y1 };
         const p2 = { x: chord.x2, y: chord.y2 };
-        const { nx, ny } = chordNormalWorld(p0, p2);
-        const mx = (p0.x + p2.x) / 2;
-        const my = (p0.y + p2.y) / 2;
+        const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
         const wp = viewportClientToWorld(ev.clientX, ev.clientY);
         if (!wp) return;
-        let bend = (wp.x - mx) * nx + (wp.y - my) * ny;
-        bend = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, bend));
+        const dx = wp.x - mx;
+        const dy = wp.y - my;
+        let bendT = (dx * tx + dy * ty) / 2;
+        let bendN = (dx * nx + dy * ny) / 2;
+        bendT = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, bendT));
+        bendN = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, bendN));
         setManualConnections((prev) =>
-          prev.map((ed) => (manualConnectionKey(ed) === key ? { ...ed, bend } : ed))
+          prev.map((ed) =>
+            manualConnectionKey(ed) === key ? { ...ed, bendT, bendN, bend: bendN } : ed
+          )
         );
       };
       const onUp = () => {
@@ -2363,7 +2372,7 @@ export default function CanvasPage() {
         const toId = handleEl.getAttribute('data-note-id');
         if (!toId) return;
         if (toId === s.fromId) return;
-        const nextEdge = { fromId: s.fromId, toId, bend: 0 };
+        const nextEdge = { fromId: s.fromId, toId, bendT: 0, bendN: 0, bend: 0 };
         const k = manualConnectionKey(nextEdge);
         setManualConnections((prev) =>
           normalizeManualConnections([
@@ -2431,15 +2440,16 @@ export default function CanvasPage() {
         const chord = connectorBetweenRects(ra, rb);
         const p0 = { x: chord.x1, y: chord.y1 };
         const p2 = { x: chord.x2, y: chord.y2 };
-        const bendRaw = Number.isFinite(edge.bend) ? edge.bend : 0;
-        const bend = Math.min(MANUAL_EDGE_BEND_LIMIT, Math.max(-MANUAL_EDGE_BEND_LIMIT, bendRaw));
-        const q = quadControlFromChordAndBend(p0, p2, bend);
+        const { bendT, bendN } = resolveManualEdgeBends(edge);
+        const q = quadControlFromChordBends(p0, p2, bendT, bendN);
         const mid = quadCurveMidpoint(p0, q, p2);
         const pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
         const key = manualConnectionKey(edge);
         return {
           ...edge,
-          bend,
+          bendT,
+          bendN,
+          bend: bendN,
           key,
           pathD,
           mid,

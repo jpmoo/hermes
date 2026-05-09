@@ -125,8 +125,39 @@ function clampManualBend(v) {
 }
 
 /**
+ * Chord-local bend: tangent (along the connector) and normal (perpendicular) from chord midpoint
+ * toward the quadratic control point. Legacy `bend` only sets the normal component.
+ */
+export function resolveManualEdgeBends(edge) {
+  if (!edge || typeof edge !== 'object') return { bendT: 0, bendN: 0 };
+  let bendT = 0;
+  let bendN = 0;
+  let hasT = false;
+  let hasN = false;
+  if (edge.bendT != null && edge.bendT !== '') {
+    const b = typeof edge.bendT === 'number' ? edge.bendT : parseFloat(String(edge.bendT));
+    if (Number.isFinite(b)) {
+      bendT = clampManualBend(b);
+      hasT = true;
+    }
+  }
+  if (edge.bendN != null && edge.bendN !== '') {
+    const b = typeof edge.bendN === 'number' ? edge.bendN : parseFloat(String(edge.bendN));
+    if (Number.isFinite(b)) {
+      bendN = clampManualBend(b);
+      hasN = true;
+    }
+  }
+  if (!hasT && !hasN && edge.bend != null && edge.bend !== '') {
+    const b = typeof edge.bend === 'number' ? edge.bend : parseFloat(String(edge.bend));
+    if (Number.isFinite(b)) bendN = clampManualBend(b);
+  }
+  return { bendT, bendN };
+}
+
+/**
  * Directed arrow between two notes. Endpoints follow card geometry (closest sides).
- * `bend`: signed perpendicular sagitta at t=½ along the quadratic (world units); 0 = straight chord.
+ * `bendT` / `bendN`: chord-local control offset (world px). Legacy `bend` = `bendN` only.
  */
 export function normalizeManualConnections(raw) {
   if (!Array.isArray(raw)) return [];
@@ -137,13 +168,9 @@ export function normalizeManualConnections(raw) {
     const fromId = String(item.fromId ?? item.from ?? '').trim();
     const toId = String(item.toId ?? item.to ?? '').trim();
     if (!fromId || !toId || fromId === toId || fromId.length > 96 || toId.length > 96) continue;
-    let bend = 0;
-    if (item.bend != null && item.bend !== '') {
-      const b = typeof item.bend === 'number' ? item.bend : parseFloat(String(item.bend));
-      if (Number.isFinite(b)) bend = clampManualBend(b);
-    }
+    const { bendT, bendN } = resolveManualEdgeBends(item);
     const key = `${fromId}->${toId}`;
-    map.set(key, { fromId, toId, bend });
+    map.set(key, { fromId, toId, bendT, bendN, bend: bendN });
     if (map.size >= 120) break;
   }
   return Array.from(map.values());

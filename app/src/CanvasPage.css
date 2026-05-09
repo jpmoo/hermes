@@ -764,6 +764,8 @@
   width: 4000px;
   height: 4000px;
   overflow: visible;
+  /* Root must not capture clicks — otherwise it sits above cards (z-index) and blocks drill / double-click. */
+  pointer-events: none;
   z-index: 4;
 }
 
