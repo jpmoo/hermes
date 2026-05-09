@@ -485,6 +485,33 @@ function isCanvasDragInteractiveTarget(target) {
 }
 
 /**
+ * Canvas note bodies use column flex; default flex-shrink:1 can shrink the attachment strip (or tags)
+ * while scrollHeight still matches clientHeight, so wheel never delegates here and the canvas pans instead.
+ * This uses layout boxes as a fallback when scroll metrics under-report overflow.
+ */
+function canvasNoteBodyNeedsVerticalScrollGestures(bm) {
+  if (!(bm instanceof Element)) return false;
+  if (bm.scrollHeight > bm.clientHeight + 1) return true;
+  const br = bm.getBoundingClientRect();
+  const eps = 1;
+  for (const sel of [
+    '.note-attachments-row',
+    '.note-card-tags',
+    '.note-card-edit-attachments',
+    '.note-rich-markdown',
+    '.note-card-content',
+    '.note-card-profile-row',
+  ]) {
+    const el = bm.querySelector(sel);
+    if (!el) continue;
+    const er = el.getBoundingClientRect();
+    if (er.width < 2 && er.height < 2) continue;
+    if (er.bottom > br.bottom + eps || er.top < br.top - eps) return true;
+  }
+  return false;
+}
+
+/**
  * Nested scrollports (long note body, textarea, etc.): let the browser handle wheel/trackpad so we do not
  * steal the gesture for canvas pan.
  * Canvas note scroll body (`.canvas-card-body .note-card-body-main`): never chain to canvas pan at edges —
@@ -492,6 +519,15 @@ function isCanvasDragInteractiveTarget(target) {
  */
 function wheelEventShouldScrollNestedTarget(target, rootViewport, deltaX, deltaY) {
   if (!(target instanceof Node) || !rootViewport?.contains(target)) return false;
+  if (Math.abs(deltaY) > 0.5) {
+    const el = target instanceof Element ? target : target.parentElement;
+    if (el instanceof Element) {
+      const bm = el.closest?.('.canvas-card-body .note-card-body-main');
+      if (bm instanceof Element && rootViewport.contains(bm) && canvasNoteBodyNeedsVerticalScrollGestures(bm)) {
+        return true;
+      }
+    }
+  }
   let node = target;
   while (node && rootViewport.contains(node)) {
     if (node === rootViewport) break;

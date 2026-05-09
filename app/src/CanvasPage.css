@@ -675,6 +675,13 @@
   touch-action: pan-y;
 }
 
+/* Default flex-shrink:1 can clip the attachment row while scrollHeight still equals clientHeight,
+   so vertical wheel never targets this scrollport and the canvas steals the gesture. */
+.canvas-card-body .note-card-body-main > *,
+.canvas-card-body .note-card-profile-row-main > * {
+  flex-shrink: 0;
+}
+
 /* Dropdown lives under meta; keep ancestors from clipping while open. */
 .canvas-card-body .note-card-body:has(.note-card-tag-dropdown) {
   overflow: visible;
