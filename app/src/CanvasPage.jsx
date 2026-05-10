@@ -458,8 +458,17 @@ function quadControlFromCenterAnchoredBend(p0, p2, ca, cb, bendT, bendN) {
   };
 }
 
+/** Parametric midpoint (u=½) on quadratic p0 → qc → p2 — center of the drawn edge‑to‑edge arc. */
+function quadBezierMidAtHalf(p0, qc, p2) {
+  return {
+    x: 0.25 * p0.x + 0.5 * qc.x + 0.25 * p2.x,
+    y: 0.25 * p0.y + 0.5 * qc.y + 0.25 * p2.y,
+  };
+}
+
 /**
- * Drag: bend offsets measured from center midpoint M_center along center→center frame (same as curve B(½)).
+ * Drag: map cursor to curve midpoint B(½); bend is in the center→center frame (same line as border clip).
+ * In 2D, B(½) follows `wp` because wp = M_center + (wp−M_center)·t · t + (wp−M_center)·n · n.
  */
 function solveBendCenterAnchoredTowardWorldPoint(ca, cb, wp) {
   const { mCenter, tx, ty, nx, ny } = centerToCenterFrame(ca, cb);
@@ -2607,19 +2616,18 @@ export default function CanvasPage() {
           edge.bendAnchor === 'center'
             ? raw
             : migrateBendToCenterAnchored(p0, p2, ca, cb, raw.bendT, raw.bendN);
-        const { mCenter, tx, ty, nx, ny } = centerToCenterFrame(ca, cb);
-        const mid = {
-          x: mCenter.x + eff.bendT * tx + eff.bendN * nx,
-          y: mCenter.y + eff.bendT * ty + eff.bendN * ny,
-        };
         const bendLen = Math.hypot(eff.bendT, eff.bendN);
-        const pathD =
-          bendLen < 1e-4
-            ? `M ${p0.x} ${p0.y} L ${p2.x} ${p2.y}`
-            : (() => {
-                const q = quadControlFromCenterAnchoredBend(p0, p2, ca, cb, eff.bendT, eff.bendN);
-                return `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
-              })();
+        /** Midpoint along the visible edge→edge segment (chord midpoint when straight, u=½ on the quad when curved). */
+        let mid;
+        let pathD;
+        if (bendLen < 1e-4) {
+          pathD = `M ${p0.x} ${p0.y} L ${p2.x} ${p2.y}`;
+          mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
+        } else {
+          const q = quadControlFromCenterAnchoredBend(p0, p2, ca, cb, eff.bendT, eff.bendN);
+          pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
+          mid = quadBezierMidAtHalf(p0, q, p2);
+        }
         return {
           ...edge,
           bendT: raw.bendT,
