@@ -490,7 +490,9 @@ export default function MentionsTextarea({
     return undefined;
   }, [menuQueryKey, menu?.type, allowMentionCreate, inboxThreadRootId, connectionPeerIds.join('|')]);
 
-  const applyMention = async (item) => {
+  const applyMention = async (item, opts = {}) => {
+    const { trailingSpace = false } = opts;
+    const ts = trailingSpace ? ' ' : '';
     const el = taRef.current;
     if (!menu || !el) return;
     const caret = caretForTriggerReplace(el, menu);
@@ -521,7 +523,7 @@ export default function MentionsTextarea({
           item.createText ||
           'Note';
         const link = formatNoteMentionLink(label, created.id);
-        const next = replaceTriggerQuery(el.value, menu.start, caret, link);
+        const next = replaceTriggerQuery(el.value, menu.start, caret, link) + ts;
         onChange(next);
         if (noteId) {
           try {
@@ -532,7 +534,7 @@ export default function MentionsTextarea({
         }
         closeMenu();
         requestAnimationFrame(() => {
-          const pos = menu.start + link.length;
+          const pos = menu.start + link.length + ts.length;
           el.focus();
           el.setSelectionRange(pos, pos);
         });
@@ -548,7 +550,7 @@ export default function MentionsTextarea({
               item.createText ||
               'Note';
             const link = formatNoteMentionLink(label, created.id);
-            const next = replaceTriggerQuery(el.value, menu.start, caret, link);
+            const next = replaceTriggerQuery(el.value, menu.start, caret, link) + ts;
             onChange(next);
             if (noteId) {
               try {
@@ -559,7 +561,7 @@ export default function MentionsTextarea({
             }
             closeMenu();
             requestAnimationFrame(() => {
-              const pos = menu.start + link.length;
+              const pos = menu.start + link.length + ts.length;
               el.focus();
               el.setSelectionRange(pos, pos);
             });
@@ -574,7 +576,7 @@ export default function MentionsTextarea({
       return;
     }
     const link = formatNoteMentionLink(item.label, item.id);
-    const next = replaceTriggerQuery(el.value, menu.start, caret, link);
+    const next = replaceTriggerQuery(el.value, menu.start, caret, link) + ts;
     onChange(next);
     if (noteId) {
       try {
@@ -585,13 +587,15 @@ export default function MentionsTextarea({
     }
     closeMenu();
     requestAnimationFrame(() => {
-      const pos = menu.start + link.length;
+      const pos = menu.start + link.length + ts.length;
       el.focus();
       el.setSelectionRange(pos, pos);
     });
   };
 
-  const applyTag = async (item) => {
+  const applyTag = async (item, opts = {}) => {
+    const { trailingSpace = false } = opts;
+    const ts = trailingSpace ? ' ' : '';
     const el = taRef.current;
     if (!menu || !el || item.kind === 'note') return;
     const caret = el.selectionStart ?? menu.caret;
@@ -609,7 +613,7 @@ export default function MentionsTextarea({
       }
     }
     const insertion = `#${tagName}`;
-    const next = replaceTriggerQuery(el.value, menu.start, caret, insertion);
+    const next = replaceTriggerQuery(el.value, menu.start, caret, insertion) + ts;
     onChange(next);
     if (noteId) {
       try {
@@ -620,7 +624,7 @@ export default function MentionsTextarea({
     }
     closeMenu();
     requestAnimationFrame(() => {
-      const pos = menu.start + insertion.length;
+      const pos = menu.start + insertion.length + ts.length;
       el.focus();
       el.setSelectionRange(pos, pos);
     });
@@ -642,6 +646,7 @@ export default function MentionsTextarea({
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       closeMenu();
       return;
     }
@@ -663,6 +668,16 @@ export default function MentionsTextarea({
       if (menu.type === '@') void applyMention(item);
       else if (item.kind === 'note') void applyMention(item);
       else void applyTag(item);
+      return;
+    }
+    if (e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space') {
+      const item = items[0];
+      if (!item) return;
+      e.preventDefault();
+      if (menu.type === '@') void applyMention(item, { trailingSpace: true });
+      else if (item.kind === 'note') void applyMention(item, { trailingSpace: true });
+      else void applyTag(item, { trailingSpace: true });
+      return;
     }
   };
 
