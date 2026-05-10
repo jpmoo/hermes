@@ -776,26 +776,6 @@
   z-index: 4;
 }
 
-.canvas-manual-edge-group .canvas-manual-bend-handle {
-  pointer-events: none;
-  fill: var(--accent, #3b82f6);
-  opacity: 0;
-  stroke: var(--bg, #1a1a1a);
-  stroke-width: 1px;
-  cursor: grab;
-  transition: opacity 0.12s ease;
-}
-
-.canvas-manual-edge-group:hover .canvas-manual-bend-handle,
-.canvas-manual-edge-group.canvas-manual-edge-group--dragging .canvas-manual-bend-handle {
-  opacity: 0.92;
-  pointer-events: all;
-}
-
-.canvas-manual-edge-group.canvas-manual-edge-group--dragging .canvas-manual-bend-handle:active {
-  cursor: grabbing;
-}
-
 .canvas-manual-link-rubber {
   pointer-events: none;
   z-index: 8;

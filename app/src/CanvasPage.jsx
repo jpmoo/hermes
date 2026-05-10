@@ -58,11 +58,9 @@ import {
   computeCanvasHorizontalArrangementRects,
   computeCanvasVerticalArrangementRects,
   filterManualConnectionsForVisibleNotes,
-  MANUAL_EDGE_BEND_LIMIT,
   manualConnectionKey,
   mergeCanvasLayoutPatch,
   normalizeManualConnections,
-  resolveManualEdgeBends,
   replaceCanvasLayoutFocusBlock,
   resolveCanvasBlockPrefs,
   resolveCanvasView,
@@ -297,23 +295,6 @@ function sideMidpoint(rect, side) {
   }
 }
 
-const RECT_SIDES = ['top', 'right', 'bottom', 'left'];
-
-/** Side of `rect` whose midpoint is closest to `pt` (world coordinates). */
-function closestSideToPoint(rect, pt) {
-  let best = RECT_SIDES[0];
-  let bestD = Infinity;
-  for (const side of RECT_SIDES) {
-    const p = sideMidpoint(rect, side);
-    const d = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = side;
-    }
-  }
-  return best;
-}
-
 /** Connect consecutive cards via midpoints of the sides that face each other. */
 function connectorBetweenRects(a, b) {
   const cax = a.x + a.w / 2;
@@ -350,125 +331,75 @@ function connectorFocusToChildVertical(a, b) {
   return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
 }
 
-/** Unit tangent (chord direction) and left normal at chord midpoint; midpoint for control construction. */
-function chordBasisWorld(p0, p2) {
-  const vx = p2.x - p0.x;
-  const vy = p2.y - p0.y;
-  const len = Math.hypot(vx, vy);
-  const mx = (p0.x + p2.x) / 2;
-  const my = (p0.y + p2.y) / 2;
-  if (len < 1e-9) return { mx, my, tx: 1, ty: 0, nx: 0, ny: 1 };
-  const tx = vx / len;
-  const ty = vy / len;
-  const nx = -vy / len;
-  const ny = vx / len;
-  return { mx, my, tx, ty, nx, ny };
+function rectCenterWorld(r) {
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
 }
 
-/** Quadratic control from chord-local bends (see resolveManualEdgeBends). Q = M + 2*(bendT*t + bendN*n). */
-function quadControlFromChordBends(p0, p2, bendT, bendN) {
-  const b = chordBasisWorld(p0, p2);
-  const bt = Number.isFinite(bendT) ? bendT : 0;
-  const bn = Number.isFinite(bendN) ? bendN : 0;
-  return {
-    x: b.mx + 2 * (b.tx * bt + b.nx * bn),
-    y: b.my + 2 * (b.ty * bt + b.ny * bn),
-  };
+/** Intersection parameter t on segment A→B with segment P→Q (each t,u in [0,1]). Returns t or null. */
+function segmentIntersectSegmentParam(ax, ay, bx, by, px, py, qx, qy) {
+  const rx = bx - ax;
+  const ry = by - ay;
+  const sx = qx - px;
+  const sy = qy - py;
+  const denom = rx * sy - ry * sx;
+  if (Math.abs(denom) < 1e-14) return null;
+  const t = ((px - ax) * sy - (py - ay) * sx) / denom;
+  const u = ((px - ax) * ry - (py - ay) * rx) / denom;
+  if (u < -1e-9 || u > 1 + 1e-9) return null;
+  if (t < -1e-9 || t > 1 + 1e-9) return null;
+  return t;
 }
 
-function quadCurveMidpoint(p0, qc, p2) {
-  return {
-    x: 0.25 * p0.x + 0.5 * qc.x + 0.25 * p2.x,
-    y: 0.25 * p0.y + 0.5 * qc.y + 0.25 * p2.y,
-  };
-}
-
-/**
- * Manual arrows: faces follow the quadratic centerpoint B(½) — closest side midpoint on each card.
- * If `fixedSides` is set (from a stored edge), those faces are used so endpoints move with card layout
- * and match bend-drag interaction. Otherwise faces are re-picked from the running center estimate.
- * Bend is re-solved so B(½) tracks the anchor; bend inputs seed the initial anchor only.
- */
-function manualConnectorChord(ra, rb, bendT_in, bendN_in, fixedSides) {
-  const bt0 = Number.isFinite(bendT_in) ? bendT_in : 0;
-  const bn0 = Number.isFinite(bendN_in) ? bendN_in : 0;
-
-  const cax = ra.x + ra.w / 2;
-  const cay = ra.y + ra.h / 2;
-  const cbx = rb.x + rb.w / 2;
-  const cby = rb.y + rb.h / 2;
-  const midCards = { x: (cax + cbx) / 2, y: (cay + cby) / 2 };
-
-  const fixed =
-    fixedSides &&
-    fixedSides.from &&
-    fixedSides.to &&
-    RECT_SIDES.includes(fixedSides.from) &&
-    RECT_SIDES.includes(fixedSides.to);
-
-  let sideA = fixed ? fixedSides.from : closestSideToPoint(ra, midCards);
-  let sideB = fixed ? fixedSides.to : closestSideToPoint(rb, midCards);
-  let p0 = sideMidpoint(ra, sideA);
-  let p2 = sideMidpoint(rb, sideB);
-  let bendT = bt0;
-  let bendN = bn0;
-  let q = quadControlFromChordBends(p0, p2, bendT, bendN);
-  /** Anchor for face choice + bend solve — seeded from saved bend, then tracks the curve midpoint. */
-  let center = quadCurveMidpoint(p0, q, p2);
-
-  let prevSideA = sideA;
-  let prevSideB = sideB;
-
-  for (let i = 0; i < 16; i++) {
-    if (fixed) {
-      sideA = fixedSides.from;
-      sideB = fixedSides.to;
-    } else {
-      sideA = closestSideToPoint(ra, center);
-      sideB = closestSideToPoint(rb, center);
-    }
-    const nextP0 = sideMidpoint(ra, sideA);
-    const nextP2 = sideMidpoint(rb, sideB);
-    const solved = solveBendFixedChordTowardWorldPoint(nextP0, nextP2, center);
-    bendT = solved.bendT;
-    bendN = solved.bendN;
-    q = quadControlFromChordBends(nextP0, nextP2, bendT, bendN);
-    const centerNext = quadCurveMidpoint(nextP0, q, nextP2);
-    const shift = Math.hypot(centerNext.x - center.x, centerNext.y - center.y);
-    p0 = nextP0;
-    p2 = nextP2;
-    center = centerNext;
-
-    const stable =
-      i > 0 &&
-      sideA === prevSideA &&
-      sideB === prevSideB &&
-      shift < 0.25;
-    prevSideA = sideA;
-    prevSideB = sideB;
-    if (stable) break;
+/** All t ∈ [0,1] where segment ca→cb meets the axis-aligned rectangle border (weak tolerance). */
+function segmentBorderCrossingTs(ca, cb, rect) {
+  const { x, y, w, h } = rect;
+  const ax = ca.x;
+  const ay = ca.y;
+  const bx = cb.x;
+  const by = cb.y;
+  const edges = [
+    [x, y, x + w, y],
+    [x + w, y, x + w, y + h],
+    [x + w, y + h, x, y + h],
+    [x, y + h, x, y],
+  ];
+  const ts = [];
+  for (const [sx, sy, ex, ey] of edges) {
+    const t = segmentIntersectSegmentParam(ax, ay, bx, by, sx, sy, ex, ey);
+    if (t != null) ts.push(Math.min(1, Math.max(0, t)));
   }
+  const uniq = [...new Set(ts.map((t) => Math.round(t * 1e9) / 1e9))].sort((a, b) => a - b);
+  return uniq;
+}
 
-  return { x1: p0.x, y1: p0.y, x2: p2.x, y2: p2.y, bendT, bendN };
+function lerpAlong(ca, cb, t) {
+  return {
+    x: ca.x + t * (cb.x - ca.x),
+    y: ca.y + t * (cb.y - ca.y),
+  };
 }
 
 /**
- * Bend (chord-local) so quadratic midpoint B(½)=M+bendT·t̂+bendN·n̂ tracks `wp`, with **fixed**
- * endpoints p0→p2. Used while dragging so attachment sides do not flip each frame (stable handle).
+ * Manual arrows: straight segment from note center to note center, clipped so endpoints sit where that
+ * line crosses each card border (arrowhead at target border crossing).
  */
-function solveBendFixedChordTowardWorldPoint(p0, p2, wp) {
-  const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
-  const dx = wp.x - mx;
-  const dy = wp.y - my;
-  const bendT = Math.min(
-    MANUAL_EDGE_BEND_LIMIT,
-    Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * tx + dy * ty)
-  );
-  const bendN = Math.min(
-    MANUAL_EDGE_BEND_LIMIT,
-    Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * nx + dy * ny)
-  );
-  return { bendT, bendN };
+function manualConnectorCenterLine(ra, rb) {
+  const ca = rectCenterWorld(ra);
+  const cb = rectCenterWorld(rb);
+  const len = Math.hypot(cb.x - ca.x, cb.y - ca.y);
+  if (len < 1e-9) {
+    return { x1: ca.x, y1: ca.y, x2: cb.x, y2: cb.y };
+  }
+  const eps = 1e-7;
+  const tsRa = segmentBorderCrossingTs(ca, cb, ra);
+  const tsRb = segmentBorderCrossingTs(ca, cb, rb);
+  const exitA = tsRa.filter((t) => t >= eps && t <= 1 - eps);
+  const t0 = exitA.length ? Math.min(...exitA) : 0;
+  const entryB = tsRb.filter((t) => t > t0 + eps && t <= 1 - eps);
+  const t1 = entryB.length ? Math.min(...entryB) : 1;
+  const p0 = lerpAlong(ca, cb, t0);
+  const p2 = lerpAlong(ca, cb, t1);
+  return { x1: p0.x, y1: p0.y, x2: p2.x, y2: p2.y };
 }
 
 function notePreview(content, max = 72) {
@@ -501,7 +432,6 @@ function isCanvasDragInteractiveTarget(target) {
         '.canvas-sequence-menu__panel',
         '.canvas-card-link-handle-zone',
         '.canvas-card-link-handle',
-        '.canvas-manual-bend-handle',
       ].join(', ')
     )
   );
@@ -849,10 +779,6 @@ export default function CanvasPage() {
   const autoArrangementWrapAfterRef = useRef(0);
   const manualConnectionsRef = useRef([]);
   const manualLinkDragSessionRef = useRef(null);
-  /** Keep bend dot visible while dragging (group :hover can drop mid-drag). */
-  const [bendDragEdgeKey, setBendDragEdgeKey] = useState(null);
-  /** While bending: pinned attachment faces (ref only). Idle wires use centerpoint-based faces again. */
-  const bendDragSidesRef = useRef(null);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
   canvasArrangementRef.current = canvasArrangement;
@@ -2424,66 +2350,6 @@ export default function CanvasPage() {
     [removeManualConnectionByKey]
   );
 
-  const startBendDrag = useCallback(
-    (e, seg) => {
-      if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
-      e.stopPropagation();
-      e.preventDefault();
-      const key = seg.key;
-      const fromId = seg.fromId;
-      const toId = seg.toId;
-      const ra0 = cardRectsRef.current[fromId];
-      const rb0 = cardRectsRef.current[toId];
-      if (!ra0 || !rb0) return;
-      const fromSide = closestSideToPoint(ra0, seg.p0);
-      const toSide = closestSideToPoint(rb0, seg.p2);
-      /** Pins faces only for this gesture — idle layout still picks faces from centerpoint. */
-      bendDragSidesRef.current = { key, fromSide, toSide };
-      const captureEl = e.currentTarget;
-      const capturePid = e.pointerId;
-      try {
-        captureEl.setPointerCapture(capturePid);
-      } catch {
-        /* ignore */
-      }
-      setBendDragEdgeKey(key);
-      const onMove = (ev) => {
-        const sides = bendDragSidesRef.current;
-        if (!sides || sides.key !== key) return;
-        const ra = cardRectsRef.current[fromId];
-        const rb = cardRectsRef.current[toId];
-        if (!ra || !rb) return;
-        const p0 = sideMidpoint(ra, sides.fromSide);
-        const p2 = sideMidpoint(rb, sides.toSide);
-        const wp = viewportClientToWorld(ev.clientX, ev.clientY);
-        if (!wp) return;
-        const { bendT, bendN } = solveBendFixedChordTowardWorldPoint(p0, p2, wp);
-        setManualConnections((prev) =>
-          prev.map((ed) =>
-            manualConnectionKey(ed) === key ? { ...ed, bendT, bendN, bend: bendN } : ed
-          )
-        );
-      };
-      const onUp = () => {
-        try {
-          captureEl.releasePointerCapture(capturePid);
-        } catch {
-          /* ignore */
-        }
-        bendDragSidesRef.current = null;
-        setBendDragEdgeKey(null);
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-        scheduleSaveRef.current();
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    },
-    [viewportClientToWorld]
-  );
-
   const startManualLinkDrag = useCallback(
     (e, noteId, side) => {
       if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
@@ -2595,39 +2461,17 @@ export default function CanvasPage() {
         const ra = cardRects[edge.fromId];
         const rb = cardRects[edge.toId];
         if (!ra || !rb) return null;
-        const { bendT, bendN } = resolveManualEdgeBends(edge);
         const key = manualConnectionKey(edge);
-        const dragPin =
-          bendDragEdgeKey === key &&
-          bendDragSidesRef.current?.key === key &&
-          bendDragSidesRef.current.fromSide &&
-          bendDragSidesRef.current.toSide;
-        const fixedSides = dragPin
-          ? { from: bendDragSidesRef.current.fromSide, to: bendDragSidesRef.current.toSide }
-          : null;
-        const chord = manualConnectorChord(ra, rb, bendT, bendN, fixedSides);
-        const p0 = { x: chord.x1, y: chord.y1 };
-        const p2 = { x: chord.x2, y: chord.y2 };
-        const effT = chord.bendT;
-        const effN = chord.bendN;
-        const q = quadControlFromChordBends(p0, p2, effT, effN);
-        const mid = quadCurveMidpoint(p0, q, p2);
-        const pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
+        const chord = manualConnectorCenterLine(ra, rb);
+        const pathD = `M ${chord.x1} ${chord.y1} L ${chord.x2} ${chord.y2}`;
         return {
           ...edge,
-          bendT: effT,
-          bendN: effN,
-          bend: effN,
           key,
           pathD,
-          mid,
-          p0,
-          p2,
-          q,
         };
       })
       .filter(Boolean);
-  }, [manualConnections, cardRects, sequenceNotesForCanvas, bendDragEdgeKey]);
+  }, [manualConnections, cardRects, sequenceNotesForCanvas]);
 
   pointerMoveInnerRef.current = (e) => {
     if (!viewportRef.current) return;
@@ -2957,12 +2801,7 @@ export default function CanvasPage() {
                 {canvasArrangement === CANVAS_ARRANGEMENT.MANUAL && manualLinkSegments.length > 0 ? (
                   <svg className="canvas-manual-edge-interaction" role="presentation" aria-hidden>
                     {manualLinkSegments.map((seg) => (
-                      <g
-                        key={seg.key}
-                        className={`canvas-manual-edge-group${
-                          bendDragEdgeKey === seg.key ? ' canvas-manual-edge-group--dragging' : ''
-                        }`}
-                      >
+                      <g key={seg.key} className="canvas-manual-edge-group">
                         <path
                           d={seg.pathD}
                           className="canvas-manual-connector-hit"
@@ -2971,13 +2810,6 @@ export default function CanvasPage() {
                           strokeWidth={22}
                           pointerEvents="stroke"
                           onPointerDown={(e) => onManualConnectorHitPointerDown(e, seg)}
-                        />
-                        <circle
-                          className="canvas-manual-bend-handle"
-                          cx={seg.mid.x}
-                          cy={seg.mid.y}
-                          r={12}
-                          onPointerDown={(e) => startBendDrag(e, seg)}
                         />
                       </g>
                     ))}
