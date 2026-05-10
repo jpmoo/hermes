@@ -31,6 +31,51 @@ function noteTitleLineForMention(content) {
     .trim();
 }
 
+/** Same rows as the # picker effect — instant when tags are cached (avoids empty-items gap before fetch). */
+function computeHashTagPickerItems(allTags, menu) {
+  const qRaw = menu?.query ?? '';
+  const q = qRaw.trim();
+  const qLower = q.toLowerCase();
+  const all = Array.isArray(allTags) ? allTags : [];
+  if (q.length < 1) {
+    return all.slice(0, 40).map((t) => ({
+      kind: 'tag',
+      key: `t-${t.id}`,
+      id: t.id,
+      name: t.name,
+      label: t.name,
+    }));
+  }
+  const tagItems = all
+    .filter((t) => !qLower || (t.name && t.name.toLowerCase().startsWith(qLower)))
+    .slice(0, 24)
+    .map((t) => ({
+      kind: 'tag',
+      key: `t-${t.id}`,
+      id: t.id,
+      name: t.name,
+      label: t.name,
+    }));
+  const rawTag = q;
+  const normalized = rawTag.toLowerCase().replace(/\s+/g, '-');
+  const validNewTag = /^[a-z0-9-]+$/.test(normalized) && normalized.length > 0;
+  const exactTagExists = all.some((t) => (t.name || '').toLowerCase() === normalized);
+  const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
+  const createRow = showCreateRow
+    ? [
+        {
+          kind: 'tag',
+          key: '__create__',
+          createNew: true,
+          createName: rawTag,
+          name: normalized,
+          label: `Create tag #${normalized}`,
+        },
+      ]
+    : [];
+  return [...tagItems, ...createRow];
+}
+
 /** WebKit on iPad often reports null or stale selectionStart; clamp using known text length. */
 function readTextareaCaret(el, text) {
   const len = text.length;
@@ -141,6 +186,11 @@ export default function MentionsTextarea({
   const navigate = useNavigate();
   const { inboxThreadRootId } = useNoteTypeColors();
   const [connectionPeerIds, setConnectionPeerIds] = useState([]);
+  const activeMenuRef = useRef(null);
+
+  useEffect(() => {
+    activeMenuRef.current = menu;
+  }, [menu]);
 
   useEffect(() => {
     if (!noteId) {
@@ -186,6 +236,83 @@ export default function MentionsTextarea({
       searchTimer.current = null;
     }
   }, []);
+
+  const runAtMentionSearch = useCallback(
+    async (menuSnapshot) => {
+      const q = menuSnapshot.query.trim();
+      const qForSearch = q.replace(/_/g, ' ').trim();
+      const qNorm = qForSearch.trim().toLowerCase();
+      try {
+        const list = await searchContent(qForSearch, 40, { firstLine: true });
+        const filtered = list.filter((n) =>
+          qNorm ? noteTitleLineForMention(n.content).toLowerCase().startsWith(qNorm) : true
+        );
+        const noteItems = filtered.slice(0, 12).map((n) => ({
+          kind: 'note',
+          key: n.id,
+          id: n.id,
+          label: noteTitleLineForMention(n.content).slice(0, 72) || 'Note',
+          raw: n,
+        }));
+        const peerSet = new Set(connectionPeerIds);
+        const firstLinked = noteItems.find((n) => peerSet.has(n.id));
+        const linkedExtras =
+          firstLinked && qForSearch.length >= 1
+            ? [
+                {
+                  kind: 'linked-edit',
+                  key: `__ledit_${firstLinked.id}`,
+                  id: firstLinked.id,
+                  label: `Edit original note and links (${firstLinked.label.slice(0, 56)}${
+                    firstLinked.label.length > 56 ? '…' : ''
+                  })`,
+                },
+                ...(allowMentionCreate
+                  ? [
+                      {
+                        kind: 'linked-create',
+                        key: '__lcreate__',
+                        createText: qForSearch,
+                        label: `Create new note “${qForSearch}”`,
+                      },
+                    ]
+                  : []),
+              ]
+            : [];
+        const createItems =
+          noteItems.length === 0 && allowMentionCreate && qForSearch
+            ? [
+                {
+                  kind: 'note-create',
+                  key: '__create_mention_note__',
+                  createText: qForSearch,
+                  label: inboxThreadRootId
+                    ? `Create note in inbox thread: "${qForSearch}"`
+                    : `Create note in this thread: "${qForSearch}"`,
+                },
+              ]
+            : [];
+        return [...linkedExtras, ...noteItems, ...createItems];
+      } catch (e) {
+        console.error(e);
+        const createItems =
+          allowMentionCreate && qForSearch
+            ? [
+                {
+                  kind: 'note-create',
+                  key: '__create_mention_note__',
+                  createText: qForSearch,
+                  label: inboxThreadRootId
+                    ? `Create note in inbox thread: "${qForSearch}"`
+                    : `Create note in this thread: "${qForSearch}"`,
+                },
+              ]
+            : [];
+        return createItems;
+      }
+    },
+    [connectionPeerIds, allowMentionCreate, inboxThreadRootId]
+  );
 
   const refreshMenu = useCallback(() => {
     const el = taRef.current;
@@ -319,78 +446,9 @@ export default function MentionsTextarea({
       }
       setLoading(true);
       searchTimer.current = setTimeout(async () => {
-        try {
-          const qNorm = qForSearch.trim().toLowerCase();
-          const list = await searchContent(qForSearch, 40, { firstLine: true });
-          const filtered = list.filter((n) =>
-            qNorm ? noteTitleLineForMention(n.content).toLowerCase().startsWith(qNorm) : true
-          );
-          const noteItems = filtered.slice(0, 12).map((n) => ({
-            kind: 'note',
-            key: n.id,
-            id: n.id,
-            label:
-              noteTitleLineForMention(n.content).slice(0, 72) || 'Note',
-            raw: n,
-          }));
-          const peerSet = new Set(connectionPeerIds);
-          const firstLinked = noteItems.find((n) => peerSet.has(n.id));
-          const linkedExtras =
-            firstLinked && qForSearch.length >= 1
-              ? [
-                  {
-                    kind: 'linked-edit',
-                    key: `__ledit_${firstLinked.id}`,
-                    id: firstLinked.id,
-                    label: `Edit original note and links (${firstLinked.label.slice(0, 56)}${
-                      firstLinked.label.length > 56 ? '…' : ''
-                    })`,
-                  },
-                  ...(allowMentionCreate
-                    ? [
-                        {
-                          kind: 'linked-create',
-                          key: '__lcreate__',
-                          createText: qForSearch,
-                          label: `Create new note “${qForSearch}”`,
-                        },
-                      ]
-                    : []),
-                ]
-              : [];
-          const createItems =
-            noteItems.length === 0 && allowMentionCreate && qForSearch
-              ? [
-                  {
-                    kind: 'note-create',
-                    key: '__create_mention_note__',
-                    createText: qForSearch,
-                    label: inboxThreadRootId
-                      ? `Create note in inbox thread: "${qForSearch}"`
-                      : `Create note in this thread: "${qForSearch}"`,
-                  },
-                ]
-              : [];
-          setItems([...linkedExtras, ...noteItems, ...createItems]);
-        } catch (e) {
-          console.error(e);
-          const createItems =
-            allowMentionCreate && qForSearch
-              ? [
-                  {
-                    kind: 'note-create',
-                    key: '__create_mention_note__',
-                    createText: qForSearch,
-                    label: inboxThreadRootId
-                      ? `Create note in inbox thread: "${qForSearch}"`
-                      : `Create note in this thread: "${qForSearch}"`,
-                  },
-                ]
-              : [];
-          setItems(createItems);
-        } finally {
-          setLoading(false);
-        }
+        const nextItems = await runAtMentionSearch(menu);
+        setItems(nextItems);
+        setLoading(false);
       }, 180);
       return () => {
         if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -402,31 +460,27 @@ export default function MentionsTextarea({
     if (menu.type === '#') {
       const qRaw = menu.query;
       const q = qRaw.trim();
-      const qLower = q.toLowerCase();
 
       if (q.length < 1) {
         let cancelled = false;
-        setLoading(true);
-        setItems([]);
+        if (tagsCache.current) {
+          setItems(computeHashTagPickerItems(tagsCache.current, menu));
+          setLoading(false);
+        } else {
+          setLoading(true);
+          setItems([]);
+        }
         (async () => {
           try {
             if (!tagsCache.current) tagsCache.current = await getTags();
             if (cancelled) return;
             const all = Array.isArray(tagsCache.current) ? tagsCache.current : [];
-            const tagItems = all.slice(0, 40).map((t) => ({
-              kind: 'tag',
-              key: `t-${t.id}`,
-              id: t.id,
-              name: t.name,
-              label: t.name,
-            }));
-            if (cancelled) return;
-            setItems(tagItems);
+            setItems(computeHashTagPickerItems(all, menu));
           } catch (e) {
             console.error(e);
             if (!cancelled) setItems([]);
           } finally {
-            setLoading(false);
+            if (!cancelled) setLoading(false);
           }
         })();
         return () => {
@@ -436,41 +490,19 @@ export default function MentionsTextarea({
       }
 
       if (searchTimer.current) clearTimeout(searchTimer.current);
-      setLoading(true);
-      setItems([]);
+      if (tagsCache.current) {
+        setItems(computeHashTagPickerItems(tagsCache.current, menu));
+        setLoading(false);
+      } else {
+        setLoading(true);
+        setItems([]);
+      }
 
       (async () => {
         try {
           if (!tagsCache.current) tagsCache.current = await getTags();
           const all = Array.isArray(tagsCache.current) ? tagsCache.current : [];
-          const tagItems = all
-            .filter((t) => !qLower || (t.name && t.name.toLowerCase().startsWith(qLower)))
-            .slice(0, 24)
-            .map((t) => ({
-              kind: 'tag',
-              key: `t-${t.id}`,
-              id: t.id,
-              name: t.name,
-              label: t.name,
-            }));
-          const rawTag = q;
-          const normalized = rawTag.toLowerCase().replace(/\s+/g, '-');
-          const validNewTag = /^[a-z0-9-]+$/.test(normalized) && normalized.length > 0;
-          const exactTagExists = all.some((t) => (t.name || '').toLowerCase() === normalized);
-          const showCreateRow = validNewTag && !exactTagExists && !tagItems.length;
-          const createRow = showCreateRow
-            ? [
-                {
-                  kind: 'tag',
-                  key: '__create__',
-                  createNew: true,
-                  createName: rawTag,
-                  name: normalized,
-                  label: `Create tag #${normalized}`,
-                },
-              ]
-            : [];
-          setItems([...tagItems, ...createRow]);
+          setItems(computeHashTagPickerItems(all, menu));
           setLoading(false);
         } catch (e) {
           console.error(e);
@@ -488,14 +520,15 @@ export default function MentionsTextarea({
       };
     }
     return undefined;
-  }, [menuQueryKey, menu?.type, allowMentionCreate, inboxThreadRootId, connectionPeerIds.join('|')]);
+  }, [menuQueryKey, menu?.type, allowMentionCreate, inboxThreadRootId, connectionPeerIds.join('|'), runAtMentionSearch]);
 
-  const applyMention = async (item, opts = {}) => {
+  const applyMention = async (item, opts = {}, menuCtx) => {
     const { trailingSpace = false } = opts;
     const ts = trailingSpace ? ' ' : '';
     const el = taRef.current;
-    if (!menu || !el) return;
-    const caret = caretForTriggerReplace(el, menu);
+    const m = menuCtx ?? menu;
+    if (!m || !el) return;
+    const caret = caretForTriggerReplace(el, m);
     if (item.kind === 'linked-edit') {
       try {
         const root = await getNoteThreadRoot(item.id);
@@ -515,7 +548,7 @@ export default function MentionsTextarea({
         const preferredParentId =
           inboxThreadRootId || (mentionCreateParentId !== undefined ? mentionCreateParentId : null);
         const created = await createNote({
-          content: item.createText || menu.query.trim().replace(/_/g, ' '),
+          content: item.createText || m.query.trim().replace(/_/g, ' '),
           parent_id: preferredParentId,
         });
         const label =
@@ -523,7 +556,7 @@ export default function MentionsTextarea({
           item.createText ||
           'Note';
         const link = formatNoteMentionLink(label, created.id);
-        const next = replaceTriggerQuery(el.value, menu.start, caret, link) + ts;
+        const next = replaceTriggerQuery(el.value, m.start, caret, link) + ts;
         onChange(next);
         if (noteId) {
           try {
@@ -534,7 +567,7 @@ export default function MentionsTextarea({
         }
         closeMenu();
         requestAnimationFrame(() => {
-          const pos = menu.start + link.length + ts.length;
+          const pos = m.start + link.length + ts.length;
           el.focus();
           el.setSelectionRange(pos, pos);
         });
@@ -542,7 +575,7 @@ export default function MentionsTextarea({
         if (inboxThreadRootId && inboxThreadRootId !== mentionCreateParentId) {
           try {
             const created = await createNote({
-              content: item.createText || menu.query.trim().replace(/_/g, ' '),
+              content: item.createText || m.query.trim().replace(/_/g, ' '),
               parent_id: mentionCreateParentId !== undefined ? mentionCreateParentId : null,
             });
             const label =
@@ -550,7 +583,7 @@ export default function MentionsTextarea({
               item.createText ||
               'Note';
             const link = formatNoteMentionLink(label, created.id);
-            const next = replaceTriggerQuery(el.value, menu.start, caret, link) + ts;
+            const next = replaceTriggerQuery(el.value, m.start, caret, link) + ts;
             onChange(next);
             if (noteId) {
               try {
@@ -561,7 +594,7 @@ export default function MentionsTextarea({
             }
             closeMenu();
             requestAnimationFrame(() => {
-              const pos = menu.start + link.length + ts.length;
+              const pos = m.start + link.length + ts.length;
               el.focus();
               el.setSelectionRange(pos, pos);
             });
@@ -576,7 +609,7 @@ export default function MentionsTextarea({
       return;
     }
     const link = formatNoteMentionLink(item.label, item.id);
-    const next = replaceTriggerQuery(el.value, menu.start, caret, link) + ts;
+    const next = replaceTriggerQuery(el.value, m.start, caret, link) + ts;
     onChange(next);
     if (noteId) {
       try {
@@ -587,18 +620,19 @@ export default function MentionsTextarea({
     }
     closeMenu();
     requestAnimationFrame(() => {
-      const pos = menu.start + link.length + ts.length;
+      const pos = m.start + link.length + ts.length;
       el.focus();
       el.setSelectionRange(pos, pos);
     });
   };
 
-  const applyTag = async (item, opts = {}) => {
+  const applyTag = async (item, opts = {}, menuCtx) => {
     const { trailingSpace = false } = opts;
     const ts = trailingSpace ? ' ' : '';
     const el = taRef.current;
-    if (!menu || !el || item.kind === 'note') return;
-    const caret = el.selectionStart ?? menu.caret;
+    const m = menuCtx ?? menu;
+    if (!m || !el || item.kind === 'note') return;
+    const caret = el.selectionStart ?? m.caret;
     let tagId = item.id;
     let tagName = item.name;
     if (item.createNew) {
@@ -613,7 +647,7 @@ export default function MentionsTextarea({
       }
     }
     const insertion = `#${tagName}`;
-    const next = replaceTriggerQuery(el.value, menu.start, caret, insertion) + ts;
+    const next = replaceTriggerQuery(el.value, m.start, caret, insertion) + ts;
     onChange(next);
     if (noteId) {
       try {
@@ -624,7 +658,7 @@ export default function MentionsTextarea({
     }
     closeMenu();
     requestAnimationFrame(() => {
-      const pos = menu.start + insertion.length + ts.length;
+      const pos = m.start + insertion.length + ts.length;
       el.focus();
       el.setSelectionRange(pos, pos);
     });
@@ -650,6 +684,80 @@ export default function MentionsTextarea({
       closeMenu();
       return;
     }
+
+    const spaceKey = e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space';
+
+    if (spaceKey) {
+      /* Non-empty @ query: always flush search so Space matches current partial text (debounce no longer stale). */
+      if (menu.type === '@' && menu.query.trim().length >= 1) {
+        e.preventDefault();
+        if (searchTimer.current) {
+          clearTimeout(searchTimer.current);
+          searchTimer.current = null;
+        }
+        void (async () => {
+          const snap = activeMenuRef.current;
+          if (!snap || snap.type !== '@') return;
+          setLoading(true);
+          let nextItems;
+          try {
+            nextItems = await runAtMentionSearch(snap);
+          } catch {
+            setLoading(false);
+            return;
+          }
+          setItems(nextItems);
+          setLoading(false);
+          const el = taRef.current;
+          if (!el) return;
+          const text = el.value;
+          const pos = readTextareaCaret(el, text);
+          const { trig } = resolveMentionTrigger(text, pos);
+          if (!trig || trig.type !== '@' || trig.start !== snap.start) return;
+          const top = nextItems[0];
+          if (!top) return;
+          const menuCtx = { ...snap, ...trig, caret: pos };
+          await applyMention(top, { trailingSpace: true }, menuCtx);
+        })();
+        return;
+      }
+
+      let pick = items[0];
+      if (!pick && menu.type === '#' && tagsCache.current) {
+        pick = computeHashTagPickerItems(tagsCache.current, menu)[0];
+      }
+      if (!pick && menu.type === '#' && !tagsCache.current) {
+        e.preventDefault();
+        void (async () => {
+          try {
+            if (!tagsCache.current) tagsCache.current = await getTags();
+            const el = taRef.current;
+            const snap = activeMenuRef.current;
+            if (!el || !snap || snap.type !== '#') return;
+            const text = el.value;
+            const pos = readTextareaCaret(el, text);
+            const { trig } = resolveMentionTrigger(text, pos);
+            if (!trig || trig.type !== '#' || trig.start !== snap.start) return;
+            const menuCtx = { ...snap, ...trig, caret: pos };
+            const computed = computeHashTagPickerItems(tagsCache.current, menuCtx);
+            const top = computed[0];
+            if (!top) return;
+            setItems(computed);
+            await applyTag(top, { trailingSpace: true }, menuCtx);
+          } catch (err) {
+            console.error(err);
+          }
+        })();
+        return;
+      }
+      if (!pick) return;
+      e.preventDefault();
+      if (menu.type === '@') void applyMention(pick, { trailingSpace: true });
+      else if (pick.kind === 'note') void applyMention(pick, { trailingSpace: true });
+      else void applyTag(pick, { trailingSpace: true });
+      return;
+    }
+
     if (items.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -668,15 +776,6 @@ export default function MentionsTextarea({
       if (menu.type === '@') void applyMention(item);
       else if (item.kind === 'note') void applyMention(item);
       else void applyTag(item);
-      return;
-    }
-    if (e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space') {
-      const item = items[0];
-      if (!item) return;
-      e.preventDefault();
-      if (menu.type === '@') void applyMention(item, { trailingSpace: true });
-      else if (item.kind === 'note') void applyMention(item, { trailingSpace: true });
-      else void applyTag(item, { trailingSpace: true });
       return;
     }
   };
