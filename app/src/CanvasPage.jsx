@@ -58,9 +58,11 @@ import {
   computeCanvasHorizontalArrangementRects,
   computeCanvasVerticalArrangementRects,
   filterManualConnectionsForVisibleNotes,
+  MANUAL_EDGE_BEND_LIMIT,
   manualConnectionKey,
   mergeCanvasLayoutPatch,
   normalizeManualConnections,
+  resolveManualEdgeBends,
   replaceCanvasLayoutFocusBlock,
   resolveCanvasBlockPrefs,
   resolveCanvasView,
@@ -402,6 +404,57 @@ function manualConnectorCenterLine(ra, rb) {
   return { x1: p0.x, y1: p0.y, x2: p2.x, y2: p2.y };
 }
 
+/** Unit tangent (chord direction) and left normal at chord midpoint; midpoint for control construction. */
+function chordBasisWorld(p0, p2) {
+  const vx = p2.x - p0.x;
+  const vy = p2.y - p0.y;
+  const len = Math.hypot(vx, vy);
+  const mx = (p0.x + p2.x) / 2;
+  const my = (p0.y + p2.y) / 2;
+  if (len < 1e-9) return { mx, my, tx: 1, ty: 0, nx: 0, ny: 1 };
+  const tx = vx / len;
+  const ty = vy / len;
+  const nx = -vy / len;
+  const ny = vx / len;
+  return { mx, my, tx, ty, nx, ny };
+}
+
+/** Quadratic control from chord-local bends: Q = M + 2*(bendT·t̂ + bendN·n̂). */
+function quadControlFromChordBends(p0, p2, bendT, bendN) {
+  const b = chordBasisWorld(p0, p2);
+  const bt = Number.isFinite(bendT) ? bendT : 0;
+  const bn = Number.isFinite(bendN) ? bendN : 0;
+  return {
+    x: b.mx + 2 * (b.tx * bt + b.nx * bn),
+    y: b.my + 2 * (b.ty * bt + b.ny * bn),
+  };
+}
+
+function quadCurveMidpoint(p0, qc, p2) {
+  return {
+    x: 0.25 * p0.x + 0.5 * qc.x + 0.25 * p2.x,
+    y: 0.25 * p0.y + 0.5 * qc.y + 0.25 * p2.y,
+  };
+}
+
+/**
+ * Bend (chord-local) so quadratic midpoint B(½)=M+bendT·t̂+bendN·n̂ tracks `wp`, with fixed endpoints p0→p2.
+ */
+function solveBendFixedChordTowardWorldPoint(p0, p2, wp) {
+  const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
+  const dx = wp.x - mx;
+  const dy = wp.y - my;
+  const bendT = Math.min(
+    MANUAL_EDGE_BEND_LIMIT,
+    Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * tx + dy * ty)
+  );
+  const bendN = Math.min(
+    MANUAL_EDGE_BEND_LIMIT,
+    Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * nx + dy * ny)
+  );
+  return { bendT, bendN };
+}
+
 function notePreview(content, max = 72) {
   if (!content || typeof content !== 'string') return '—';
   const line = content.split('\n')[0].trim().replace(/^#+\s*/, '');
@@ -432,6 +485,7 @@ function isCanvasDragInteractiveTarget(target) {
         '.canvas-sequence-menu__panel',
         '.canvas-card-link-handle-zone',
         '.canvas-card-link-handle',
+        '.canvas-manual-bend-handle',
       ].join(', ')
     )
   );
@@ -779,6 +833,8 @@ export default function CanvasPage() {
   const autoArrangementWrapAfterRef = useRef(0);
   const manualConnectionsRef = useRef([]);
   const manualLinkDragSessionRef = useRef(null);
+  /** Keep bend handle visible while dragging (group :hover can drop mid-drag). */
+  const [bendDragEdgeKey, setBendDragEdgeKey] = useState(null);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
   canvasArrangementRef.current = canvasArrangement;
@@ -2350,6 +2406,57 @@ export default function CanvasPage() {
     [removeManualConnectionByKey]
   );
 
+  const startBendDrag = useCallback(
+    (e, seg) => {
+      if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const key = seg.key;
+      const fromId = seg.fromId;
+      const toId = seg.toId;
+      const captureEl = e.currentTarget;
+      const capturePid = e.pointerId;
+      try {
+        captureEl.setPointerCapture(capturePid);
+      } catch {
+        /* ignore */
+      }
+      setBendDragEdgeKey(key);
+      const onMove = (ev) => {
+        const ra = cardRectsRef.current[fromId];
+        const rb = cardRectsRef.current[toId];
+        if (!ra || !rb) return;
+        const chord = manualConnectorCenterLine(ra, rb);
+        const p0 = { x: chord.x1, y: chord.y1 };
+        const p2 = { x: chord.x2, y: chord.y2 };
+        const wp = viewportClientToWorld(ev.clientX, ev.clientY);
+        if (!wp) return;
+        const { bendT, bendN } = solveBendFixedChordTowardWorldPoint(p0, p2, wp);
+        setManualConnections((prev) =>
+          prev.map((ed) =>
+            manualConnectionKey(ed) === key ? { ...ed, bendT, bendN, bend: bendN } : ed
+          )
+        );
+      };
+      const onUp = () => {
+        try {
+          captureEl.releasePointerCapture(capturePid);
+        } catch {
+          /* ignore */
+        }
+        setBendDragEdgeKey(null);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        scheduleSaveRef.current();
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [viewportClientToWorld]
+  );
+
   const startManualLinkDrag = useCallback(
     (e, noteId, side) => {
       if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
@@ -2462,12 +2569,21 @@ export default function CanvasPage() {
         const rb = cardRects[edge.toId];
         if (!ra || !rb) return null;
         const key = manualConnectionKey(edge);
+        const { bendT, bendN } = resolveManualEdgeBends(edge);
         const chord = manualConnectorCenterLine(ra, rb);
-        const pathD = `M ${chord.x1} ${chord.y1} L ${chord.x2} ${chord.y2}`;
+        const p0 = { x: chord.x1, y: chord.y1 };
+        const p2 = { x: chord.x2, y: chord.y2 };
+        const q = quadControlFromChordBends(p0, p2, bendT, bendN);
+        const mid = quadCurveMidpoint(p0, q, p2);
+        const pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
         return {
           ...edge,
+          bendT,
+          bendN,
+          bend: bendN,
           key,
           pathD,
+          mid,
         };
       })
       .filter(Boolean);
@@ -2801,7 +2917,12 @@ export default function CanvasPage() {
                 {canvasArrangement === CANVAS_ARRANGEMENT.MANUAL && manualLinkSegments.length > 0 ? (
                   <svg className="canvas-manual-edge-interaction" role="presentation" aria-hidden>
                     {manualLinkSegments.map((seg) => (
-                      <g key={seg.key} className="canvas-manual-edge-group">
+                      <g
+                        key={seg.key}
+                        className={`canvas-manual-edge-group${
+                          bendDragEdgeKey === seg.key ? ' canvas-manual-edge-group--dragging' : ''
+                        }`}
+                      >
                         <path
                           d={seg.pathD}
                           className="canvas-manual-connector-hit"
@@ -2810,6 +2931,13 @@ export default function CanvasPage() {
                           strokeWidth={22}
                           pointerEvents="stroke"
                           onPointerDown={(e) => onManualConnectorHitPointerDown(e, seg)}
+                        />
+                        <circle
+                          className="canvas-manual-bend-handle"
+                          cx={seg.mid.x}
+                          cy={seg.mid.y}
+                          r={12}
+                          onPointerDown={(e) => startBendDrag(e, seg)}
                         />
                       </g>
                     ))}
