@@ -443,8 +443,8 @@ function migrateBendToCenterAnchored(p0, p2, ca, cb, bendT, bendN) {
   };
 }
 
-/** Quadratic control so B(½) = M_center + bendT·t̂ + bendN·n̂ with endpoints p0,p2 (center‑anchored bend). */
-function quadControlFromCenterAnchoredBend(p0, p2, ca, cb, bendT, bendN) {
+/** Quadratic control for curve from note center ca → cb so B(½)=M_center+bend (not border endpoints). */
+function quadControlFromCenterAnchoredBend(ca, cb, bendT, bendN) {
   const { mCenter, tx, ty, nx, ny } = centerToCenterFrame(ca, cb);
   const bt = Number.isFinite(bendT) ? bendT : 0;
   const bn = Number.isFinite(bendN) ? bendN : 0;
@@ -453,16 +453,133 @@ function quadControlFromCenterAnchoredBend(p0, p2, ca, cb, bendT, bendN) {
     y: mCenter.y + ty * bt + ny * bn,
   };
   return {
-    x: 2 * B.x - 0.5 * p0.x - 0.5 * p2.x,
-    y: 2 * B.y - 0.5 * p0.y - 0.5 * p2.y,
+    x: 2 * B.x - 0.5 * ca.x - 0.5 * cb.x,
+    y: 2 * B.y - 0.5 * ca.y - 0.5 * cb.y,
   };
 }
 
-/** Parametric midpoint (u=½) on quadratic p0 → qc → p2 — center of the drawn edge‑to‑edge arc. */
-function quadBezierMidAtHalf(p0, qc, p2) {
+function quadBezierPoint(ca, q, cb, u) {
+  const omu = 1 - u;
   return {
-    x: 0.25 * p0.x + 0.5 * qc.x + 0.25 * p2.x,
-    y: 0.25 * p0.y + 0.5 * qc.y + 0.25 * p2.y,
+    x: omu * omu * ca.x + 2 * omu * u * q.x + u * u * cb.x,
+    y: omu * omu * ca.y + 2 * omu * u * q.y + u * u * cb.y,
+  };
+}
+
+function pointInRectInclusive(pt, r) {
+  return (
+    pt.x >= r.x &&
+    pt.x <= r.x + r.w &&
+    pt.y >= r.y &&
+    pt.y <= r.y + r.h
+  );
+}
+
+/** First u>0 where the ca→cb quadratic leaves rect r (ca assumed inside). */
+function firstUExitRect(ca, q, cb, r) {
+  const ins = (u) => pointInRectInclusive(quadBezierPoint(ca, q, cb, u), r);
+  const eps = 1e-9;
+  if (!ins(eps)) return 0;
+  let lo = eps;
+  let hi = 1;
+  if (!ins(1)) {
+    while (hi - lo > 1e-5) {
+      const mid = (lo + hi) / 2;
+      if (ins(mid)) lo = mid;
+      else hi = mid;
+    }
+    return hi;
+  }
+  return 1;
+}
+
+/** First u ≥ uMin where the quadratic enters rect r (used for target card). */
+function firstUEnterRect(ca, q, cb, r, uMin) {
+  const ins = (u) => pointInRectInclusive(quadBezierPoint(ca, q, cb, u), r);
+  if (ins(uMin)) return uMin;
+  if (!ins(1)) return 1;
+  let lo = uMin;
+  let hi = 1;
+  while (hi - lo > 1e-5) {
+    const mid = (lo + hi) / 2;
+    if (ins(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+function subdivideQuadAt(ca, q, cb, t) {
+  const b01 = {
+    x: (1 - t) * ca.x + t * q.x,
+    y: (1 - t) * ca.y + t * q.y,
+  };
+  const b12 = {
+    x: (1 - t) * q.x + t * cb.x,
+    y: (1 - t) * q.y + t * cb.y,
+  };
+  const b012 = {
+    x: (1 - t) * b01.x + t * b12.x,
+    y: (1 - t) * b01.y + t * b12.y,
+  };
+  return {
+    left: { ca, q: b01, cb: b012 },
+    right: { ca: b012, q: b12, cb },
+  };
+}
+
+/** Subcurve parameters u ∈ [u0,u1] on the original quadratic (inclusive). */
+function trimQuadraticBezier(ca, q, cb, u0, u1) {
+  if (u1 <= u0 + 1e-9) {
+    const p = quadBezierPoint(ca, q, cb, u0);
+    return { ca: p, q: p, cb: p };
+  }
+  const { right } = subdivideQuadAt(ca, q, cb, u0);
+  const span = 1 - u0;
+  const t = span > 1e-12 ? (u1 - u0) / span : 1;
+  if (t <= 1e-9) {
+    const p = quadBezierPoint(ca, q, cb, u0);
+    return { ca: p, q: p, cb: p };
+  }
+  const { left } = subdivideQuadAt(right.ca, right.q, right.cb, t);
+  return left;
+}
+
+/**
+ * Visible manual path: quadratic anchored at note centers (ca→cb), trimmed from source border exit to
+ * target border entry. Falls back to straight ray clip when bend≈0 or trim fails.
+ */
+function manualConnectorCurvedPath(ra, rb, bendT, bendN) {
+  const chord = manualConnectorCenterLine(ra, rb);
+  const { ca, cb } = chord;
+  const p0 = { x: chord.x1, y: chord.y1 };
+  const p2 = { x: chord.x2, y: chord.y2 };
+  const bendLen = Math.hypot(
+    Number.isFinite(bendT) ? bendT : 0,
+    Number.isFinite(bendN) ? bendN : 0
+  );
+  if (bendLen < 1e-4) {
+    const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
+    return {
+      pathD: `M ${p0.x} ${p0.y} L ${p2.x} ${p2.y}`,
+      mid,
+    };
+  }
+  const q = quadControlFromCenterAnchoredBend(ca, cb, bendT, bendN);
+  let u0 = firstUExitRect(ca, q, cb, ra);
+  let u1 = firstUEnterRect(ca, q, cb, rb, Math.min(u0 + 1e-5, 1));
+  if (u1 <= u0 + 1e-6) {
+    const mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
+    return {
+      pathD: `M ${p0.x} ${p0.y} L ${p2.x} ${p2.y}`,
+      mid,
+    };
+  }
+  const trimmed = trimQuadraticBezier(ca, q, cb, u0, u1);
+  const um = u0 + 0.5 * (u1 - u0);
+  const mid = quadBezierPoint(ca, q, cb, um);
+  return {
+    pathD: `M ${trimmed.ca.x} ${trimmed.ca.y} Q ${trimmed.q.x} ${trimmed.q.y} ${trimmed.cb.x} ${trimmed.cb.y}`,
+    mid,
   };
 }
 
@@ -2489,28 +2606,28 @@ export default function CanvasPage() {
   );
 
   const startManualLinkDrag = useCallback(
-    (e, noteId, side) => {
+    (e, noteId) => {
       if (canvasArrangementRef.current !== CANVAS_ARRANGEMENT.MANUAL) return;
       e.stopPropagation();
       e.preventDefault();
       const id = String(noteId);
       const rect = cardRectsRef.current[id];
       if (!rect) return;
-      manualLinkDragSessionRef.current = { fromId: id, fromSide: side };
-      const p1 = sideMidpoint(rect, side);
+      manualLinkDragSessionRef.current = { fromId: id };
+      const c0 = rectCenterWorld(rect);
       const w0 = viewportClientToWorld(e.clientX, e.clientY);
       setManualLinkRubber(
-        w0 ? { x1: p1.x, y1: p1.y, x2: w0.x, y2: w0.y } : null
+        w0 ? { x1: c0.x, y1: c0.y, x2: w0.x, y2: w0.y } : null
       );
       const onMove = (ev) => {
         const s = manualLinkDragSessionRef.current;
         if (!s) return;
         const rr = cardRectsRef.current[s.fromId];
         if (!rr) return;
-        const p = sideMidpoint(rr, s.fromSide);
+        const c = rectCenterWorld(rr);
         const w = viewportClientToWorld(ev.clientX, ev.clientY);
         if (!w) return;
-        setManualLinkRubber({ x1: p.x, y1: p.y, x2: w.x, y2: w.y });
+        setManualLinkRubber({ x1: c.x, y1: c.y, x2: w.x, y2: w.y });
       };
       const onUp = (ev) => {
         window.removeEventListener('pointermove', onMove);
@@ -2616,18 +2733,7 @@ export default function CanvasPage() {
           edge.bendAnchor === 'center'
             ? raw
             : migrateBendToCenterAnchored(p0, p2, ca, cb, raw.bendT, raw.bendN);
-        const bendLen = Math.hypot(eff.bendT, eff.bendN);
-        /** Midpoint along the visible edge→edge segment (chord midpoint when straight, u=½ on the quad when curved). */
-        let mid;
-        let pathD;
-        if (bendLen < 1e-4) {
-          pathD = `M ${p0.x} ${p0.y} L ${p2.x} ${p2.y}`;
-          mid = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
-        } else {
-          const q = quadControlFromCenterAnchoredBend(p0, p2, ca, cb, eff.bendT, eff.bendN);
-          pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
-          mid = quadBezierMidAtHalf(p0, q, p2);
-        }
+        const { pathD, mid } = manualConnectorCurvedPath(ra, rb, eff.bendT, eff.bendN);
         return {
           ...edge,
           bendT: raw.bendT,
@@ -3060,9 +3166,9 @@ export default function CanvasPage() {
                                 data-canvas-link-handle="true"
                                 data-note-id={id}
                                 data-side={side}
-                                aria-label={`Draw arrow from ${side} side`}
-                                title="Drag to another note to connect"
-                                onPointerDown={(e) => startManualLinkDrag(e, n.id, side)}
+                                aria-label={`Draw arrow from note (${side})`}
+                                title="Drag from note center to another note"
+                                onPointerDown={(e) => startManualLinkDrag(e, n.id)}
                               />
                             </div>
                           ))}
