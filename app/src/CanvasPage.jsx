@@ -66,7 +66,6 @@ import {
   replaceCanvasLayoutFocusBlock,
   resolveCanvasBlockPrefs,
   resolveCanvasView,
-  normalizeCanvasLinkSide,
 } from './canvasLayoutApi';
 import CanvasSequenceMenu from './CanvasSequenceMenu';
 import { useMediaQuery } from './useMediaQuery';
@@ -852,7 +851,7 @@ export default function CanvasPage() {
   const manualLinkDragSessionRef = useRef(null);
   /** Keep bend dot visible while dragging (group :hover can drop mid-drag). */
   const [bendDragEdgeKey, setBendDragEdgeKey] = useState(null);
-  /** Attachment sides for active bend-drag — endpoints track moving cards via side midpoints (sync with edge state). */
+  /** While bending: pinned attachment faces (ref only). Idle wires use centerpoint-based faces again. */
   const bendDragSidesRef = useRef(null);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
@@ -2438,12 +2437,8 @@ export default function CanvasPage() {
       if (!ra0 || !rb0) return;
       const fromSide = closestSideToPoint(ra0, seg.p0);
       const toSide = closestSideToPoint(rb0, seg.p2);
+      /** Pins faces only for this gesture — idle layout still picks faces from centerpoint. */
       bendDragSidesRef.current = { key, fromSide, toSide };
-      setManualConnections((prev) =>
-        prev.map((ed) =>
-          manualConnectionKey(ed) === key ? { ...ed, fromSide, toSide } : ed
-        )
-      );
       const captureEl = e.currentTarget;
       const capturePid = e.pointerId;
       try {
@@ -2602,10 +2597,14 @@ export default function CanvasPage() {
         if (!ra || !rb) return null;
         const { bendT, bendN } = resolveManualEdgeBends(edge);
         const key = manualConnectionKey(edge);
-        const fixedFrom = normalizeCanvasLinkSide(edge.fromSide);
-        const fixedTo = normalizeCanvasLinkSide(edge.toSide);
-        const fixedSides =
-          fixedFrom && fixedTo ? { from: fixedFrom, to: fixedTo } : null;
+        const dragPin =
+          bendDragEdgeKey === key &&
+          bendDragSidesRef.current?.key === key &&
+          bendDragSidesRef.current.fromSide &&
+          bendDragSidesRef.current.toSide;
+        const fixedSides = dragPin
+          ? { from: bendDragSidesRef.current.fromSide, to: bendDragSidesRef.current.toSide }
+          : null;
         const chord = manualConnectorChord(ra, rb, bendT, bendN, fixedSides);
         const p0 = { x: chord.x1, y: chord.y1 };
         const p2 = { x: chord.x2, y: chord.y2 };
