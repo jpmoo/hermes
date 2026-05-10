@@ -556,7 +556,7 @@ export default function MentionsTextarea({
           item.createText ||
           'Note';
         const link = formatNoteMentionLink(label, created.id);
-        const next = replaceTriggerQuery(el.value, m.start, caret, link) + ts;
+        const next = replaceTriggerQuery(el.value, m.start, caret, link + ts);
         onChange(next);
         if (noteId) {
           try {
@@ -583,7 +583,7 @@ export default function MentionsTextarea({
               item.createText ||
               'Note';
             const link = formatNoteMentionLink(label, created.id);
-            const next = replaceTriggerQuery(el.value, m.start, caret, link) + ts;
+            const next = replaceTriggerQuery(el.value, m.start, caret, link + ts);
             onChange(next);
             if (noteId) {
               try {
@@ -609,7 +609,7 @@ export default function MentionsTextarea({
       return;
     }
     const link = formatNoteMentionLink(item.label, item.id);
-    const next = replaceTriggerQuery(el.value, m.start, caret, link) + ts;
+    const next = replaceTriggerQuery(el.value, m.start, caret, link + ts);
     onChange(next);
     if (noteId) {
       try {
@@ -632,7 +632,7 @@ export default function MentionsTextarea({
     const el = taRef.current;
     const m = menuCtx ?? menu;
     if (!m || !el || item.kind === 'note') return;
-    const caret = el.selectionStart ?? m.caret;
+    const caret = caretForTriggerReplace(el, m);
     let tagId = item.id;
     let tagName = item.name;
     if (item.createNew) {
@@ -647,7 +647,7 @@ export default function MentionsTextarea({
       }
     }
     const insertion = `#${tagName}`;
-    const next = replaceTriggerQuery(el.value, m.start, caret, insertion) + ts;
+    const next = replaceTriggerQuery(el.value, m.start, caret, insertion + ts);
     onChange(next);
     if (noteId) {
       try {
