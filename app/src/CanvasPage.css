@@ -815,43 +815,44 @@
   justify-content: center;
   z-index: 6;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .canvas-card-link-handle-zone--top {
   top: 0;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 36px;
-  height: 28px;
+  width: 44px;
+  height: 36px;
 }
 
 .canvas-card-link-handle-zone--right {
   right: 0;
   top: 50%;
   transform: translate(50%, -50%);
-  width: 28px;
-  height: 36px;
+  width: 36px;
+  height: 44px;
 }
 
 .canvas-card-link-handle-zone--bottom {
   bottom: 0;
   left: 50%;
   transform: translate(-50%, 50%);
-  width: 36px;
-  height: 28px;
+  width: 44px;
+  height: 36px;
 }
 
 .canvas-card-link-handle-zone--left {
   left: 0;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 28px;
-  height: 36px;
+  width: 36px;
+  height: 44px;
 }
 
 .canvas-card-link-handle {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   margin: 0;
   border: 2px solid var(--accent, #3b82f6);
@@ -862,12 +863,20 @@
   flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.12s ease;
+  touch-action: none;
 }
 
-.canvas-card-link-handle-zone:hover .canvas-card-link-handle {
+.canvas-card-link-handle-zone:hover .canvas-card-link-handle,
+.canvas-card-link-handle-zone:active .canvas-card-link-handle {
   opacity: 0.9;
 }
 
 .canvas-card-link-handle:hover {
   opacity: 1;
+}
+
+@media (hover: none) {
+  .canvas-card-link-handle-zone .canvas-card-link-handle {
+    opacity: 0.5;
+  }
 }

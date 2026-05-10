@@ -411,6 +411,19 @@ function manualConnectorCenterLine(ra, rb) {
   };
 }
 
+/** First exit point from `sourceRect` along the ray center(source)→`toward` (rubber-band line start). */
+function rubberExitFromSourceToward(sourceRect, towardX, towardY) {
+  const ca = rectCenterWorld(sourceRect);
+  const cb = { x: towardX, y: towardY };
+  const len = Math.hypot(cb.x - ca.x, cb.y - ca.y);
+  if (len < 1e-9) return ca;
+  const eps = 1e-7;
+  const tsRa = segmentBorderCrossingTs(ca, cb, sourceRect);
+  const exitA = tsRa.filter((t) => t >= eps && t <= 1 - eps);
+  const t0 = exitA.length ? Math.min(...exitA) : 0;
+  return lerpAlong(ca, cb, t0);
+}
+
 /** Tangent/normal along center→center (same line as border‑clipped chord p0→p2). */
 function centerToCenterFrame(ca, cb) {
   const vx = cb.x - ca.x;
@@ -2614,20 +2627,20 @@ export default function CanvasPage() {
       const rect = cardRectsRef.current[id];
       if (!rect) return;
       manualLinkDragSessionRef.current = { fromId: id };
-      const c0 = rectCenterWorld(rect);
       const w0 = viewportClientToWorld(e.clientX, e.clientY);
+      const p0 = w0 ? rubberExitFromSourceToward(rect, w0.x, w0.y) : null;
       setManualLinkRubber(
-        w0 ? { x1: c0.x, y1: c0.y, x2: w0.x, y2: w0.y } : null
+        w0 && p0 ? { x1: p0.x, y1: p0.y, x2: w0.x, y2: w0.y } : null
       );
       const onMove = (ev) => {
         const s = manualLinkDragSessionRef.current;
         if (!s) return;
         const rr = cardRectsRef.current[s.fromId];
         if (!rr) return;
-        const c = rectCenterWorld(rr);
         const w = viewportClientToWorld(ev.clientX, ev.clientY);
         if (!w) return;
-        setManualLinkRubber({ x1: c.x, y1: c.y, x2: w.x, y2: w.y });
+        const edge = rubberExitFromSourceToward(rr, w.x, w.y);
+        setManualLinkRubber({ x1: edge.x, y1: edge.y, x2: w.x, y2: w.y });
       };
       const onUp = (ev) => {
         window.removeEventListener('pointermove', onMove);
@@ -2638,17 +2651,15 @@ export default function CanvasPage() {
         setManualLinkRubber(null);
         if (!s) return;
         const els = document.elementsFromPoint(ev.clientX, ev.clientY);
-        let handleEl = null;
+        let toId = null;
         for (const el of els) {
           if (!(el instanceof Element)) continue;
-          const h = el.closest('[data-canvas-link-handle="true"]');
-          if (h) {
-            handleEl = h;
+          const frame = el.closest('[data-canvas-note-id]');
+          if (frame) {
+            toId = frame.getAttribute('data-canvas-note-id');
             break;
           }
         }
-        if (!handleEl) return;
-        const toId = handleEl.getAttribute('data-note-id');
         if (!toId) return;
         if (toId === s.fromId) return;
         const nextEdge = {
@@ -3132,7 +3143,11 @@ export default function CanvasPage() {
                         height: r.h,
                       }}
                       onPointerDown={(e) => onCanvasCardPointerDown(n.id, e)}
-                      title="Drag to move · use corner to resize"
+                      title={
+                        canvasArrangement === CANVAS_ARRANGEMENT.MANUAL
+                          ? 'Drag to move · edge handles to draw arrows · corner to resize'
+                          : 'Drag to move · use corner to resize'
+                      }
                     >
                       <div className="canvas-card-body">
                         <NoteCard
@@ -3165,10 +3180,12 @@ export default function CanvasPage() {
                                 className="canvas-card-link-handle"
                                 data-canvas-link-handle="true"
                                 data-note-id={id}
-                                data-side={side}
-                                aria-label={`Draw arrow from note (${side})`}
-                                title="Drag from note center to another note"
-                                onPointerDown={(e) => startManualLinkDrag(e, n.id)}
+                                aria-label={`Draw arrow from ${side} edge`}
+                                title="Drag to another note"
+                                onPointerDown={(e) => {
+                                  e.stopPropagation();
+                                  startManualLinkDrag(e, n.id);
+                                }}
                               />
                             </div>
                           ))}
