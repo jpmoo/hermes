@@ -125,8 +125,9 @@ function clampManualBend(v) {
 }
 
 /**
- * Chord-local bend: tangent (along the connector) and normal (perpendicular) from chord midpoint
- * toward the quadratic control point. Legacy `bend` only sets the normal component.
+ * Bend in tangent/normal coords vs center midpoint (`bendAnchor: 'center'`) or, for legacy edges,
+ * vs border chord midpoint (render-time migration converts to the same curve).
+ * Legacy `bend` only sets the normal component.
  */
 export function resolveManualEdgeBends(edge) {
   if (!edge || typeof edge !== 'object') return { bendT: 0, bendN: 0 };
@@ -156,8 +157,9 @@ export function resolveManualEdgeBends(edge) {
 }
 
 /**
- * Directed arrow between two notes. Endpoints follow dynamic geometry (closest sides to curve center).
- * `bendT` / `bendN`: chord-local control offset (world px). Legacy `bend` = `bendN` only.
+ * Directed arrow between two notes. Endpoints follow center-to-center clipping to card borders.
+ * `bendT` / `bendN`: tangent/normal vs midpoint (`bendAnchor: 'center'` = note-centers midpoint).
+ * Legacy `bend` = `bendN` only; omitting `bendAnchor` keeps saved bends via render-time migration.
  */
 export function normalizeManualConnections(raw) {
   if (!Array.isArray(raw)) return [];
@@ -170,7 +172,9 @@ export function normalizeManualConnections(raw) {
     if (!fromId || !toId || fromId === toId || fromId.length > 96 || toId.length > 96) continue;
     const { bendT, bendN } = resolveManualEdgeBends(item);
     const key = `${fromId}->${toId}`;
-    map.set(key, { fromId, toId, bendT, bendN, bend: bendN });
+    const row = { fromId, toId, bendT, bendN, bend: bendN };
+    if (item.bendAnchor === 'center') row.bendAnchor = 'center';
+    map.set(key, row);
     if (map.size >= 120) break;
   }
   return Array.from(map.values());

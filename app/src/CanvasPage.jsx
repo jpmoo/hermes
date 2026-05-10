@@ -390,7 +390,7 @@ function manualConnectorCenterLine(ra, rb) {
   const cb = rectCenterWorld(rb);
   const len = Math.hypot(cb.x - ca.x, cb.y - ca.y);
   if (len < 1e-9) {
-    return { x1: ca.x, y1: ca.y, x2: cb.x, y2: cb.y };
+    return { x1: ca.x, y1: ca.y, x2: cb.x, y2: cb.y, ca, cb };
   }
   const eps = 1e-7;
   const tsRa = segmentBorderCrossingTs(ca, cb, ra);
@@ -401,49 +401,70 @@ function manualConnectorCenterLine(ra, rb) {
   const t1 = entryB.length ? Math.min(...entryB) : 1;
   const p0 = lerpAlong(ca, cb, t0);
   const p2 = lerpAlong(ca, cb, t1);
-  return { x1: p0.x, y1: p0.y, x2: p2.x, y2: p2.y };
+  return {
+    x1: p0.x,
+    y1: p0.y,
+    x2: p2.x,
+    y2: p2.y,
+    ca,
+    cb,
+  };
 }
 
-/** Unit tangent (chord direction) and left normal at chord midpoint; midpoint for control construction. */
-function chordBasisWorld(p0, p2) {
-  const vx = p2.x - p0.x;
-  const vy = p2.y - p0.y;
+/** Tangent/normal along center→center (same line as border‑clipped chord p0→p2). */
+function centerToCenterFrame(ca, cb) {
+  const vx = cb.x - ca.x;
+  const vy = cb.y - ca.y;
   const len = Math.hypot(vx, vy);
-  const mx = (p0.x + p2.x) / 2;
-  const my = (p0.y + p2.y) / 2;
-  if (len < 1e-9) return { mx, my, tx: 1, ty: 0, nx: 0, ny: 1 };
+  const mx = (ca.x + cb.x) / 2;
+  const my = (ca.y + cb.y) / 2;
+  if (len < 1e-9) return { mCenter: { x: mx, y: my }, tx: 1, ty: 0, nx: 0, ny: 1 };
   const tx = vx / len;
   const ty = vy / len;
   const nx = -vy / len;
   const ny = vx / len;
-  return { mx, my, tx, ty, nx, ny };
+  return { mCenter: { x: mx, y: my }, tx, ty, nx, ny };
 }
 
-/** Quadratic control from chord-local bends: Q = M + 2*(bendT·t̂ + bendN·n̂). */
-function quadControlFromChordBends(p0, p2, bendT, bendN) {
-  const b = chordBasisWorld(p0, p2);
+/**
+ * Stored bendT/bendN were historically relative to border‑chord midpoint M_border=(p0+p2)/2.
+ * Express the same curve midpoint in center‑anchored coords: B = M_center + bendT'·t + bendN'·n.
+ */
+function migrateBendToCenterAnchored(p0, p2, ca, cb, bendT, bendN) {
+  const { mCenter, tx, ty, nx, ny } = centerToCenterFrame(ca, cb);
+  const mBorder = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
+  const dmx = mBorder.x - mCenter.x;
+  const dmy = mBorder.y - mCenter.y;
   const bt = Number.isFinite(bendT) ? bendT : 0;
   const bn = Number.isFinite(bendN) ? bendN : 0;
   return {
-    x: b.mx + 2 * (b.tx * bt + b.nx * bn),
-    y: b.my + 2 * (b.ty * bt + b.ny * bn),
+    bendT: bt + dmx * tx + dmy * ty,
+    bendN: bn + dmx * nx + dmy * ny,
   };
 }
 
-function quadCurveMidpoint(p0, qc, p2) {
+/** Quadratic control so B(½) = M_center + bendT·t̂ + bendN·n̂ with endpoints p0,p2 (center‑anchored bend). */
+function quadControlFromCenterAnchoredBend(p0, p2, ca, cb, bendT, bendN) {
+  const { mCenter, tx, ty, nx, ny } = centerToCenterFrame(ca, cb);
+  const bt = Number.isFinite(bendT) ? bendT : 0;
+  const bn = Number.isFinite(bendN) ? bendN : 0;
+  const B = {
+    x: mCenter.x + tx * bt + nx * bn,
+    y: mCenter.y + ty * bt + ny * bn,
+  };
   return {
-    x: 0.25 * p0.x + 0.5 * qc.x + 0.25 * p2.x,
-    y: 0.25 * p0.y + 0.5 * qc.y + 0.25 * p2.y,
+    x: 2 * B.x - 0.5 * p0.x - 0.5 * p2.x,
+    y: 2 * B.y - 0.5 * p0.y - 0.5 * p2.y,
   };
 }
 
 /**
- * Bend (chord-local) so quadratic midpoint B(½)=M+bendT·t̂+bendN·n̂ tracks `wp`, with fixed endpoints p0→p2.
+ * Drag: bend offsets measured from center midpoint M_center along center→center frame (same as curve B(½)).
  */
-function solveBendFixedChordTowardWorldPoint(p0, p2, wp) {
-  const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
-  const dx = wp.x - mx;
-  const dy = wp.y - my;
+function solveBendCenterAnchoredTowardWorldPoint(ca, cb, wp) {
+  const { mCenter, tx, ty, nx, ny } = centerToCenterFrame(ca, cb);
+  const dx = wp.x - mCenter.x;
+  const dy = wp.y - mCenter.y;
   const bendT = Math.min(
     MANUAL_EDGE_BEND_LIMIT,
     Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * tx + dy * ty)
@@ -2427,14 +2448,15 @@ export default function CanvasPage() {
         const rb = cardRectsRef.current[toId];
         if (!ra || !rb) return;
         const chord = manualConnectorCenterLine(ra, rb);
-        const p0 = { x: chord.x1, y: chord.y1 };
-        const p2 = { x: chord.x2, y: chord.y2 };
+        const { ca, cb } = chord;
         const wp = viewportClientToWorld(ev.clientX, ev.clientY);
         if (!wp) return;
-        const { bendT, bendN } = solveBendFixedChordTowardWorldPoint(p0, p2, wp);
+        const { bendT, bendN } = solveBendCenterAnchoredTowardWorldPoint(ca, cb, wp);
         setManualConnections((prev) =>
           prev.map((ed) =>
-            manualConnectionKey(ed) === key ? { ...ed, bendT, bendN, bend: bendN } : ed
+            manualConnectionKey(ed) === key
+              ? { ...ed, bendT, bendN, bend: bendN, bendAnchor: 'center' }
+              : ed
           )
         );
       };
@@ -2503,7 +2525,14 @@ export default function CanvasPage() {
         const toId = handleEl.getAttribute('data-note-id');
         if (!toId) return;
         if (toId === s.fromId) return;
-        const nextEdge = { fromId: s.fromId, toId, bendT: 0, bendN: 0, bend: 0 };
+        const nextEdge = {
+          fromId: s.fromId,
+          toId,
+          bendT: 0,
+          bendN: 0,
+          bend: 0,
+          bendAnchor: 'center',
+        };
         const k = manualConnectionKey(nextEdge);
         setManualConnections((prev) =>
           normalizeManualConnections([
@@ -2569,18 +2598,33 @@ export default function CanvasPage() {
         const rb = cardRects[edge.toId];
         if (!ra || !rb) return null;
         const key = manualConnectionKey(edge);
-        const { bendT, bendN } = resolveManualEdgeBends(edge);
+        const raw = resolveManualEdgeBends(edge);
         const chord = manualConnectorCenterLine(ra, rb);
         const p0 = { x: chord.x1, y: chord.y1 };
         const p2 = { x: chord.x2, y: chord.y2 };
-        const q = quadControlFromChordBends(p0, p2, bendT, bendN);
-        const mid = quadCurveMidpoint(p0, q, p2);
-        const pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
+        const { ca, cb } = chord;
+        const eff =
+          edge.bendAnchor === 'center'
+            ? raw
+            : migrateBendToCenterAnchored(p0, p2, ca, cb, raw.bendT, raw.bendN);
+        const { mCenter, tx, ty, nx, ny } = centerToCenterFrame(ca, cb);
+        const mid = {
+          x: mCenter.x + eff.bendT * tx + eff.bendN * nx,
+          y: mCenter.y + eff.bendT * ty + eff.bendN * ny,
+        };
+        const bendLen = Math.hypot(eff.bendT, eff.bendN);
+        const pathD =
+          bendLen < 1e-4
+            ? `M ${p0.x} ${p0.y} L ${p2.x} ${p2.y}`
+            : (() => {
+                const q = quadControlFromCenterAnchoredBend(p0, p2, ca, cb, eff.bendT, eff.bendN);
+                return `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
+              })();
         return {
           ...edge,
-          bendT,
-          bendN,
-          bend: bendN,
+          bendT: raw.bendT,
+          bendN: raw.bendN,
+          bend: raw.bendN,
           key,
           pathD,
           mid,
