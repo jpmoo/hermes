@@ -449,37 +449,21 @@ function manualConnectorChord(ra, rb, bendT, bendN) {
 }
 
 /**
- * Bend so the quadratic midpoint tracks `wp`, with endpoints from manualConnectorChord
- * (attachment faces may change as bend updates). Fixed-point iteration — same geometry
- * as idle rendering so the wire does not jump on pointer-up.
+ * Bend (chord-local) so quadratic midpoint B(½)=M+bendT·t̂+bendN·n̂ tracks `wp`, with **fixed**
+ * endpoints p0→p2. Used while dragging so attachment sides do not flip each frame (stable handle).
  */
-function solveManualBendTowardWorldPoint(ra, rb, wp, bendT0, bendN0, maxIter = 16) {
-  let bendT = bendT0;
-  let bendN = bendN0;
-  for (let iter = 0; iter < maxIter; iter++) {
-    const chord = manualConnectorChord(ra, rb, bendT, bendN);
-    const p0 = { x: chord.x1, y: chord.y1 };
-    const p2 = { x: chord.x2, y: chord.y2 };
-    const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
-    const dx = wp.x - mx;
-    const dy = wp.y - my;
-    /* Handle at t=½: B(½)=M + bendT·t̂ + bendN·n̂ */
-    const nextT = Math.min(
-      MANUAL_EDGE_BEND_LIMIT,
-      Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * tx + dy * ty)
-    );
-    const nextN = Math.min(
-      MANUAL_EDGE_BEND_LIMIT,
-      Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * nx + dy * ny)
-    );
-    if (Math.abs(nextT - bendT) < 1e-4 && Math.abs(nextN - bendN) < 1e-4) {
-      bendT = nextT;
-      bendN = nextN;
-      break;
-    }
-    bendT = nextT;
-    bendN = nextN;
-  }
+function solveBendFixedChordTowardWorldPoint(p0, p2, wp) {
+  const { mx, my, tx, ty, nx, ny } = chordBasisWorld(p0, p2);
+  const dx = wp.x - mx;
+  const dy = wp.y - my;
+  const bendT = Math.min(
+    MANUAL_EDGE_BEND_LIMIT,
+    Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * tx + dy * ty)
+  );
+  const bendN = Math.min(
+    MANUAL_EDGE_BEND_LIMIT,
+    Math.max(-MANUAL_EDGE_BEND_LIMIT, dx * nx + dy * ny)
+  );
   return { bendT, bendN };
 }
 
@@ -863,6 +847,8 @@ export default function CanvasPage() {
   const manualLinkDragSessionRef = useRef(null);
   /** Keep bend dot visible while dragging (group :hover can drop mid-drag). */
   const [bendDragEdgeKey, setBendDragEdgeKey] = useState(null);
+  /** Fixed chord endpoints for the edge being bent — avoids side flips / oscillation mid-drag. */
+  const bendDragChordLockRef = useRef(null);
   cardRectsRef.current = cardRects;
   canvasLayoutsRef.current = canvasLayouts;
   canvasArrangementRef.current = canvasArrangement;
@@ -2445,23 +2431,38 @@ export default function CanvasPage() {
       const ra0 = cardRectsRef.current[fromId];
       const rb0 = cardRectsRef.current[toId];
       if (!ra0 || !rb0) return;
+      bendDragChordLockRef.current = {
+        key,
+        p0: { x: seg.p0.x, y: seg.p0.y },
+        p2: { x: seg.p2.x, y: seg.p2.y },
+      };
+      const captureEl = e.currentTarget;
+      const capturePid = e.pointerId;
+      try {
+        captureEl.setPointerCapture(capturePid);
+      } catch {
+        /* ignore */
+      }
       setBendDragEdgeKey(key);
       const onMove = (ev) => {
-        const ra = cardRectsRef.current[fromId];
-        const rb = cardRectsRef.current[toId];
-        if (!ra || !rb) return;
+        const lock = bendDragChordLockRef.current;
+        if (!lock || lock.key !== key) return;
         const wp = viewportClientToWorld(ev.clientX, ev.clientY);
         if (!wp) return;
-        setManualConnections((prev) => {
-          const cur = prev.find((ed) => manualConnectionKey(ed) === key);
-          const { bendT: bt0, bendN: bn0 } = resolveManualEdgeBends(cur || {});
-          const { bendT, bendN } = solveManualBendTowardWorldPoint(ra, rb, wp, bt0, bn0);
-          return prev.map((ed) =>
+        const { bendT, bendN } = solveBendFixedChordTowardWorldPoint(lock.p0, lock.p2, wp);
+        setManualConnections((prev) =>
+          prev.map((ed) =>
             manualConnectionKey(ed) === key ? { ...ed, bendT, bendN, bend: bendN } : ed
-          );
-        });
+          )
+        );
       };
       const onUp = () => {
+        try {
+          captureEl.releasePointerCapture(capturePid);
+        } catch {
+          /* ignore */
+        }
+        bendDragChordLockRef.current = null;
         setBendDragEdgeKey(null);
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
@@ -2581,19 +2582,29 @@ export default function CanvasPage() {
   const manualLinkSegments = useMemo(() => {
     const ids = new Set(sequenceNotesForCanvas.map((n) => String(n.id)));
     const filtered = filterManualConnectionsForVisibleNotes(manualConnections, ids);
+    const lock = bendDragChordLockRef.current;
     return filtered
       .map((edge) => {
         const ra = cardRects[edge.fromId];
         const rb = cardRects[edge.toId];
         if (!ra || !rb) return null;
         const { bendT, bendN } = resolveManualEdgeBends(edge);
-        const chord = manualConnectorChord(ra, rb, bendT, bendN);
-        const p0 = { x: chord.x1, y: chord.y1 };
-        const p2 = { x: chord.x2, y: chord.y2 };
+        const key = manualConnectionKey(edge);
+        const useLockedChord =
+          bendDragEdgeKey === key && lock?.key === key && lock.p0 && lock.p2;
+        let p0;
+        let p2;
+        if (useLockedChord) {
+          p0 = lock.p0;
+          p2 = lock.p2;
+        } else {
+          const chord = manualConnectorChord(ra, rb, bendT, bendN);
+          p0 = { x: chord.x1, y: chord.y1 };
+          p2 = { x: chord.x2, y: chord.y2 };
+        }
         const q = quadControlFromChordBends(p0, p2, bendT, bendN);
         const mid = quadCurveMidpoint(p0, q, p2);
         const pathD = `M ${p0.x} ${p0.y} Q ${q.x} ${q.y} ${p2.x} ${p2.y}`;
-        const key = manualConnectionKey(edge);
         return {
           ...edge,
           bendT,
@@ -2608,7 +2619,7 @@ export default function CanvasPage() {
         };
       })
       .filter(Boolean);
-  }, [manualConnections, cardRects, sequenceNotesForCanvas]);
+  }, [manualConnections, cardRects, sequenceNotesForCanvas, bendDragEdgeKey]);
 
   pointerMoveInnerRef.current = (e) => {
     if (!viewportRef.current) return;
