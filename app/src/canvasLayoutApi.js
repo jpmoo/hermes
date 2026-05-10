@@ -156,8 +156,8 @@ export function resolveManualEdgeBends(edge) {
 }
 
 /**
- * Directed arrow between two notes. Endpoints follow card geometry (closest sides).
- * `bendT` / `bendN`: chord-local control offset (world px). Legacy `bend` = `bendN` only.
+ * Directed arrow between two notes. Optional `fromSide` / `toSide` pin attachment faces (`top`…`left`);
+ * otherwise endpoints follow dynamic geometry (closest sides). Bend fields as above.
  */
 export function normalizeManualConnections(raw) {
   if (!Array.isArray(raw)) return [];
@@ -170,7 +170,14 @@ export function normalizeManualConnections(raw) {
     if (!fromId || !toId || fromId === toId || fromId.length > 96 || toId.length > 96) continue;
     const { bendT, bendN } = resolveManualEdgeBends(item);
     const key = `${fromId}->${toId}`;
-    map.set(key, { fromId, toId, bendT, bendN, bend: bendN });
+    const fromSide = normalizeCanvasLinkSide(item.fromSide);
+    const toSide = normalizeCanvasLinkSide(item.toSide);
+    const row = { fromId, toId, bendT, bendN, bend: bendN };
+    if (fromSide && toSide) {
+      row.fromSide = fromSide;
+      row.toSide = toSide;
+    }
+    map.set(key, row);
     if (map.size >= 120) break;
   }
   return Array.from(map.values());
