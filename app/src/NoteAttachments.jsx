@@ -1,29 +1,114 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getToken } from './api';
 import { isImageMime, isPdfMime, noteFileUrl, noteFileThumbnailUrl } from './attachmentUtils';
 import { NavIconAttach } from './icons/NavIcons';
 import './NoteAttachments.css';
 
+const ZOOM_MIN = 0.35;
+const ZOOM_MAX = 4;
+const WHEEL_ZOOM_STEP = 1.09;
+
+function getReactPortalContainer() {
+  if (typeof document === 'undefined') return null;
+  return document.getElementById('root') || document.body;
+}
+
 function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
+  const [scale, setScale] = useState(1);
+  const zoomWrapRef = useRef(null);
+  const pinchDistRef = useRef(null);
+
+  useEffect(() => {
+    setScale(1);
+  }, [url, kind]);
+
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
     };
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
       document.body.style.overflow = prev;
     };
   }, [onClose]);
 
-  if (!url || !kind) return null;
+  useEffect(() => {
+    const el = zoomWrapRef.current;
+    if (!el) return undefined;
+
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const delta = -e.deltaY;
+      const factor = delta > 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP;
+      setScale((s) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * factor)));
+    };
+
+    const touchDist = (touches) => {
+      if (touches.length < 2) return 0;
+      const a = touches[0];
+      const b = touches[1];
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    };
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        pinchDistRef.current = touchDist(e.touches);
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (e.touches.length !== 2 || pinchDistRef.current == null) return;
+      e.preventDefault();
+      const d = touchDist(e.touches);
+      if (d <= 0 || pinchDistRef.current <= 0) return;
+      const ratio = d / pinchDistRef.current;
+      pinchDistRef.current = d;
+      setScale((s) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * ratio)));
+    };
+
+    const onTouchEnd = () => {
+      pinchDistRef.current = null;
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, []);
+
+  const bumpZoom = useCallback((dir) => {
+    setScale((s) => {
+      const next = dir > 0 ? s * WHEEL_ZOOM_STEP : s / WHEEL_ZOOM_STEP;
+      return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+    });
+  }, []);
+
+  const portalParent = getReactPortalContainer();
+  if (!url || !kind || !portalParent) return null;
+
+  const pct = Math.round(scale * 100);
 
   return createPortal(
     <div
       className="note-attachment-preview-backdrop"
+      data-note-attachment-preview
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -35,34 +120,78 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
         aria-modal="true"
         aria-labelledby="note-attachment-preview-title"
         onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="note-attachment-preview-toolbar">
           <span id="note-attachment-preview-title" className="note-attachment-preview-title">
             {att.filename || 'Attachment'}
           </span>
-          <div className="note-attachment-preview-actions">
-            <button type="button" className="note-attachment-preview-btn" onClick={onDownload}>
-              Download
-            </button>
-            <button
-              type="button"
-              className="note-attachment-preview-btn note-attachment-preview-btn--primary"
-              onClick={onClose}
-            >
-              Close
-            </button>
+          <div className="note-attachment-preview-toolbar-right">
+            <div className="note-attachment-preview-zoom" role="group" aria-label="Zoom">
+              <button
+                type="button"
+                className="note-attachment-preview-btn note-attachment-preview-btn--icon"
+                onClick={() => bumpZoom(-1)}
+                aria-label="Zoom out"
+                title="Zoom out"
+              >
+                −
+              </button>
+              <span className="note-attachment-preview-zoom-pct" title="Two-finger pinch or Ctrl+scroll (trackpad)">
+                {pct}%
+              </span>
+              <button
+                type="button"
+                className="note-attachment-preview-btn note-attachment-preview-btn--icon"
+                onClick={() => bumpZoom(1)}
+                aria-label="Zoom in"
+                title="Zoom in"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="note-attachment-preview-btn"
+                onClick={() => setScale(1)}
+                disabled={scale === 1}
+                aria-label="Reset zoom"
+                title="Reset zoom"
+              >
+                Reset
+              </button>
+            </div>
+            <div className="note-attachment-preview-actions">
+              <button type="button" className="note-attachment-preview-btn" onClick={onDownload}>
+                Download
+              </button>
+              <button
+                type="button"
+                className="note-attachment-preview-btn note-attachment-preview-btn--primary"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
-        <div className="note-attachment-preview-body">
-          {kind === 'image' ? (
-            <img src={url} alt={att.filename || ''} className="note-attachment-preview-img" />
-          ) : (
-            <iframe title={att.filename || 'PDF'} src={url} className="note-attachment-preview-iframe" />
-          )}
+        <div ref={zoomWrapRef} className="note-attachment-preview-zoom-wrap">
+          <div
+            className="note-attachment-preview-zoom-inner"
+            style={{
+              transform: `scale(${scale})`,
+              transformOrigin: 'center top',
+            }}
+          >
+            {kind === 'image' ? (
+              <img src={url} alt={att.filename || ''} className="note-attachment-preview-img" />
+            ) : (
+              <iframe title={att.filename || 'PDF'} src={url} className="note-attachment-preview-iframe" />
+            )}
+          </div>
         </div>
       </div>
     </div>,
-    document.body
+    portalParent
   );
 }
 

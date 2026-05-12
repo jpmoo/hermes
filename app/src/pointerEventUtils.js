@@ -32,6 +32,7 @@ export function insightPointerPathShouldKeepOpen(event) {
   if (typeof event?.button === 'number' && event.button !== 0) return true;
   const t = pointerEventTargetElement(event);
   if (!t) return false;
+  if (t.closest('[data-note-attachment-preview]')) return true;
   if (t.closest('[data-insight-ui]')) return true;
   if (t.closest('[data-stream-compose]') || t.closest('[data-canvas-compose]')) return true;
   if (t.closest('.note-card--editing')) return true;
