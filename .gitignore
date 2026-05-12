@@ -1,4 +1,5 @@
 node_modules/
+server/backups/
 .env
 *.log
 app/dist/
