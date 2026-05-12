@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getToken } from './api';
 import { isImageMime, isPdfMime, noteFileUrl, noteFileThumbnailUrl } from './attachmentUtils';
@@ -9,6 +9,252 @@ const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 4;
 const WHEEL_ZOOM_STEP = 1.09;
 
+function clampScale(s) {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s));
+}
+
+/** Contain natural size into a reasonable preview box (CSS px). */
+function fitImageLayout(nw, nh) {
+  const maxW = Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.94 : 1100, 1100);
+  const maxH = Math.min(typeof window !== 'undefined' ? window.innerHeight * 0.74 : 820, 820);
+  let w = nw;
+  let h = nh;
+  if (w > maxW) {
+    h = (h * maxW) / w;
+    w = maxW;
+  }
+  if (h > maxH) {
+    w = (w * maxH) / h;
+    h = maxH;
+  }
+  return { w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) };
+}
+
+/**
+ * Image preview: real scroll extents (pan), zoom-to-cursor / pinch focal via scroll compensation.
+ * `outerRef` is the scroll viewport (same as parent zoomWrapRef).
+ */
+function AttachmentPreviewImageZoom({ url, alt, outerRef, scale, setScale, bumpZoomRef, resetNonce }) {
+  const [fit, setFit] = useState(null);
+  const scrollPendingRef = useRef(null);
+  const imgRef = useRef(null);
+
+  const onImgLoad = useCallback((e) => {
+    const el = e.currentTarget;
+    setFit(fitImageLayout(el.naturalWidth, el.naturalHeight));
+  }, []);
+
+  useLayoutEffect(() => {
+    const im = imgRef.current;
+    if (im?.complete && im.naturalWidth) {
+      setFit(fitImageLayout(im.naturalWidth, im.naturalHeight));
+    }
+  }, [url]);
+
+  useLayoutEffect(() => {
+    const p = scrollPendingRef.current;
+    const vp = outerRef.current;
+    if (!p || !vp) return;
+    const maxSl = Math.max(0, vp.scrollWidth - vp.clientWidth);
+    const maxSt = Math.max(0, vp.scrollHeight - vp.clientHeight);
+    vp.scrollLeft = Math.max(0, Math.min(p.sl, maxSl));
+    vp.scrollTop = Math.max(0, Math.min(p.st, maxSt));
+    scrollPendingRef.current = null;
+  }, [scale, outerRef]);
+
+  useLayoutEffect(() => {
+    const vp = outerRef.current;
+    if (!vp || !fit) return undefined;
+    const center = () => {
+      vp.scrollLeft = Math.max(0, (vp.scrollWidth - vp.clientWidth) / 2);
+      vp.scrollTop = Math.max(0, (vp.scrollHeight - vp.clientHeight) / 2);
+    };
+    const id = requestAnimationFrame(center);
+    return () => cancelAnimationFrame(id);
+  }, [fit, url, resetNonce, outerRef]);
+
+  useEffect(() => {
+    const vp = outerRef.current;
+    if (!vp || !fit) return undefined;
+
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const rect = vp.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const delta = -e.deltaY;
+      const factor = delta > 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP;
+      setScale((s0) => {
+        const s1 = clampScale(s0 * factor);
+        if (s1 === s0) return s0;
+        scrollPendingRef.current = {
+          sl: (mx + vp.scrollLeft) * (s1 / s0) - mx,
+          st: (my + vp.scrollTop) * (s1 / s0) - my,
+        };
+        return s1;
+      });
+    };
+
+    let pinch0 = null;
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        const [a, b] = [e.touches[0], e.touches[1]];
+        pinch0 = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (e.touches.length !== 2 || pinch0 == null || pinch0 <= 0) return;
+      e.preventDefault();
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      if (d <= 0) return;
+      const midX = (a.clientX + b.clientX) / 2;
+      const midY = (a.clientY + b.clientY) / 2;
+      const rect = vp.getBoundingClientRect();
+      const mx = midX - rect.left;
+      const my = midY - rect.top;
+      const ratio = d / pinch0;
+      pinch0 = d;
+      setScale((s0) => {
+        const s1 = clampScale(s0 * ratio);
+        if (s1 === s0) return s0;
+        scrollPendingRef.current = {
+          sl: (mx + vp.scrollLeft) * (s1 / s0) - mx,
+          st: (my + vp.scrollTop) * (s1 / s0) - my,
+        };
+        return s1;
+      });
+    };
+
+    const onTouchEnd = () => {
+      pinch0 = null;
+    };
+
+    vp.addEventListener('wheel', onWheel, { passive: false });
+    vp.addEventListener('touchstart', onTouchStart, { passive: true });
+    vp.addEventListener('touchmove', onTouchMove, { passive: false });
+    vp.addEventListener('touchend', onTouchEnd, { passive: true });
+    vp.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    return () => {
+      vp.removeEventListener('wheel', onWheel);
+      vp.removeEventListener('touchstart', onTouchStart);
+      vp.removeEventListener('touchmove', onTouchMove);
+      vp.removeEventListener('touchend', onTouchEnd);
+      vp.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [fit, setScale, outerRef]);
+
+  useEffect(() => {
+    bumpZoomRef.current = (dir) => {
+      const vp = outerRef.current;
+      if (!vp || !fit) return;
+      const rect = vp.getBoundingClientRect();
+      const mx = rect.width / 2;
+      const my = rect.height / 2;
+      setScale((s0) => {
+        const f = dir > 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP;
+        const s1 = clampScale(s0 * f);
+        if (s1 === s0) return s0;
+        scrollPendingRef.current = {
+          sl: (mx + vp.scrollLeft) * (s1 / s0) - mx,
+          st: (my + vp.scrollTop) * (s1 / s0) - my,
+        };
+        return s1;
+      });
+    };
+    return () => {
+      bumpZoomRef.current = null;
+    };
+  }, [fit, setScale, outerRef, bumpZoomRef]);
+
+  const panDragRef = useRef(null);
+
+  const onPanPointerDown = useCallback(
+    (e) => {
+      if (e.button !== 0) return;
+      if (e.pointerType === 'touch') return;
+      const vp = outerRef.current;
+      if (!vp || !fit) return;
+      if (vp.scrollWidth <= vp.clientWidth + 2 && vp.scrollHeight <= vp.clientHeight + 2) return;
+      panDragRef.current = { lastX: e.clientX, lastY: e.clientY };
+      vp.style.cursor = 'grabbing';
+      try {
+        vp.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    [fit, outerRef]
+  );
+
+  const onPanPointerMove = useCallback(
+    (e) => {
+      const d = panDragRef.current;
+      const vp = outerRef.current;
+      if (!d || !vp) return;
+      const dx = e.clientX - d.lastX;
+      const dy = e.clientY - d.lastY;
+      d.lastX = e.clientX;
+      d.lastY = e.clientY;
+      vp.scrollLeft -= dx;
+      vp.scrollTop -= dy;
+    },
+    [outerRef]
+  );
+
+  const onPanPointerUp = useCallback(
+    (e) => {
+      const vp = outerRef.current;
+      panDragRef.current = null;
+      if (vp) {
+        vp.style.cursor = '';
+        try {
+          vp.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [outerRef]
+  );
+
+  return (
+    <div
+      className="note-attachment-preview-zoom-wrap note-attachment-preview-zoom-wrap--image"
+      ref={outerRef}
+      onPointerDown={onPanPointerDown}
+      onPointerMove={onPanPointerMove}
+      onPointerUp={onPanPointerUp}
+      onPointerCancel={onPanPointerUp}
+    >
+      <div
+        className="note-attachment-preview-image-sizer"
+        style={
+          fit
+            ? { width: fit.w * scale, height: fit.h * scale, margin: '0 auto' }
+            : { minHeight: 'min(70vh, 560px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }
+      >
+        <img
+          ref={imgRef}
+          src={url}
+          alt={alt}
+          draggable={false}
+          onLoad={onImgLoad}
+          className="note-attachment-preview-img note-attachment-preview-img--zoom"
+          style={
+            fit
+              ? { width: '100%', height: '100%', objectFit: 'contain', display: 'block' }
+              : { maxWidth: 'min(94vw, 1080px)', maxHeight: 'min(72vh, 800px)', width: 'auto', height: 'auto', opacity: 0.35 }
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
 function getReactPortalContainer() {
   if (typeof document === 'undefined') return null;
   return document.getElementById('root') || document.body;
@@ -16,11 +262,14 @@ function getReactPortalContainer() {
 
 function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
   const [scale, setScale] = useState(1);
+  const [imageResetNonce, setImageResetNonce] = useState(0);
   const zoomWrapRef = useRef(null);
+  const imageBumpRef = useRef(null);
   const pinchDistRef = useRef(null);
 
   useEffect(() => {
     setScale(1);
+    setImageResetNonce((n) => n + 1);
   }, [url, kind]);
 
   useEffect(() => {
@@ -41,6 +290,7 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
   }, [onClose]);
 
   useEffect(() => {
+    if (kind !== 'pdf') return undefined;
     const el = zoomWrapRef.current;
     if (!el) return undefined;
 
@@ -49,7 +299,7 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
       e.preventDefault();
       const delta = -e.deltaY;
       const factor = delta > 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP;
-      setScale((s) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * factor)));
+      setScale((s) => clampScale(s * factor));
     };
 
     const touchDist = (touches) => {
@@ -72,7 +322,7 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
       if (d <= 0 || pinchDistRef.current <= 0) return;
       const ratio = d / pinchDistRef.current;
       pinchDistRef.current = d;
-      setScale((s) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * ratio)));
+      setScale((s) => clampScale(s * ratio));
     };
 
     const onTouchEnd = () => {
@@ -91,14 +341,30 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
       el.removeEventListener('touchend', onTouchEnd);
       el.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, []);
+  }, [kind]);
 
-  const bumpZoom = useCallback((dir) => {
-    setScale((s) => {
-      const next = dir > 0 ? s * WHEEL_ZOOM_STEP : s / WHEEL_ZOOM_STEP;
-      return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
-    });
-  }, []);
+  const bumpZoom = useCallback(
+    (dir) => {
+      if (kind === 'image' && typeof imageBumpRef.current === 'function') {
+        imageBumpRef.current(dir);
+        return;
+      }
+      setScale((s) => {
+        const next = dir > 0 ? s * WHEEL_ZOOM_STEP : s / WHEEL_ZOOM_STEP;
+        return clampScale(next);
+      });
+    },
+    [kind]
+  );
+
+  const handleClosePointer = useCallback(
+    (e) => {
+      if (e.button != null && e.button !== 0) return;
+      e.stopPropagation();
+      onClose();
+    },
+    [onClose]
+  );
 
   const portalParent = getReactPortalContainer();
   if (!url || !kind || !portalParent) return null;
@@ -152,7 +418,10 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
               <button
                 type="button"
                 className="note-attachment-preview-btn"
-                onClick={() => setScale(1)}
+                onClick={() => {
+                  setScale(1);
+                  if (kind === 'image') setImageResetNonce((n) => n + 1);
+                }}
                 disabled={scale === 1}
                 aria-label="Reset zoom"
                 title="Reset zoom"
@@ -161,34 +430,51 @@ function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
               </button>
             </div>
             <div className="note-attachment-preview-actions">
-              <button type="button" className="note-attachment-preview-btn" onClick={onDownload}>
+              <button
+                type="button"
+                className="note-attachment-preview-btn"
+                onClick={onDownload}
+                onPointerDown={(e) => {
+                  if (e.button != null && e.button !== 0) return;
+                  e.stopPropagation();
+                }}
+              >
                 Download
               </button>
               <button
                 type="button"
                 className="note-attachment-preview-btn note-attachment-preview-btn--primary"
                 onClick={onClose}
+                onPointerDown={handleClosePointer}
               >
                 Close
               </button>
             </div>
           </div>
         </div>
-        <div ref={zoomWrapRef} className="note-attachment-preview-zoom-wrap">
-          <div
-            className="note-attachment-preview-zoom-inner"
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: 'center top',
-            }}
-          >
-            {kind === 'image' ? (
-              <img src={url} alt={att.filename || ''} className="note-attachment-preview-img" />
-            ) : (
+        {kind === 'image' ? (
+          <AttachmentPreviewImageZoom
+            url={url}
+            alt={att.filename || ''}
+            outerRef={zoomWrapRef}
+            scale={scale}
+            setScale={setScale}
+            bumpZoomRef={imageBumpRef}
+            resetNonce={imageResetNonce}
+          />
+        ) : (
+          <div ref={zoomWrapRef} className="note-attachment-preview-zoom-wrap note-attachment-preview-zoom-wrap--pdf">
+            <div
+              className="note-attachment-preview-zoom-inner"
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: 'center top',
+              }}
+            >
               <iframe title={att.filename || 'PDF'} src={url} className="note-attachment-preview-iframe" />
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>,
     portalParent

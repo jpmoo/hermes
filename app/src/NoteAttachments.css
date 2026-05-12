@@ -215,6 +215,10 @@
 }
 
 .note-attachment-preview-toolbar {
+  /* Sit above .note-attachment-preview-zoom-wrap: later flex siblings paint on top; scaled PDF/image
+     hit-targets can extend upward and steal clicks from the toolbar without an explicit stack order. */
+  position: relative;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -301,17 +305,37 @@
 }
 
 .note-attachment-preview-zoom-wrap {
+  position: relative;
+  z-index: 0;
   flex: 1;
   min-height: 0;
   overflow: auto;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
   padding: 0.45rem 0.5rem 0.55rem;
   box-sizing: border-box;
   background: #fff;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+.note-attachment-preview-zoom-wrap--pdf {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.note-attachment-preview-zoom-wrap--image {
+  display: block;
+  user-select: none;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.note-attachment-preview-image-sizer {
+  display: block;
+  box-sizing: border-box;
+}
+
+.note-attachment-preview-img--zoom {
+  border-radius: 6px;
 }
 
 .note-attachment-preview-zoom-inner {
