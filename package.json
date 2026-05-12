@@ -14,7 +14,8 @@
     "dev:client": "cd client && npm run dev",
     "db:migrate": "cd server && npm install && npm run db:migrate",
     "db:apply-migrations": "cd server && npm run db:apply-migrations",
-    "db:backup": "cd server && npm run db:backup"
+    "db:backup": "cd server && npm run db:backup",
+    "db:backfill-pdf-thumbnails": "cd server && npm run db:backfill-pdf-thumbnails"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

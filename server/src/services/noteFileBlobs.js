@@ -1,8 +1,32 @@
 import pool from '../db/pool.js';
+import { buildPdfAttachmentThumbnail, isPdfAttachmentMime } from './pdfAttachmentThumbnail.js';
 
 const MAX_BYTES = Number(process.env.HERMES_MAX_ATTACHMENT_BYTES) || 20 * 1024 * 1024;
 
 export { MAX_BYTES };
+
+/**
+ * Insert a note_file_blobs row; PDFs get a first-page PNG thumbnail when generation succeeds.
+ * @param {{ noteId: string, userId: string, filename: string, mime: string, buf: Buffer, sortIndex: number }} p
+ */
+export async function insertNoteFileBlobRow({ noteId, userId, filename, mime, buf, sortIndex }) {
+  let thumbMime = null;
+  let thumbData = null;
+  if (isPdfAttachmentMime(mime, filename)) {
+    const t = await buildPdfAttachmentThumbnail(buf);
+    if (t?.data?.length) {
+      thumbMime = t.mime;
+      thumbData = t.data;
+    }
+  }
+  const ins = await pool.query(
+    `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data, sort_index, thumbnail_mime, thumbnail_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, filename, mime_type, byte_size`,
+    [noteId, userId, filename, mime, buf.length, buf, sortIndex, thumbMime, thumbData]
+  );
+  return ins.rows[0];
+}
 
 export async function attachBlobListToNotes(notes, userId) {
   if (!notes?.length) return;

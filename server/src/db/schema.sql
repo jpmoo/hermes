@@ -61,7 +61,9 @@ CREATE TABLE IF NOT EXISTS note_file_blobs (
   data       BYTEA NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   sort_index INTEGER NOT NULL DEFAULT 0,
-  is_banner  BOOLEAN NOT NULL DEFAULT false
+  is_banner  BOOLEAN NOT NULL DEFAULT false,
+  thumbnail_mime TEXT,
+  thumbnail_data BYTEA
 );
 
 CREATE INDEX IF NOT EXISTS idx_note_file_blobs_note ON note_file_blobs(note_id);

@@ -4,6 +4,16 @@ export function noteFileUrl(id) {
   return `${BASE.replace(/\/$/, '')}/api/note-files/${id}`;
 }
 
+export function noteFileThumbnailUrl(id) {
+  return `${BASE.replace(/\/$/, '')}/api/note-files/${id}/thumbnail`;
+}
+
+export function isPdfMime(m, filename) {
+  if (m === 'application/pdf') return true;
+  if (typeof filename === 'string' && filename.toLowerCase().endsWith('.pdf')) return true;
+  return false;
+}
+
 /**
  * Authenticated GET for the account default background image (no id).
  * Pass `revision` (e.g. timestamp from account settings) to bust caches after upload/replace.

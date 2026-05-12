@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import pool from '../db/pool.js';
+import { insertNoteFileBlobRow } from '../services/noteFileBlobs.js';
 import { requireAuth } from '../middleware/auth.js';
 import { embedNote } from '../services/embedding.js';
 import {
@@ -177,13 +178,15 @@ router.post('/:id/attachments', (req, res, next) => {
       const filename = f.originalname?.slice(0, 512) || 'file';
       const mime = f.mimetype || 'application/octet-stream';
       const si = nextSort++;
-      const ins = await pool.query(
-        `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data, sort_index)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, filename, mime_type, byte_size`,
-        [noteId, userId, filename, mime, buf.length, buf, si]
-      );
-      inserted.push(ins.rows[0]);
+      const row = await insertNoteFileBlobRow({
+        noteId,
+        userId,
+        filename,
+        mime,
+        buf,
+        sortIndex: si,
+      });
+      inserted.push(row);
       if (runOcr) {
         const { noteText, stats } = await runIngestOcrPipeline(buf, filename, mime, {
           source: 'attachments',

@@ -1,15 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getToken } from './api';
-import { isImageMime, noteFileUrl } from './attachmentUtils';
+import { isImageMime, isPdfMime, noteFileUrl, noteFileThumbnailUrl } from './attachmentUtils';
 import { NavIconAttach } from './icons/NavIcons';
 import './NoteAttachments.css';
-
-function isPdfMime(m, filename) {
-  if (m === 'application/pdf') return true;
-  if (typeof filename === 'string' && filename.toLowerCase().endsWith('.pdf')) return true;
-  return false;
-}
 
 function AttachmentPreviewModal({ att, url, kind, onClose, onDownload }) {
   useEffect(() => {
@@ -185,6 +179,7 @@ function AttachmentItem({
   const [previewKind, setPreviewKind] = useState(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfThumbSrc, setPdfThumbSrc] = useState(null);
 
   const isImage = isImageMime(att.mime_type, att.filename);
   const isPdf = isPdfMime(att.mime_type, att.filename);
@@ -210,6 +205,26 @@ function AttachmentItem({
       setImgSrc(null);
     };
   }, [att.id, isImage]);
+
+  useEffect(() => {
+    if (!isPdf) return undefined;
+    let objectUrl;
+    let cancelled = false;
+    const t = getToken();
+    fetch(noteFileThumbnailUrl(att.id), { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((blob) => {
+        if (cancelled || !blob) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPdfThumbSrc(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setPdfThumbSrc(null);
+    };
+  }, [att.id, isPdf]);
 
   useEffect(() => {
     return () => {
@@ -335,12 +350,16 @@ function AttachmentItem({
         ) : isPdf ? (
           <button
             type="button"
-            className="note-attachment-thumb-hit note-attachment-thumb-hit--file"
+            className={`note-attachment-thumb-hit ${pdfThumbSrc ? '' : 'note-attachment-thumb-hit--file'}`}
             onClick={openPreview}
             disabled={pdfLoading}
             aria-label={`Preview PDF ${name}`}
           >
-            <NonImageAttachmentPlaceholder />
+            {pdfThumbSrc ? (
+              <img src={pdfThumbSrc} alt="" className="note-attachment-thumb-img" />
+            ) : (
+              <NonImageAttachmentPlaceholder />
+            )}
           </button>
         ) : (
           <button type="button" className="note-attachment-thumb-hit note-attachment-thumb-hit--file" onClick={openNonImage}>

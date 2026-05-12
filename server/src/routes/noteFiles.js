@@ -1,9 +1,55 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
+import { buildPdfAttachmentThumbnail, isPdfAttachmentMime } from '../services/pdfAttachmentThumbnail.js';
 
 const router = Router();
 router.use(requireAuth);
+
+/** First-page PNG for PDF attachment tiles; generates and persists on first hit if missing. */
+router.get('/:id/thumbnail', async (req, res) => {
+  const blobId = req.params.id;
+  const userId = req.userId;
+  try {
+    const r = await pool.query(
+      `SELECT f.data, f.mime_type, f.filename, f.thumbnail_data, f.thumbnail_mime
+       FROM note_file_blobs f
+       JOIN notes n ON n.id = f.note_id AND n.user_id = $2
+       WHERE f.id = $1::uuid AND f.user_id = $2`,
+      [blobId, userId]
+    );
+    if (r.rows.length === 0) return res.status(404).end();
+    const row = r.rows[0];
+    if (row.thumbnail_data) {
+      res.setHeader('Content-Type', row.thumbnail_mime || 'image/png');
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      return res.send(row.thumbnail_data);
+    }
+    if (!isPdfAttachmentMime(row.mime_type, row.filename)) {
+      return res.status(404).end();
+    }
+    const raw = row.data;
+    const pdfBuf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+    const built = await buildPdfAttachmentThumbnail(pdfBuf);
+    if (!built?.data?.length) return res.status(404).end();
+    await pool.query(
+      `UPDATE note_file_blobs SET thumbnail_mime = $1, thumbnail_data = $2 WHERE id = $3::uuid AND user_id = $4`,
+      [built.mime, built.data, blobId, userId]
+    );
+    res.setHeader('Content-Type', built.mime);
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.send(built.data);
+  } catch (err) {
+    if (err.code === '42703') {
+      console.error(
+        'note_file_blobs missing thumbnail columns — run migration 013_note_file_blobs_pdf_thumbnail.sql'
+      );
+    } else {
+      console.error(err);
+    }
+    res.status(500).end();
+  }
+});
 
 /** Blobs whose note_id no longer exists (integrity / legacy data). */
 router.get('/orphans', async (req, res) => {

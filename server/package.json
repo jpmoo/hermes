@@ -12,6 +12,7 @@
     "db:migrate": "node src/db/migrate.js",
     "db:apply-migrations": "node src/db/runMigrations.js",
     "db:backup": "node scripts/backup-db.mjs",
+    "db:backfill-pdf-thumbnails": "node scripts/backfill-pdf-thumbnails.mjs",
     "reembed": "node scripts/reembed-note-embeddings.js"
   },
   "dependencies": {

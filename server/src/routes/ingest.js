@@ -4,7 +4,7 @@ import multer from 'multer';
 import pool from '../db/pool.js';
 import { requireIngestAuth } from '../middleware/ingestAuth.js';
 import { embedNote } from '../services/embedding.js';
-import { MAX_BYTES } from '../services/noteFileBlobs.js';
+import { MAX_BYTES, insertNoteFileBlobRow } from '../services/noteFileBlobs.js';
 import {
   resolveNoteContentFromIngestFile,
   runIngestOcrPipeline,
@@ -141,13 +141,15 @@ router.post('/notes', requireIngestAuth, ingestNotesBodyParser, async (req, res)
         embedNote(note.id, note.content).catch(() => {});
         proposeTagsForNote(note.id, note.content, userId).catch(() => {});
 
-        const ins = await pool.query(
-          `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data, sort_index)
-           VALUES ($1, $2, $3, $4, $5, $6, 0)
-           RETURNING id, filename, mime_type, byte_size`,
-          [note.id, userId, filename, mime, buf.length, buf]
-        );
-        notesOut.push({ ...note, attachments: [ins.rows[0]] });
+        const ins = await insertNoteFileBlobRow({
+          noteId: note.id,
+          userId,
+          filename,
+          mime,
+          buf,
+          sortIndex: 0,
+        });
+        notesOut.push({ ...note, attachments: [ins] });
       }
 
       if (notesOut.length === 0) {
@@ -248,13 +250,15 @@ router.post(
         const filename = f.originalname?.slice(0, 512) || 'file';
         const mime = f.mimetype || 'application/octet-stream';
         const si = nextSort++;
-        const ins = await pool.query(
-          `INSERT INTO note_file_blobs (note_id, user_id, filename, mime_type, byte_size, data, sort_index)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           RETURNING id, filename, mime_type, byte_size`,
-          [noteId, userId, filename, mime, buf.length, buf, si]
-        );
-        inserted.push(ins.rows[0]);
+        const row = await insertNoteFileBlobRow({
+          noteId,
+          userId,
+          filename,
+          mime,
+          buf,
+          sortIndex: si,
+        });
+        inserted.push(row);
         if (runOcr) {
           const { noteText, stats } = await runIngestOcrPipeline(buf, filename, mime, {
             source: 'ingest_attachments',
